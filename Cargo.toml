@@ -8,3 +8,4 @@ description = "A browser for the web of Markdown — no HTML, no DOM, no webview
 [dependencies]
 iced = { version = "0.14", features = ["canvas", "advanced"] }
 pulldown-cmark = "0.13"
+yaml-rust2 = "0.13.0"

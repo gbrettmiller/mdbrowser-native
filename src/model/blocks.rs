@@ -1,0 +1,143 @@
+//! Block structure: walks pulldown-cmark's event stream into owned blocks.
+
+use pulldown_cmark::{Alignment, CodeBlockKind, Event, Tag, TagEnd};
+
+use super::inlines::{inlines, is_inline};
+use super::slug::Slugger;
+use super::{Align, Block, Item, Span, text_of};
+
+/// The parser's event stream with arbitrary lookahead (task markers can sit
+/// one event deep inside a list item), plus the document-wide slug counter.
+pub struct Events<'a> {
+    events: Vec<Event<'a>>,
+    pos: usize,
+    slugger: Slugger,
+}
+
+impl<'a> Events<'a> {
+    pub fn new(events: Vec<Event<'a>>) -> Self {
+        Events { events, pos: 0, slugger: Slugger::default() }
+    }
+
+    pub fn peek(&self, ahead: usize) -> Option<&Event<'a>> {
+        self.events.get(self.pos + ahead)
+    }
+
+    pub fn next(&mut self) -> Option<Event<'a>> {
+        let event = self.events.get(self.pos).cloned();
+        self.pos += 1;
+        event
+    }
+}
+
+/// Blocks up to (not including) the enclosing End event, or end of input.
+pub fn blocks(events: &mut Events) -> Vec<Block> {
+    let mut out = Vec::new();
+    while let Some(event) = events.peek(0) {
+        if matches!(event, Event::End(_)) {
+            break;
+        }
+        let block = if is_inline(event) { paragraph(inlines(events)) } else { block(events) };
+        out.extend(block);
+    }
+    out
+}
+
+fn paragraph(spans: Vec<Span>) -> Option<Block> {
+    (!spans.is_empty()).then_some(Block::Paragraph(spans))
+}
+
+fn block(events: &mut Events) -> Option<Block> {
+    let block = match events.next()? {
+        Event::Rule => return Some(Block::Rule),
+        Event::Start(Tag::Paragraph) => paragraph(inlines(events)),
+        Event::Start(Tag::Heading { level, .. }) => {
+            let spans = inlines(events);
+            let slug = events.slugger.slug(&text_of(&spans));
+            Some(Block::Heading { level: level as u8, spans, slug })
+        }
+        Event::Start(Tag::BlockQuote(_)) => Some(Block::Quote(blocks(events))),
+        Event::Start(Tag::CodeBlock(kind)) => {
+            let lang = match kind {
+                CodeBlockKind::Fenced(lang) if !lang.is_empty() => Some(lang.to_string()),
+                _ => None,
+            };
+            Some(Block::Code { lang, text: text_until_end(events) })
+        }
+        // Raw HTML is shown as literal text, never interpreted.
+        Event::Start(Tag::HtmlBlock) => {
+            Some(Block::Code { lang: None, text: text_until_end(events).trim_end_matches('\n').to_string() })
+        }
+        Event::Start(Tag::List(start)) => Some(Block::List { start, items: items(events) }),
+        Event::Start(Tag::Table(aligns)) => return Some(table(events, aligns)),
+        // Frontmatter, footnote definitions and anything else we don't show.
+        Event::Start(_) => {
+            skip_to_end(events);
+            None
+        }
+        _ => return None,
+    };
+    events.next(); // the matching End
+    block
+}
+
+fn skip_to_end(events: &mut Events) {
+    let mut depth = 0usize;
+    while let Some(event) = events.peek(0) {
+        match event {
+            Event::End(_) if depth == 0 => return,
+            Event::End(_) => depth -= 1,
+            Event::Start(_) => depth += 1,
+            _ => {}
+        }
+        events.next();
+    }
+}
+
+fn items(events: &mut Events) -> Vec<Item> {
+    let mut items = Vec::new();
+    while let Some(Event::Start(Tag::Item)) = events.peek(0) {
+        events.next();
+        let checked = [0, 1].iter().find_map(|&ahead| match events.peek(ahead) {
+            Some(Event::TaskListMarker(checked)) => Some(*checked),
+            _ => None,
+        });
+        items.push(Item { checked, blocks: blocks(events) });
+        events.next(); // End(Item)
+    }
+    items
+}
+
+fn table(events: &mut Events, aligns: Vec<Alignment>) -> Block {
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
+    while let Some(event) = events.next() {
+        match event {
+            Event::End(TagEnd::Table) => break,
+            Event::Start(Tag::TableCell) => {
+                row.push(inlines(events));
+                events.next();
+            }
+            Event::End(TagEnd::TableHead | TagEnd::TableRow) => rows.push(std::mem::take(&mut row)),
+            _ => {}
+        }
+    }
+    let aligns = aligns
+        .iter()
+        .map(|align| match align {
+            Alignment::Center => Align::Center,
+            Alignment::Right => Align::Right,
+            _ => Align::Left,
+        })
+        .collect();
+    Block::Table { aligns, rows }
+}
+
+fn text_until_end(events: &mut Events) -> String {
+    let mut text = String::new();
+    while let Some(Event::Text(t) | Event::Html(t)) = events.peek(0) {
+        text.push_str(t);
+        events.next();
+    }
+    text
+}
