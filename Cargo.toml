@@ -1,0 +1,10 @@
+[package]
+name = "mdbrowser"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "A browser for the web of Markdown — no HTML, no DOM, no webview"
+
+[dependencies]
+iced = { version = "0.14", features = ["canvas", "advanced"] }
+pulldown-cmark = "0.13"
