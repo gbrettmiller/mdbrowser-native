@@ -1,4 +1,3 @@
-fn main() {
-    mdbrowser::theme::fonts::install();
-    println!("mdbrowser: nothing to browse yet");
+fn main() -> iced::Result {
+    mdbrowser::ui::app::run()
 }
