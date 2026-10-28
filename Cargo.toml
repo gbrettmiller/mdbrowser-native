@@ -8,10 +8,13 @@ description = "A browser for the web of Markdown — no HTML, no DOM, no webview
 [dependencies]
 iced = { version = "0.14", features = ["canvas", "advanced"] }
 pulldown-cmark = "0.13"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 yaml-rust2 = "0.13.0"
 
 [dev-dependencies]
 insta = "1.49.0"
+tempfile = "3.27.0"
 
 # Shaping and rendering crates are unusably slow unoptimised; our own code stays debuggable.
 [profile.dev.package."*"]

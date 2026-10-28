@@ -9,6 +9,7 @@ use iced::widget::{column, container, responsive, scrollable, text};
 use iced::{Element, Fill, Task};
 
 use super::document::Document;
+use crate::content;
 use crate::layout::{self, Page};
 use crate::model::{self, Document as Doc};
 use crate::services::files;
@@ -36,7 +37,7 @@ impl App {
         let path = PathBuf::from(std::env::args().nth(1).unwrap_or_else(|| "corpus/index.md".into()));
         let font = std::env::var("MDBROWSER_FONT").ok().and_then(|key| ReadingFont::from_key(&key)).unwrap_or_default();
         let document =
-            files::read(&path).map(|source| model::parse(&source)).map_err(|e| format!("{}: {e}", path.display()));
+            files::read_markdown(&path).map(|source| model::parse(&source)).map_err(|code| content::error(code).into());
         let app = App { path, document, theme: theme::reading(font), page: RefCell::new(None), status: String::new() };
         (app, Task::none())
     }
