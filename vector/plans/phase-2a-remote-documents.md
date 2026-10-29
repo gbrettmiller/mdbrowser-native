@@ -317,7 +317,7 @@ Replace `html_is_shown_as_literal_text_not_interpreted`. **Before GREEN**, list 
 **Files**: `src/model/html.rs` (new), `src/model/{mod,inlines,blocks}.rs`, `features/browse.feature`, `tests/acceptance/steps.rs`, the listed snapshots
 **Commit**: `feat(model): strip raw HTML and keep the text between tags`
 
-### Step 2: ADR-003, the HTTP client and URL handling, plus doctrine
+### Step 2: ADR-003, the HTTP client and URL handling, plus doctrine — done
 
 **Complexity**: trivial
 **GREEN**: Use `invest-adr` to record ureq 3 (blocking, which fits `background::run_blocking`; rustls with webpki roots, so no OpenSSL anywhere) and `url`. The alternatives are reqwest with tokio (a second runtime alongside iced's) and hand-rolled HTTP (no TLS). Costs to record: about 2 MB of binary, and corporate MITM proxies fail as `unreachable`. Also record the accepted **private-network risk**: a page can link to `http://192.168.x.x/…`, which is fetched only on a click, with no cookies. It is tracked as a follow-up.
