@@ -27,19 +27,21 @@ Fonts are bundled: `assets/fonts/` holds static Literata, Source Serif 4, iA Wri
 `fetch → parse → lay out → paint`. Each arrow is a pure function except fetch.
 
 ```
-bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, width)──▶ Page (fragments + fills) ──ui paint──▶ pixels
+bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, width)──▶ Page ──ui paint──▶ pixels
 ```
+
+`Page` is flat: shaped text buffers, fills, fragments (for hit-testing and selection), and heading anchors. The document widget culls each list to the viewport. The phase 1 plan proposed grouping these per block. A flat page was simpler and fast enough, so per-block grouping waits until incremental layout needs it.
 
 ## Layers
 
 | Layer | Location | Rule |
 |-------|----------|------|
-| **Model** | `src/model/` | Markdown source → owned document tree. Pure. Depends only on pulldown-cmark. |
+| **Model** | `src/model/` | Markdown source → owned document tree. Pure. Depends only on pulldown-cmark and yaml-rust2 (frontmatter). |
 | **Layout** | `src/layout/` | Tree + theme + width → `Page`; hit-testing, carets, selection and copy text. Pure apart from reading the shared font database. |
 | **Session** | `src/session/` | Address parsing, link classification, back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
-| **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) and bundled fonts. Data only. |
+| **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) and bundled fonts. Data only, with one exception: `fonts::install()` loads the bundled faces into iced's process-wide font system once at startup. |
 | **Content** | `src/content.rs` | All user-facing strings. |
-| **Services** | `src/services/` | All I/O: reading files, the external opener, the store (History and settings), and `runner`, which turns effects into iced tasks that report back as events. The only layer that touches `std::fs`, `std::net` or `std::process`. |
+| **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net`, `std::process` or `std::thread`. |
 | **UI** | `src/ui/` | The iced application: dispatches events to the reducer, runs effects through `services::runner`, and draws state. Holds the document widget (paints a `Page`, turns input into messages) and the page cache. Owns no browsing logic. |
 
 Every module belongs to exactly one layer. If you're unsure where something goes, and it can be pure, put it in `model`, `layout` or `session`.
@@ -47,7 +49,8 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 ## Import Direction
 
 - `ui` may use every other layer.
-- `services` may use `model` and `session` types, never `ui`.
+- `services` may use `model`, `session` and `theme` value types (`ReadingFont`), never `ui`.
+- `content` may use `session` and `theme` enums, to key its strings. Only `ui` uses `content`.
 - `layout` may use `model` and `theme`.
 - `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` (settings).
 - Pure layers (`model`, `layout`, `session`, `theme`) never perform I/O and never use iced's runtime (`Task`, `Element`). Iced *value* types (`Color`, `Font`, `Rectangle`) are allowed.
@@ -65,7 +68,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - Rust defaults: `snake_case` modules and functions, `CamelCase` types, formatted by rustfmt.
 - Functional style: functions take values and return new values. Mutation stays local to a function (builders, accumulators) and never leaks through shared state. No trait-object hierarchies without an ADR.
 - No `unsafe`.
-- Tests live beside the code in `#[cfg(test)] mod tests`. Layout gets golden tests over the corpus.
+- Tests live beside the code in `#[cfg(test)] mod tests`. Layout gets golden snapshots for the corpus documents whose glyphs are all in the bundled fonts. Documents that fall back to host fonts (mixed scripts, symbols) get smoke tests only, because fallback faces differ between machines.
 - Files stay under roughly 300 lines. Split by responsibility before that.
 
 ## What Not to Do

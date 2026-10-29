@@ -29,6 +29,6 @@ Task-list checkboxes are drawn as shapes rather than typed glyphs, because none 
 | Block gap | 16 px; list items 4 px; indent 28 px | A sublist hugs its item |
 | Palette (light) | background `#fbfaf7`, ink `#222`, muted `#6b6b6b`, link `#1f5fbf`, code background `#efede8`, rule `#d8d5ce`, selection link at 22% | Dark palette still to come |
 
-The bundled fonts add about 5.3 MB to the binary.
+The bundled fonts add about 5.3 MB to the binary (`du -sh assets/fonts`, 2026-10-29).
 
 Accessibility (contrast, focus, keyboard reach) is owned by `a11y-review`. Where Impeccable's rules overlap with it, they are advisory only.

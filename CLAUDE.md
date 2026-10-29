@@ -20,6 +20,8 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
+CI (`.github/workflows/ci.yml`) runs the same gates, with the build in release mode. Keep the two in sync.
+
 `cargo run --release -- <path.md>` runs the app. `scripts/shoot.sh -f "literata inter" corpus/index.md` screenshots documents in each font, using a scratch store. Read the screenshots to check rendering.
 
 ## Language notes
@@ -29,4 +31,4 @@ The global JS style defaults (quotes, semicolons, pnpm) don't apply here. rustfm
 ## Prior art
 
 - `~/projects/mdbrowser`: the predecessor (Tauri + Svelte + webview). Its acceptance behaviour is carried over in `features/`.
-- `~/projects/mdbrowser-spike`: the throwaway spike that validated this stack. Findings are in `vector/research/2026-10-28-spike-findings.md`. Its tested `model`, `session`, `links` and `layout` modules are reference material: port them deliberately, test first, rather than copying them wholesale.
+- `~/projects/mdbrowser-spike`: the throwaway spike that validated this stack. Findings are in `vector/research/2026-10-28-spike-findings.md`. Its tested `src/{model,session,links,layout}.rs` are reference material: port them deliberately, test first, rather than copying them wholesale.
