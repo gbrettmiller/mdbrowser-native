@@ -57,6 +57,7 @@ CI runs the same gates on every pull request. Acceptance scenarios live in [`fea
 
 ## Acknowledgements
 
+- [The Web of Markdown](https://github.com/scripting/markdownWeb) by Dave Winer: the idea this browser serves, writers owning the words and readers owning the presentation, and the shared front matter vocabulary we aim to interoperate with.
 - [agentic-dev-team](https://github.com/bdfinst/agentic-dev-team) by Bryan Finster: the agentic workhorse of this project, from planning through test-driven builds, review and pull requests.
 - [Investiture](https://github.com/erikaflowers/investiture) and [Zero Vector](https://zerovector.design/investiture) by Allison Flowers: my assistant in building out the project doctrine, `VECTOR.md`, `ARCHITECTURE.md` and the `vector/` research and decision records.
 
