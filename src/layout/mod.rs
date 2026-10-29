@@ -2,7 +2,9 @@
 //! Text shaping and line breaking are borrowed (cosmic-text, through iced's
 //! shared font system); block flow, selection and hit-testing are ours.
 
+pub mod anchor;
 mod flow;
+mod image;
 mod select;
 mod text;
 
@@ -14,6 +16,8 @@ use std::sync::Arc;
 use iced::advanced::graphics::text::cosmic_text::Buffer;
 use iced::advanced::graphics::text::font_system;
 use iced::{Color, Font, Point, Rectangle};
+
+pub use image::{ImageView, no_images};
 
 use crate::model::Block;
 use crate::theme::Theme;
@@ -40,6 +44,12 @@ pub struct Fragment {
     /// Visual line id: fragments side by side (marker + text, table cells) share one.
     pub line: usize,
     pub joint: Joint,
+    /// The top-level block it belongs to: a key that holds while images arrive.
+    pub block: usize,
+    /// For an image's clickable note: the image source a click loads.
+    pub action: Option<String>,
+    /// Part of an image's note: interface text, never copied.
+    pub note: bool,
 }
 
 /// How a fragment continues from the one before it, for copying text.
@@ -51,6 +61,14 @@ pub enum Joint {
     Wrap,
     /// Hard break or a new block.
     Break,
+}
+
+/// A shown image's box, for painting and clicks.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LaidImage {
+    pub src: String,
+    pub bounds: Rectangle,
+    pub link: Option<String>,
 }
 
 /// A filled rectangle: code backgrounds, quote bars, rules, underlines, checkboxes.
@@ -65,6 +83,7 @@ pub struct Page {
     pub texts: Vec<LaidText>,
     pub fills: Vec<Fill>,
     pub fragments: Vec<Fragment>,
+    pub images: Vec<LaidImage>,
     /// Heading slug → top of the heading, in document order.
     pub anchors: Vec<(String, f32)>,
     pub height: f32,
@@ -77,9 +96,11 @@ pub struct Caret {
     pub byte: usize,
 }
 
-pub fn layout(blocks: &[Block], theme: &Theme, width: f32) -> Page {
+/// `images` says how each image source shows: drawn at a known size, or as its
+/// description and a note.
+pub fn layout(blocks: &[Block], theme: &Theme, width: f32, images: &dyn Fn(&str) -> ImageView) -> Page {
     let mut system = font_system().write().expect("font system lock");
-    flow::run(blocks, theme, system.raw(), width)
+    flow::run(blocks, theme, system.raw(), width, images)
 }
 
 impl Page {
@@ -103,7 +124,7 @@ pub(crate) mod tests {
 
     pub fn page_at(source: &str, font: ReadingFont, width: f32) -> Page {
         fonts::install();
-        layout(&parse(source).blocks, &reading(font), width)
+        layout(&parse(source).blocks, &reading(font), width, &no_images)
     }
 
     fn page(source: &str) -> Page {

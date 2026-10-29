@@ -105,6 +105,9 @@ impl Flow<'_> {
                     stops,
                     line: self.line,
                     joint,
+                    block: self.block,
+                    action: None,
+                    note: false,
                 });
                 joint = Joint::Flush;
             }

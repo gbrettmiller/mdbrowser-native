@@ -561,7 +561,7 @@ In ARCHITECTURE.md:
 **Files**: `src/session/images/*`, `src/session/{mod,reducer,tests}.rs`
 **Commit**: `feat(session): load a page's images, four at a time, with a cache`
 
-### Step 7: Lay out images
+### Step 7: Lay out images — done
 
 **Complexity**: standard
 **RED**: Layout tests:

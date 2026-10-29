@@ -1,0 +1,28 @@
+---
+source: src/layout/golden.rs
+expression: "geometry(&page_at(include_str!(\"../../corpus/images.md\"),\nReadingFont::Literata, WIDTH))"
+---
+height 1039.1, 23 fragments, anchors [("images", 32.0), ("a-heading-with-an-image-image-logo-stays-text", 814.1)]
+   32.0   32.0  124.1 "Images"
+  109.0   32.0  635.9 "A Markdown image stands alone, or opens a paragraph the way many posts"
+  138.0   32.0   27.4 "do:"
+  183.0   32.0  144.9 "[image: A red box]"
+  228.0   32.0   61.1 "[image]"
+  273.0   32.0  592.2 "I gotta say, the image above this sentence opened the paragraph in the"
+  302.0   32.0  114.8 "original post."
+  347.0   32.0  258.6 "An image can sit mid-sentence"
+  392.0   32.0  165.6 "[image: a small icon]"
+  437.0   32.0  308.9 "and the sentence carries on below it."
+  482.0   32.0  188.2 "[image: A linked image]"
+  527.0   51.6  190.2 "A quote with an image"
+  572.0   51.6  125.5 "[image: quoted]"
+  617.0   51.6   74.4 "inside it."
+  662.0   32.0   10.8 "•"
+  662.0   60.0   87.0 "A list item"
+  707.0   60.0  114.1 "[image: listed]"
+  752.0   60.0  112.9 "with one too."
+  814.1   32.0  431.6 "A heading with an image "
+  814.1  463.6  220.6 "[image: logo]"
+  869.1   32.0  163.0 "stays text"
+  946.1   32.0  324.0 "![code](is-never-an-image.png)"
+  946.1  356.0  192.3 " and  are never images."

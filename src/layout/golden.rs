@@ -36,6 +36,44 @@ fn tables_and_code() {
 }
 
 #[test]
+fn images_as_placeholders() {
+    insta::assert_snapshot!(geometry(&page_at(include_str!("../../corpus/images.md"), ReadingFont::Literata, WIDTH)));
+}
+
+/// Every corpus file with images lays out with images both shown and missing,
+/// and every Markdown image in it becomes an image block.
+#[test]
+fn every_corpus_image_becomes_a_block_and_lays_out() {
+    use crate::layout::{ImageView, layout};
+    use crate::model::parse;
+    use crate::theme::reading;
+    let mut files = vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus")];
+    let mut checked = 0;
+    while let Some(path) = files.pop() {
+        if path.is_dir() {
+            files.extend(std::fs::read_dir(&path).unwrap().map(|entry| entry.unwrap().path()));
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).unwrap_or_default();
+        if path.extension().is_none_or(|ext| ext != "md") || !source.contains("![") {
+            continue;
+        }
+        let document = parse(&source);
+        let images = document.image_sources().len();
+        let shown = |_: &str| ImageView::Shown { width: 640, height: 480 };
+        let placeholder = |_: &str| ImageView::Placeholder { note: Some(("Loading image…".into(), false)) };
+        for view in [&shown as &dyn Fn(&str) -> ImageView, &placeholder] {
+            let page = layout(&document.blocks, &reading(ReadingFont::Literata), WIDTH, view);
+            assert!(page.height > 0.0, "{path:?}");
+        }
+        let page = layout(&document.blocks, &reading(ReadingFont::Literata), WIDTH, &shown);
+        assert_eq!(page.images.len(), images, "{path:?}");
+        checked += 1;
+    }
+    assert!(checked >= 5, "checked {checked} files");
+}
+
+#[test]
 fn long() {
     insta::assert_snapshot!(summary(&page_at(include_str!("../../corpus/long.md"), ReadingFont::Literata, WIDTH)));
 }

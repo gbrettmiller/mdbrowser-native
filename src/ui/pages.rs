@@ -51,7 +51,7 @@ impl Pages {
             }
         }
         let started = Instant::now();
-        let page = Arc::new(layout::layout(&document.blocks, &theme::reading(font), width));
+        let page = Arc::new(layout::layout(&document.blocks, &theme::reading(font), width, &layout::no_images));
         let cost = started.elapsed();
         self.laid = Some(Laid { document: document.clone(), font, width, page: page.clone(), cost });
         (page, false)

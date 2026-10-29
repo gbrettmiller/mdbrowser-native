@@ -3,8 +3,8 @@
 use iced::advanced::graphics::text::cosmic_text as ct;
 use iced::{Color, Font, Rectangle};
 
-use super::{Fill, Page};
-use crate::model::{Align, Block, Item, Span, Style, image_description};
+use super::{Fill, ImageView, Page};
+use crate::model::{Align, Block, Item, Span};
 use crate::theme::{Theme, bold};
 
 /// Base look of a text block before per-span styling.
@@ -18,18 +18,28 @@ pub(super) struct Ink {
 pub(super) struct Flow<'a> {
     pub theme: &'a Theme,
     pub fonts: &'a mut ct::FontSystem,
+    pub images: &'a dyn Fn(&str) -> ImageView,
     pub page: Page,
     pub y: f32,
     pub line: usize,
+    /// The top-level block being laid out, and how deep inside it we are.
+    pub block: usize,
+    nesting: usize,
 }
 
 /// Bullets come from the bundled mono face: it is the one family that has all three.
 const BULLETS: [&str; 3] = ["•", "◦", "▪"];
 
-pub(super) fn run(blocks: &[Block], theme: &Theme, fonts: &mut ct::FontSystem, width: f32) -> Page {
+pub(super) fn run(
+    blocks: &[Block],
+    theme: &Theme,
+    fonts: &mut ct::FontSystem,
+    width: f32,
+    images: &dyn Fn(&str) -> ImageView,
+) -> Page {
     let content = (width - 2.0 * theme.gutter).min(theme.measure).max(80.0);
     let x = (width - content) / 2.0;
-    let mut flow = Flow { theme, fonts, page: Page::default(), y: theme.gutter, line: 0 };
+    let mut flow = Flow { theme, fonts, images, page: Page::default(), y: theme.gutter, line: 0, block: 0, nesting: 0 };
     let ink = Ink { font: theme.body_font, size: theme.body_size, color: theme.ink };
     flow.blocks(blocks, x, content, ink, 0);
     Page { height: flow.y + theme.gutter * 2.0, ..flow.page }
@@ -38,6 +48,9 @@ pub(super) fn run(blocks: &[Block], theme: &Theme, fonts: &mut ct::FontSystem, w
 impl Flow<'_> {
     fn blocks(&mut self, blocks: &[Block], x: f32, width: f32, ink: Ink, depth: usize) {
         for (i, block) in blocks.iter().enumerate() {
+            if self.nesting == 0 {
+                self.block = i;
+            }
             if i > 0 {
                 // A sublist hugs the item text it belongs to.
                 let nested = depth > 0 && matches!(block, Block::List { .. });
@@ -51,12 +64,7 @@ impl Flow<'_> {
         let theme = self.theme;
         match block {
             Block::Paragraph(spans) => self.text(spans, x, width, ink, Align::Left, ct::Wrap::WordOrGlyph),
-            // Drawn as its description until images are laid out (phase 2b, step 7).
-            Block::Image { alt, link, .. } => {
-                let style = Style { emphasis: true, ..Style::default() };
-                let spans = [Span { text: image_description(alt), style, link: link.clone() }];
-                self.text(&spans, x, width, ink, Align::Left, ct::Wrap::WordOrGlyph)
-            }
+            Block::Image { src, alt, link } => self.image(src, alt, link, x, width, ink),
             Block::Heading { level, spans, slug } => {
                 let size = theme.body_size * theme.heading_scales[usize::from(*level).clamp(1, 6) - 1];
                 if self.y > theme.gutter {
@@ -84,7 +92,9 @@ impl Flow<'_> {
             Block::Quote(inner) => {
                 let top = self.y;
                 let indent = theme.indent * 0.7;
+                self.nesting += 1;
                 self.blocks(inner, x + indent, width - indent, Ink { color: theme.muted, ..ink }, depth);
+                self.nesting -= 1;
                 self.fill(x, top, 3.0, self.y - top, theme.rule);
             }
             Block::List { start, items } => {
@@ -123,7 +133,9 @@ impl Flow<'_> {
         // Rewind so the item's first line sits beside (and shares a line id with) the marker.
         let marker_bottom = self.y.max(top + line_height);
         (self.y, self.line) = (top, line);
+        self.nesting += 1;
         self.blocks(&item.blocks, x + theme.indent, width - theme.indent, ink, depth + 1);
+        self.nesting -= 1;
         self.y = self.y.max(marker_bottom);
         self.line = self.line.max(line + 1);
     }

@@ -323,7 +323,8 @@ fn family_in_file(menu_label: &str) -> &'static str {
 fn set_in(w: &mut Browser, name: String) {
     let Status::Ready(shown) = &w.state().status else { panic!("no document: {:?}", w.state().status) };
     fonts::install();
-    let page = layout::layout(&shown.document.blocks, &theme::reading(w.state().settings.font), 720.0);
+    let page =
+        layout::layout(&shown.document.blocks, &theme::reading(w.state().settings.font), 720.0, &layout::no_images);
     let mut system = font_system().write().unwrap();
     let db = system.raw().db();
     let families: BTreeSet<String> = page

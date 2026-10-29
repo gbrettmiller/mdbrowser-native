@@ -76,7 +76,7 @@ impl Page {
 
     pub fn selected_text(&self, a: Caret, b: Caret) -> String {
         let mut previous: Option<usize> = None;
-        self.pieces(a, b).fold(String::new(), |text, (f, start, end)| {
+        self.pieces(a, b).filter(|(f, _, _)| !f.note).fold(String::new(), |text, (f, start, end)| {
             let separator = match (previous, f.joint) {
                 (None, _) | (Some(_), Joint::Flush) => "",
                 (Some(line), _) if line == f.line => " ",
