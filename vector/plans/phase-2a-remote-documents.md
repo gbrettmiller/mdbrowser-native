@@ -470,7 +470,7 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 **Files**: `src/session/{mod,reducer}.rs`, `src/content.rs`, `src/ui/body.rs`, `tests/acceptance/steps*`. Also, found while checking by hand: `services::files::from_command_line` turned a URL argument into a path; it now passes anything with a scheme through (`session::address::has_scheme`).
 **Commit**: `feat(ui): offer the system browser for pages that aren't Markdown`
 
-### Step 10: Docs and doctrine
+### Step 10: Docs and doctrine — done
 
 **Complexity**: trivial
 **GREEN**:

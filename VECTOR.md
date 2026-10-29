@@ -34,7 +34,9 @@ Read any Markdown on the web exactly as the writer wrote it, presented the way y
 ## Direction
 Each phase has its own plan. This is the order, not a commitment to dates.
 1. **Local browsing** (built): addresses, links, back/forward, History, bundled reading fonts.
-2. **Remote browsing**: `http(s)` with `Accept: text/markdown`, relative links between `.md` files across sites, remote images.
+2. **Remote browsing**, in two parts:
+   - **2a, remote documents** (built): `http(s)` with an `Accept` header that prefers Markdown, redirects, and links between `.md` pages across sites. Raw HTML is stripped (ADR-002); fetching uses ureq (ADR-003).
+   - **2b, images**: local and remote images, next.
 3. **Shared front matter**: act on the community vocabulary, including a byline from `author` and `pubDate`, previous/next navigation from `urlPrev` and `urlNext`, `description`, `image`, `inlineImage` and `metaImage`, an `enclosure` link, and `source` (the post's feed). Unknown keys are ignored.
 4. **Reader controls**: text size, spacing and colours (including a dark palette), beyond the typeface choice.
 5. **Discovery**: `llms.txt` as a site index, RSS 2.0 feeds and OPML.
@@ -57,7 +59,7 @@ Downloadable apps for Linux, Windows and macOS, so non-technical readers can ins
 
 # Constraints
 - No HTML, DOM or webview anywhere in the rendering path.
-- Phase 1 reads local files only. Phase 2 adds `http(s)` with `Accept: text/markdown`.
+- Local files and `http(s)` only. Pages are fetched with an `Accept` header that prefers Markdown, without cookies, and a web page can't reach the reader's disk or local network (ADR-003).
 - Reading fonts are bundled with the app, not resolved from the host (spike finding 1).
 - Front matter is YAML. Keys we don't recognise are ignored, and malformed front matter never stops a document from rendering.
 - Writers get no control over appearance. A document can't choose its font, colour or layout.
@@ -71,7 +73,7 @@ Downloadable apps for Linux, Windows and macOS, so non-technical readers can ins
 
 ## Ship Criteria
 First public release:
-- [ ] Browses local files and `http(s)` Markdown, including relative links between `.md` pages on different sites.
+- [x] Browses local files and `http(s)` Markdown, including relative links between `.md` pages on different sites. (Phase 2a, 2026-10-29.)
 - [ ] Renders the markdownWeb examples 0–8 and the scripting.com archive with no crashes, no HTML interpreted, and images shown.
 - [ ] Shows title, author and date from front matter, and follows `urlPrev` and `urlNext`.
 - [ ] The reader can set typeface, text size, spacing and a light or dark palette, and the choices persist.
@@ -92,7 +94,9 @@ Detail and test methods are in `vector/research/assumptions/`.
 ## Open Questions
 - ~~HTML in documents: strip it or show it literally?~~ Resolved by ADR-002 (2026-10-29): strip tags, comments and declarations, and keep the text between them, matching markdownWeb.
 - **Image semantics.** What exactly do `image`, `inlineImage` and `metaImage` mean, and where should each appear? They are undocumented, so ask in markdownWeb issue #1.
-- **Remote images: load, click-to-load, or block?** Real posts depend on them (examples 2 and 3), which argues for loading by default with a reader setting.
+- **Remote images: load, click-to-load, or block?** (Phase 2b.) Real posts depend on them (examples 2 and 3), which argues for loading by default with a reader setting.
+- **Marking plain `http`.** The address bar shows the full URL with its scheme, but nothing labels an `http` page as not secure. Is a label worth adding?
+- **Certificate failures.** A bad certificate shows as `unreachable`, the same as a site that is down. Should it get its own error, so an intercepted connection is visible?
 - **Enclosures.** Link out to the system player, or play audio in the browser?
 - **Which discovery convention comes first?** `llms.txt`, a post's `source` feed, or OPML?
 - **Interop with other Markdown-web browsers.** Should we share a test corpus, for example with Andrew Shell's browser?
@@ -104,6 +108,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 |----------|--------|----------|
 | Rendering spike | Done (2026-10-28) | `./vector/research/2026-10-28-spike-findings.md` |
 | Phase 1 (local browsing) | Built (2026-10-28) | `features/browse.feature`, `features/reading.feature` |
+| Phase 2a (remote documents) | Built (2026-10-29) | `features/remote.feature`, `vector/plans/phase-2a-remote-documents.md` |
 | Interviews | 1, draft. The markdownWeb readme was treated as a transcript: a published manifesto, not a live session. | `./vector/research/interviews/INT-001.json` |
 | Assumptions | 6, draft | `./vector/research/assumptions/` |
 | Community examples | Not yet in the corpus | [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |
