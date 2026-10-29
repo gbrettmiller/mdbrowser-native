@@ -24,6 +24,11 @@ impl Page {
         self.fragments.iter().find(|f| f.bounds.contains(point)).and_then(|f| f.link.as_deref())
     }
 
+    /// The image a clickable note at `point` loads.
+    pub fn action_at(&self, point: Point) -> Option<&str> {
+        self.fragments.iter().find(|f| f.bounds.contains(point)).and_then(|f| f.action.as_deref())
+    }
+
     pub fn caret_at(&self, point: Point) -> Option<Caret> {
         let on_row = self
             .fragments
@@ -76,7 +81,7 @@ impl Page {
 
     pub fn selected_text(&self, a: Caret, b: Caret) -> String {
         let mut previous: Option<usize> = None;
-        self.pieces(a, b).fold(String::new(), |text, (f, start, end)| {
+        self.pieces(a, b).filter(|(f, _, _)| !f.note).fold(String::new(), |text, (f, start, end)| {
             let separator = match (previous, f.joint) {
                 (None, _) | (Some(_), Joint::Flush) => "",
                 (Some(line), _) if line == f.line => " ",

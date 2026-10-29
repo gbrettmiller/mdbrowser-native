@@ -42,13 +42,32 @@ pub struct Item {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Block {
-    Heading { level: u8, spans: Vec<Span>, slug: String },
+    Heading {
+        level: u8,
+        spans: Vec<Span>,
+        slug: String,
+    },
     Paragraph(Vec<Span>),
-    Code { lang: Option<String>, text: String },
+    Code {
+        lang: Option<String>,
+        text: String,
+    },
     Quote(Vec<Block>),
-    List { start: Option<u64>, items: Vec<Item> },
-    Table { aligns: Vec<Align>, rows: Vec<Vec<Vec<Span>>> },
+    List {
+        start: Option<u64>,
+        items: Vec<Item>,
+    },
+    Table {
+        aligns: Vec<Align>,
+        rows: Vec<Vec<Vec<Span>>>,
+    },
     Rule,
+    /// A Markdown image, split out of its paragraph. `link` is the enclosing link, if any.
+    Image {
+        src: String,
+        alt: String,
+        link: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -63,6 +82,23 @@ pub fn text_of(spans: &[Span]) -> String {
 
 impl Document {
     /// All visible text, blocks separated by newlines (for tests and search).
+    /// Every image block's source, in reading order, however deeply nested.
+    pub fn image_sources(&self) -> Vec<String> {
+        fn collect(blocks: &[Block], out: &mut Vec<String>) {
+            for block in blocks {
+                match block {
+                    Block::Image { src, .. } => out.push(src.clone()),
+                    Block::Quote(inner) => collect(inner, out),
+                    Block::List { items, .. } => items.iter().for_each(|item| collect(&item.blocks, out)),
+                    _ => {}
+                }
+            }
+        }
+        let mut sources = Vec::new();
+        collect(&self.blocks, &mut sources);
+        sources
+    }
+
     pub fn plain_text(&self) -> String {
         blocks_text(&self.blocks).join("\n")
     }
@@ -79,6 +115,11 @@ impl Document {
     }
 }
 
+/// What stands in for an image in text: `[image: alt]`, or `[image]` with no alt.
+pub fn image_description(alt: &str) -> String {
+    if alt.is_empty() { "[image]".to_string() } else { format!("[image: {alt}]") }
+}
+
 fn blocks_text(blocks: &[Block]) -> Vec<String> {
     blocks
         .iter()
@@ -91,6 +132,7 @@ fn blocks_text(blocks: &[Block]) -> Vec<String> {
                 rows.iter().map(|row| row.iter().map(|cell| text_of(cell)).collect::<Vec<_>>().join(" ")).collect()
             }
             Block::Rule => vec![],
+            Block::Image { alt, .. } => vec![image_description(alt)],
         })
         .collect()
 }
@@ -248,9 +290,117 @@ mod tests {
         assert_eq!(blocks("```\n<b>x</b>\n```"), vec![Block::Code { lang: None, text: "<b>x</b>\n".into() }]);
     }
 
+    fn image(src: &str, alt: &str) -> Block {
+        Block::Image { src: src.into(), alt: alt.into(), link: None }
+    }
+
+    fn para(text: &str) -> Block {
+        Block::Paragraph(vec![plain(text)])
+    }
+
     #[test]
-    fn images_show_alt_text() {
-        assert_eq!(paragraph_text("![a cat](cat.png)"), "[image: a cat]");
+    fn an_image_alone_is_an_image_block() {
+        assert_eq!(blocks("![a cat](cat.png)"), [image("cat.png", "a cat")]);
+        assert_eq!(blocks("![a]()"), [image("", "a")]);
+    }
+
+    /// Phase 1 skipped the event after an image, losing the text that followed it.
+    #[test]
+    fn text_after_an_image_is_kept() {
+        assert_eq!(parse("![x](y.png)text\n\nnext").plain_text(), "[image: x]\ntext\nnext");
+    }
+
+    #[test]
+    fn paragraphs_split_around_their_images() {
+        assert_eq!(blocks("![](c.png)I gotta say"), [image("c.png", ""), para("I gotta say")]);
+        assert_eq!(blocks("Before ![b](y.png) after"), [para("Before"), image("y.png", "b"), para("after")]);
+        assert_eq!(blocks("Text ![t](t.png)"), [para("Text"), image("t.png", "t")]);
+        assert_eq!(blocks("![a](a.png)![b](b.png)"), [image("a.png", "a"), image("b.png", "b")]);
+        assert_eq!(blocks("![a](a.png) ![b](b.png)"), [image("a.png", "a"), image("b.png", "b")]);
+    }
+
+    #[test]
+    fn whitespace_at_a_cut_is_trimmed_and_breaks_inside_stay() {
+        assert_eq!(blocks("a\nb ![i](i.png)\nc"), [para("a b"), image("i.png", "i"), para("c")]);
+        assert_eq!(blocks("a  \nb ![i](i.png)"), [para("a\nb"), image("i.png", "i")]);
+    }
+
+    #[test]
+    fn paragraphs_without_images_keep_their_whitespace() {
+        assert_eq!(paragraph_text("`  a  `"), " a ");
+    }
+
+    #[test]
+    fn emphasis_and_links_carry_across_a_cut() {
+        let strong = Style { strong: true, ..Style::default() };
+        assert_eq!(
+            blocks("**a ![i](i.png) b**"),
+            [
+                Block::Paragraph(vec![Span { text: "a".into(), style: strong, link: None }]),
+                image("i.png", "i"),
+                Block::Paragraph(vec![Span { text: "b".into(), style: strong, link: None }]),
+            ]
+        );
+        let link = Some("https://x.org/".to_string());
+        assert_eq!(
+            blocks("[see ![a](b.png)](https://x.org/)"),
+            [
+                Block::Paragraph(vec![Span { text: "see".into(), style: Style::default(), link: link.clone() }]),
+                Block::Image { src: "b.png".into(), alt: "a".into(), link },
+            ]
+        );
+    }
+
+    #[test]
+    fn images_split_inside_lists_and_quotes() {
+        assert_eq!(blocks("> x ![q](q.png)"), [Block::Quote(vec![para("x"), image("q.png", "q")])]);
+        assert_eq!(
+            blocks("- ![l](l.png) y"),
+            [Block::List {
+                start: None,
+                items: vec![Item { checked: None, blocks: vec![image("l.png", "l"), para("y")] }]
+            }]
+        );
+    }
+
+    #[test]
+    fn images_in_headings_and_table_cells_stay_descriptions() {
+        let emph = Style { emphasis: true, ..Style::default() };
+        assert_eq!(
+            blocks("# Title ![logo](l.png)"),
+            [Block::Heading {
+                level: 1,
+                spans: vec![plain("Title "), Span { text: "[image: logo]".into(), style: emph, link: None }],
+                slug: "title-image-logo".into(),
+            }]
+        );
+        let doc = parse("| ![c](c.png) |\n|-|\n| ![](d.png) |");
+        assert_eq!(doc.plain_text(), "[image: c]\n[image]");
+    }
+
+    #[test]
+    fn images_in_code_stay_literal() {
+        assert_eq!(paragraph_text("`![a](b.png)`"), "![a](b.png)");
+        assert_eq!(blocks("    ![a](b.png)\n"), [Block::Code { lang: None, text: "![a](b.png)\n".into() }]);
+    }
+
+    #[test]
+    fn an_image_right_after_a_heading_is_its_own_block() {
+        assert_eq!(blocks("# H\n![a](a.png)"), [heading(1, "H", "h"), image("a.png", "a")]);
+    }
+
+    #[test]
+    fn image_sources_are_listed_in_reading_order_however_deep() {
+        let doc = parse("![a](1.png)\n\n> ![b](2.png)\n\n- x ![c](3.png)\n\n# ![d](h.png)");
+        assert_eq!(doc.image_sources(), ["1.png", "2.png", "3.png"]);
+    }
+
+    #[test]
+    fn plain_text_writes_images_as_descriptions() {
+        assert_eq!(
+            parse("Before ![a box](p.png) after\n\n![](q.png)").plain_text(),
+            "Before\n[image: a box]\nafter\n[image]"
+        );
     }
 
     #[test]

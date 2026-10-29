@@ -7,9 +7,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use iced::Task;
 
 use super::store::{Store, Ticket};
-use super::{background, files, opener, web};
+use super::{background, files, images, opener, web};
 use crate::session::error::ErrorCode;
 use crate::session::location::Location;
+use crate::session::web::Origin;
 use crate::session::{Effect, Event, Loaded};
 
 fn now() -> u64 {
@@ -37,21 +38,26 @@ fn in_background(
 }
 
 /// Reads a file or fetches a page. Matched exhaustively, so a web location can never reach `files`.
-pub fn load(location: Location, limits: &web::Limits) -> Result<Loaded, ErrorCode> {
+pub fn load(location: Location, limits: &web::Limits, origin: Origin) -> Result<Loaded, ErrorCode> {
     match location {
         Location::File(path) => {
             files::read_markdown(&path).map(|source| Loaded { source, location: Location::File(path) })
         }
-        Location::Web(url) => web::fetch(&url, limits)
+        Location::Web(url) => web::fetch(&url, limits, origin)
             .map(|fetched| Loaded { source: fetched.source, location: Location::web(fetched.url) }),
     }
 }
 
 pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
     match effect {
-        Effect::Load { request_id, location } => {
-            Task::perform(background::run_blocking(move || load(location, &web::Limits::default())), move |result| {
-                Some(Event::Loaded { request_id, result, now: now() })
+        Effect::Load { request_id, location, origin } => Task::perform(
+            background::run_blocking(move || load(location, &web::Limits::default(), origin)),
+            move |result| Some(Event::Loaded { request_id, result, now: now() }),
+        ),
+        Effect::LoadImage { location, origin } => {
+            let requested = location.clone();
+            Task::perform(background::run_blocking(move || images::load(location, origin)), move |result| {
+                Some(Event::ImageLoaded { location: requested, result })
             })
         }
         Effect::OpenExternal(url) => Task::perform(background::run_blocking(move || opener::open(&url)), |result| {

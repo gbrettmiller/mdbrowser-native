@@ -8,7 +8,9 @@ description = "A browser for the web of Markdown — no HTML, no DOM, no webview
 
 [dependencies]
 dirs = "7.0.0"
-iced = { version = "0.14", features = ["canvas", "advanced"] }
+# Only the codecs ADR-004 allows: no AVIF, TIFF, EXR or the rest.
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+iced = { version = "0.14", features = ["canvas", "advanced", "image-without-codecs"] }
 open = { version = "5.4.5", features = ["shellexecute-on-windows"] }
 pulldown-cmark = "0.13"
 serde = { version = "1.0.229", features = ["derive"] }

@@ -4,41 +4,23 @@
 use url::Url;
 
 use super::{Link, MAIL_SCHEME};
-use crate::session::address::{is_network_path, scheme_of, web_target};
-use crate::session::location::{FILE_SCHEME, WEB_SCHEMES, is_markdown_name, without_credentials};
-use crate::session::network::is_local_network;
+use crate::session::address::{scheme_of, web_target};
+use crate::session::href::{OnPage, join_on_page};
+use crate::session::location::{is_markdown_name, without_credentials};
+use crate::session::network::crosses_into_local_network;
 
-/// Resolved as a browser would against the page's URL. Anything shaped like a
-/// disk path is refused before resolving, since the URL parser would quietly
-/// read `\\host\x` or `C:\x` as a path on the same site.
+/// Resolved as a browser would against the page's URL (`href::join_on_page`).
 pub(super) fn classify(reference: &str, page: &Url) -> Link {
-    if is_disk_shaped(reference) {
-        return Link::LocalFromWeb;
+    if scheme_of(reference).as_deref() == Some(MAIL_SCHEME) {
+        return Link::External(reference.to_string());
     }
-    match scheme_of(reference).as_deref() {
-        Some(MAIL_SCHEME) => return Link::External(reference.to_string()),
-        Some(scheme) if !WEB_SCHEMES.contains(&scheme) && scheme != FILE_SCHEME => return Link::Unsupported,
-        _ if reference.is_empty() => return Link::Unsupported,
-        _ => {}
+    match join_on_page(reference, page) {
+        OnPage::Disk => Link::LocalFromWeb,
+        OnPage::Unsupported => Link::Unsupported,
+        OnPage::Web(url) if !is_markdown_name(url.path()) => Link::External(without_credentials(url).to_string()),
+        OnPage::Web(url) if crosses_into_local_network(page, &url) => Link::LocalNetworkFromWeb,
+        OnPage::Web(url) => Link::Navigate(web_target(url)),
     }
-    // The boundary: whatever the checks above missed, only http(s) leaves this function.
-    match page.join(reference) {
-        Ok(url) if url.scheme() == FILE_SCHEME => Link::LocalFromWeb,
-        Ok(url) if !WEB_SCHEMES.contains(&url.scheme()) => Link::Unsupported,
-        Ok(url) if !is_markdown_name(url.path()) => Link::External(without_credentials(url).to_string()),
-        Ok(url) if is_local_network(&url) && !is_local_network(page) => Link::LocalNetworkFromWeb,
-        Ok(url) => Link::Navigate(web_target(url)),
-        Err(_) => Link::Unsupported,
-    }
-}
-
-/// A backslash start (`\\host\x`, `\x`), a slash-backslash share (`/\host`), or a
-/// drive letter (`C:\x`, `c:/x`, `c:x`). `//host` is a web address, not a share.
-fn is_disk_shaped(reference: &str) -> bool {
-    let bytes = reference.as_bytes();
-    let drive = bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
-    let share = is_network_path(reference) && !reference.starts_with("//");
-    reference.starts_with('\\') || share || drive
 }
 
 #[cfg(test)]
@@ -74,8 +56,8 @@ mod tests {
             ("../index.md", "https://x.org/docs/index.md", None),
             ("/abs.md", "https://x.org/abs.md", None),
             ("//other.host/p.md", "https://other.host/p.md", None),
-            ("HTTP://X/A.MD", "http://x/A.MD", None),
-            ("https://x/a.md?x=1#f", "https://x/a.md?x=1", Some("f")),
+            ("HTTP://X.ORG/A.MD", "http://x.org/A.MD", None),
+            ("https://y.org/a.md?x=1#f", "https://y.org/a.md?x=1", Some("f")),
             ("notes.markdown#caf%C3%A9", "https://x.org/docs/a/notes.markdown", Some("café")),
             ("  b.md  ", "https://x.org/docs/a/b.md", None),
             ("https://user:pw@y.org/p.md", "https://y.org/p.md", None),
@@ -148,6 +130,10 @@ mod tests {
             "//169.254.169.254/latest.md",
             "//[fe80::1]/x.md",
         ] {
+            assert_eq!(from_page(href), Link::LocalNetworkFromWeb, "{href:?}");
+        }
+        // Names that only mean something at home count as local too.
+        for href in ["//router/x.md", "//printer.local/x.md", "//nas.lan/x.md", "//100.100.100.100/x.md"] {
             assert_eq!(from_page(href), Link::LocalNetworkFromWeb, "{href:?}");
         }
         // The system browser applies its own rules; only in-app fetching is refused.

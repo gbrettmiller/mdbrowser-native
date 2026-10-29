@@ -6,15 +6,17 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use mdbrowser::services::runner;
 use mdbrowser::services::store::Store;
 use mdbrowser::services::web::Limits;
+use mdbrowser::services::{images, runner};
 use mdbrowser::session::location::Location;
 use mdbrowser::session::visits::Visit;
+use mdbrowser::session::web::Origin;
 use mdbrowser::session::{Effect, Event, State, step};
 use tempfile::TempDir;
 use url::Url;
 
+use crate::fixtures;
 use crate::http::{Reply, Server};
 
 const INDEX: &str = "---
@@ -69,9 +71,18 @@ fn routes() -> HashMap<String, Reply> {
         ("/slow.md", Reply::markdown("# Slow\n")),
     ]
     .into_iter()
+    .chain(fixtures::image_routes())
     .map(|(path, reply)| (path.to_string(), reply))
     .collect()
 }
+
+/// Whether a web load stays on the scenario's own server: nothing reaches the internet.
+pub fn on_test_server(url: &Url) -> bool {
+    url.host_str() == Some("127.0.0.1")
+}
+
+/// Fails the first time it is asked for, then serves an image.
+const FLAKY: &str = "/img/flaky.png";
 
 #[derive(Debug, cucumber::World)]
 #[world(init = Self::new)]
@@ -81,10 +92,15 @@ pub struct Browser {
     /// Every path a load effect actually read.
     pub reads: Vec<PathBuf>,
     pub opened: Vec<String>,
+    /// What the last "select everything and copy" copied.
+    pub copied: Option<String>,
     pub opener_fails: bool,
     /// Loads of these locations wait until released.
     held: HashSet<Location>,
-    parked: Vec<(u64, Location)>,
+    parked: Vec<(u64, Location, Origin)>,
+    /// Web image loads under these paths wait; started ones wait here.
+    slow_images: Vec<String>,
+    parked_images: Vec<(Location, Origin)>,
     pub server: Server,
     /// What the server answers, by path; anything else is a 404.
     pub routes: Arc<Mutex<HashMap<String, Reply>>>,
@@ -104,7 +120,16 @@ impl Browser {
         let store = Store::at(home.path().join(".mdbrowser"));
         let routes = Arc::new(Mutex::new(routes()));
         let served = Arc::clone(&routes);
+        let flaky_seen = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let server = Server::start(move |request| {
+            if request.path == FLAKY {
+                let seen = flaky_seen.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                return if seen == 0 {
+                    Reply::new(500)
+                } else {
+                    Reply::new(200).header("Content-Type", "image/png").body(fixtures::png(40, 20))
+                };
+            }
             let routes = served.lock().expect("routes");
             routes.get(&request.path).cloned().unwrap_or_else(|| Reply::new(404))
         });
@@ -113,9 +138,12 @@ impl Browser {
             state: Some(state),
             reads: Vec::new(),
             opened: Vec::new(),
+            copied: None,
             opener_fails: false,
             held: HashSet::new(),
             parked: Vec::new(),
+            slow_images: Vec::new(),
+            parked_images: Vec::new(),
             server,
             routes,
             store,
@@ -165,13 +193,14 @@ impl Browser {
 
     fn run(&mut self, effect: Effect) {
         match effect {
-            Effect::Load { request_id, location } => {
+            Effect::Load { request_id, location, origin } => {
                 if self.held.contains(&location) {
-                    self.parked.push((request_id, location));
+                    self.parked.push((request_id, location, origin));
                 } else {
-                    self.finish_load(request_id, location);
+                    self.finish_load(request_id, location, origin);
                 }
             }
+            Effect::LoadImage { location, origin } => self.finish_image(location, origin),
             Effect::OpenExternal(url) => {
                 if self.opener_fails {
                     self.send(Event::OpenerFailed);
@@ -189,16 +218,68 @@ impl Browser {
     }
 
     /// Loads through the app's own `runner::load`, with a lowered size limit.
-    fn finish_load(&mut self, request_id: u64, location: Location) {
+    fn finish_load(&mut self, request_id: u64, location: Location, origin: Origin) {
         match &location {
             Location::File(path) => self.reads.push(path.clone()),
-            Location::Web(url) => {
-                assert_eq!(url.host_str(), Some("127.0.0.1"), "scenarios never leave the test server: {url}")
-            }
+            Location::Web(url) => assert!(on_test_server(url), "scenarios never leave the test server: {url}"),
         }
         self.clock += 1;
-        let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() });
+        let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() }, origin);
         self.send(Event::Loaded { request_id, result, now: self.clock });
+    }
+
+    /// Loads an image through the app's own `services::images::load`.
+    fn finish_image(&mut self, location: Location, origin: Origin) {
+        let held = match &location {
+            Location::Web(url) => self.slow_images.iter().any(|prefix| url.path().starts_with(prefix.as_str())),
+            Location::File(_) => false,
+        };
+        if held {
+            self.parked_images.push((location, origin));
+        } else {
+            self.fetch_image(location, origin);
+        }
+    }
+
+    fn fetch_image(&mut self, location: Location, origin: Origin) {
+        match &location {
+            Location::File(path) => self.reads.push(path.clone()),
+            Location::Web(url) => assert!(on_test_server(url), "scenarios never leave the test server: {url}"),
+        }
+        let result = images::load(location.clone(), origin);
+        self.send(Event::ImageLoaded { location, result });
+    }
+
+    /// Web image loads whose path starts with `prefix` wait until released.
+    pub fn hold_images_under(&mut self, prefix: &str) {
+        self.slow_images.push(prefix.to_string());
+    }
+
+    /// Image loads started and not yet finished.
+    pub fn waiting_images(&self) -> usize {
+        self.parked_images.len()
+    }
+
+    /// Lets every waiting image load finish, in the order they started.
+    pub fn release_images(&mut self) {
+        self.slow_images.clear();
+        let waiting = std::mem::take(&mut self.parked_images);
+        waiting.into_iter().for_each(|(location, origin)| self.fetch_image(location, origin));
+    }
+
+    /// Lets the waiting load of one image finish; returns false if none was waiting.
+    fn release_image(&mut self, path: &str) -> bool {
+        let location = self.web(path);
+        let Some(index) = self.parked_images.iter().position(|(held, _)| *held == location) else { return false };
+        let (location, origin) = self.parked_images.remove(index);
+        self.fetch_image(location, origin); // loads it starts are still held
+        true
+    }
+
+    /// The session's image cache, with room for `bytes` of pixels.
+    pub fn set_image_budget(&mut self, bytes: u64) {
+        let state = self.state.take().expect("state");
+        self.state = Some(State { images: mdbrowser::session::images::Images::with_budget(bytes), ..state });
     }
 
     pub fn hold(&mut self, name: &str) {
@@ -208,12 +289,15 @@ impl Browser {
 
     /// Lets a held load complete, with the request id it was issued under.
     pub fn release(&mut self, name: &str) {
+        if name.starts_with('/') && self.release_image(name) {
+            return;
+        }
         let location = self.location_named(name);
         self.held.remove(&location);
-        let (ready, still): (Vec<_>, Vec<_>) = self.parked.drain(..).partition(|(_, held)| *held == location);
+        let (ready, still): (Vec<_>, Vec<_>) = self.parked.drain(..).partition(|(_, held, _)| *held == location);
         assert_eq!(ready.len(), 1, "exactly one load of {name} was waiting");
         self.parked = still;
-        ready.into_iter().for_each(|(id, p)| self.finish_load(id, p));
+        ready.into_iter().for_each(|(id, held, origin)| self.finish_load(id, held, origin));
     }
 
     pub fn restart(&mut self) {

@@ -52,6 +52,8 @@ pub struct Theme {
     pub body_size: f32,
     pub line_ratio: f32,
     pub mono_scale: f32,
+    /// The note under an image's description is smaller than the text.
+    pub note_scale: f32,
     pub heading_scales: [f32; 6],
     pub measure: f32,
     pub gutter: f32,
@@ -80,6 +82,7 @@ const LIGHT: Theme = Theme {
     body_size: 18.0,
     line_ratio: 1.6,
     mono_scale: 0.88,
+    note_scale: 0.85,
     heading_scales: [1.9, 1.5, 1.25, 1.1, 1.0, 0.9],
     measure: 720.0,
     gutter: 32.0,
@@ -97,6 +100,17 @@ const LIGHT: Theme = Theme {
     rule: rgb(0xd8, 0xd5, 0xce),
     selection: Color::from_rgba8(0x1f, 0x5f, 0xbf, 0.22),
 };
+
+/// The narrowest text column, however narrow the window.
+const MIN_COLUMN: f32 = 80.0;
+
+impl Theme {
+    /// The text column's width in a window `window` wide: the measure, less the
+    /// gutters when the window is narrow.
+    pub fn column_width(&self, window: f32) -> f32 {
+        (window - 2.0 * self.gutter).min(self.measure).max(MIN_COLUMN)
+    }
+}
 
 /// The reader theme with the chosen body typeface.
 pub const fn reading(font: ReadingFont) -> Theme {

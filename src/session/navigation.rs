@@ -3,11 +3,14 @@
 //! until a redirect settles an entry on its final address.
 
 use super::location::{Location, Target};
+use super::web::Origin;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
     pub input: String,
     pub target: Option<Target>,
+    /// Who asked for it, kept so a reload or Back fetches it under the same rules.
+    pub origin: Origin,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -41,12 +44,20 @@ impl Navigation {
     }
 
     /// The current entry now lives at `location` (a redirect's end), keeping its fragment.
+    /// Ending up on another public host makes it `Public`.
     pub fn settle(mut self, location: Location) -> Self {
         if let Some(entry) = self.entries.get_mut(self.index)
             && let Some(target) = entry.target.take()
         {
+            // A redirect to another public host was the site's choice: later reloads
+            // and Back fetch it with the checks a public page's link gets.
+            let elsewhere = location.host() != target.location.host();
+            if elsewhere && Origin::of(&location) == Origin::Public {
+                entry.origin = Origin::Public;
+            }
             let target = Target { location, ..target };
-            *entry = Entry { input: target.location.address(), target: Some(target) };
+            entry.input = target.location.address();
+            entry.target = Some(target);
         }
         self
     }
@@ -66,7 +77,7 @@ mod tests {
     use super::*;
 
     fn entry(input: &str) -> Entry {
-        Entry { input: input.into(), target: None }
+        Entry { input: input.into(), target: None, origin: Origin::Trusted }
     }
 
     fn inputs(nav: &Navigation) -> Vec<&str> {
@@ -105,7 +116,7 @@ mod tests {
 
     fn targeted(url: &str, fragment: Option<&str>) -> Entry {
         let target = Target { location: web(url), fragment: fragment.map(str::to_string) };
-        Entry { input: target.location.address(), target: Some(target) }
+        Entry { input: target.location.address(), target: Some(target), origin: Origin::Trusted }
     }
 
     #[test]
@@ -114,6 +125,17 @@ mod tests {
         let nav = nav.settle(web("https://x.org/new.md"));
         assert_eq!(nav.current(), Some(&targeted("https://x.org/new.md", Some("intro"))));
         assert_eq!(nav.back().current(), Some(&entry("a")));
+    }
+
+    #[test]
+    fn settling_on_another_public_host_makes_the_entry_public() {
+        let typed = targeted("https://short.link/x", None);
+        let nav = Navigation::default().push(typed.clone()).settle(web("https://evil.example/a.md"));
+        assert_eq!(nav.current().map(|entry| entry.origin), Some(Origin::Public));
+        let nav = Navigation::default().push(typed.clone()).settle(web("https://short.link/y.md"));
+        assert_eq!(nav.current().map(|entry| entry.origin), Some(Origin::Trusted), "same host");
+        let nav = Navigation::default().push(typed).settle(web("http://192.168.1.2/a.md"));
+        assert_eq!(nav.current().map(|entry| entry.origin), Some(Origin::Trusted), "written local");
     }
 
     #[test]

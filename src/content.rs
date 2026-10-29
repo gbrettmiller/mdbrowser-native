@@ -2,6 +2,7 @@
 
 use crate::session::NoticeKind;
 use crate::session::error::ErrorCode;
+use crate::session::images::{ImageLoading, Note};
 use crate::theme::ReadingFont;
 
 pub fn error(code: ErrorCode) -> &'static str {
@@ -15,6 +16,7 @@ pub fn error(code: ErrorCode) -> &'static str {
         ErrorCode::ServerError => "The site had a problem sending this page.",
         ErrorCode::Unreachable => "Couldn't reach this site.",
         ErrorCode::BadRedirect => "This site redirected somewhere that can't be followed safely.",
+        ErrorCode::LocalAddress => "This address leads into your local network.",
     }
 }
 
@@ -29,6 +31,9 @@ pub fn web_error(code: ErrorCode) -> Option<(&'static str, &'static str)> {
         ErrorCode::ServerError => Some((error(code), "Try again later.")),
         ErrorCode::Unreachable => Some((error(code), "Check your connection, then reload.")),
         ErrorCode::BadRedirect => Some((error(code), "Try opening the address in your web browser.")),
+        ErrorCode::LocalAddress => {
+            Some((error(code), "Links from web pages can't open it. Type the address yourself if you trust it."))
+        }
     }
 }
 
@@ -51,6 +56,31 @@ pub fn notice(kind: NoticeKind) -> &'static str {
         NoticeKind::UnsupportedLink => "Can't open this kind of link yet",
         NoticeKind::LocalFromWeb => "Web pages can't open files on your computer.",
         NoticeKind::LocalNetworkFromWeb => "Web pages can't open addresses on your local network.",
+    }
+}
+
+/// The Web images menu, one entry per mode.
+pub fn image_loading(mode: ImageLoading) -> &'static str {
+    match mode {
+        ImageLoading::Automatic => "Web images: automatic",
+        ImageLoading::OnClick => "Web images: on click",
+        ImageLoading::Off => "Web images: off",
+    }
+}
+
+/// The key that goes with Shift+I to load this page's images.
+const SHORTCUT_MODIFIER: &str = if cfg!(target_os = "macos") { "Cmd" } else { "Ctrl" };
+
+/// The line under an image that isn't shown.
+pub fn image_note(note: Note) -> String {
+    match note {
+        Note::Loading => "Loading image…".into(),
+        Note::ClickToLoad => format!("Click to load, or press {SHORTCUT_MODIFIER}+Shift+I for this page's."),
+        Note::Off => format!("Web images are off. Press {SHORTCUT_MODIFIER}+Shift+I to load this page's."),
+        Note::Failed => format!("Couldn't load this image. Click or press {SHORTCUT_MODIFIER}+Shift+I to try again."),
+        Note::Unsupported => "This image's format isn't supported.".into(),
+        Note::TooLarge => "This image is too large to show.".into(),
+        Note::Refused => "This page can't show this image.".into(),
     }
 }
 
@@ -83,13 +113,14 @@ mod tests {
     use super::*;
 
     /// Every error a fetch can end in; the rest are about the typed address.
-    const WEB_ERRORS: [ErrorCode; 6] = [
+    const WEB_ERRORS: [ErrorCode; 7] = [
         ErrorCode::NotMarkdown,
         ErrorCode::NotFound,
         ErrorCode::Unreadable,
         ErrorCode::ServerError,
         ErrorCode::Unreachable,
         ErrorCode::BadRedirect,
+        ErrorCode::LocalAddress,
     ];
 
     fn distinct_and_non_empty(strings: &[&str]) {
@@ -102,6 +133,29 @@ mod tests {
         distinct_and_non_empty(&ErrorCode::ALL.map(error));
         distinct_and_non_empty(&ErrorCode::ALL.map(ErrorCode::key));
         distinct_and_non_empty(&NoticeKind::ALL.map(notice));
+    }
+
+    #[test]
+    fn the_web_images_menu_and_image_notes() {
+        let labels = ImageLoading::ALL.map(image_loading);
+        assert_eq!(labels, ["Web images: automatic", "Web images: on click", "Web images: off"]);
+        let notes = Note::ALL.map(image_note);
+        distinct_and_non_empty(&notes.each_ref().map(String::as_str));
+        assert_eq!(image_note(Note::Loading), "Loading image…");
+        assert_eq!(image_note(Note::Unsupported), "This image's format isn't supported.");
+        assert_eq!(image_note(Note::TooLarge), "This image is too large to show.");
+        assert_eq!(image_note(Note::Refused), "This page can't show this image.");
+        let modifier = if cfg!(target_os = "macos") { "Cmd" } else { "Ctrl" };
+        // Each clickable note names the keyboard route too.
+        assert_eq!(
+            image_note(Note::ClickToLoad),
+            format!("Click to load, or press {modifier}+Shift+I for this page's.")
+        );
+        assert_eq!(
+            image_note(Note::Failed),
+            format!("Couldn't load this image. Click or press {modifier}+Shift+I to try again.")
+        );
+        assert_eq!(image_note(Note::Off), format!("Web images are off. Press {modifier}+Shift+I to load this page's."));
     }
 
     #[test]

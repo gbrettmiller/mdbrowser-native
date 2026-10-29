@@ -1,23 +1,21 @@
-//! Fetching a Markdown page over http(s). I/O only: `session::web` decides what
-//! to ask for, which redirects to follow, and which responses are Markdown.
+//! Fetching over http(s). I/O only: `session::web` decides what to ask for, which
+//! redirects to follow, and which responses to take. Pages and images share one
+//! fetch loop (`fetch::fetch_bytes`).
 
-use std::io::{self, Read};
-use std::time::{Duration, Instant};
+mod fetch;
 
-use ureq::Agent;
-use ureq::Body;
-use ureq::http::Response;
+use std::time::Duration;
+
+pub use fetch::fetch_bytes;
 use url::Url;
 
 use super::files::MAX_BYTES;
 use crate::session::error::ErrorCode;
-use crate::session::web::{self, ACCEPT, MAX_REDIRECTS, StatusClass};
+use crate::session::web::{self, Origin, Want};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// For the whole fetch, every redirect included.
 const OVERALL_TIMEOUT: Duration = Duration::from_secs(30);
-
-const USER_AGENT: &str = concat!("mdbrowser/", env!("CARGO_PKG_VERSION"));
 
 /// How long and how much one fetch may take, redirects included.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,75 +38,12 @@ pub struct Fetched {
     pub source: String,
 }
 
-/// One GET per hop, each a fresh request carrying only `Accept`: no cookies, and
-/// no credentials beyond those typed for the first host (`next_hop` strips them).
-pub fn fetch(url: &Url, limits: &Limits) -> Result<Fetched, ErrorCode> {
-    let agent = agent(limits);
-    // A deadline too far off to represent means none.
-    let deadline = Instant::now().checked_add(limits.overall);
-    let mut url = url.clone();
-    for hop in 1..=MAX_REDIRECTS + 1 {
-        let remaining = deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()));
-        let mut response = agent
-            .get(url.as_str())
-            .header("Accept", ACCEPT)
-            .config()
-            .timeout_global(remaining)
-            .build()
-            .call()
-            .map_err(unreachable)?;
-        match web::classify_status(response.status().as_u16())? {
-            StatusClass::Body => {
-                web::body_policy(header(&response, "content-type"), &url)?;
-                web::encoding_policy(header(&response, "content-encoding"))?;
-                let bytes = read_capped(response.body_mut(), limits.max_bytes)?;
-                return Ok(Fetched { source: web::to_text(bytes)?, url });
-            }
-            StatusClass::Redirect => url = web::next_hop(&url, header(&response, "location"), hop)?,
-        }
-    }
-    Err(ErrorCode::BadRedirect) // unreachable: next_hop refuses the hop past the limit
+/// A Markdown page, with the failure codes pages have always had (phase 2a).
+pub fn fetch(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, ErrorCode> {
+    let (url, bytes) = fetch_bytes(url, Want::Page, limits, origin).map_err(web::FetchError::for_page)?;
+    let source = web::to_text(bytes).map_err(web::FetchError::for_page)?;
+    Ok(Fetched { url, source })
 }
-
-fn agent(limits: &Limits) -> Agent {
-    Agent::config_builder()
-        .max_redirects(0)
-        .http_status_as_error(false)
-        .timeout_connect(Some(limits.connect))
-        .user_agent(USER_AGENT)
-        .build()
-        .into()
-}
-
-/// A header's value; one that isn't valid text counts as absent.
-fn header<'a, B>(response: &'a Response<B>, name: &str) -> Option<&'a str> {
-    response.headers().get(name).and_then(|value| value.to_str().ok())
-}
-
-/// The decoded (decompressed) body, refused past `max_bytes`. ureq's own limit
-/// counts the compressed bytes, so a small gzip body could inflate without bound.
-fn read_capped(body: &mut Body, max_bytes: u64) -> Result<Vec<u8>, ErrorCode> {
-    let mut bytes = Vec::new();
-    body.as_reader().take(max_bytes.saturating_add(1)).read_to_end(&mut bytes).map_err(|error| {
-        if timed_out(&error) { ErrorCode::Unreachable } else { ErrorCode::Unreadable } // cut off, or bad gzip
-    })?;
-    if bytes.len() as u64 > max_bytes { Err(ErrorCode::Unreadable) } else { Ok(bytes) }
-}
-
-/// ureq wraps its own timeout in an `io::Error` of kind `Other` when reading a body.
-fn timed_out(error: &io::Error) -> bool {
-    let wrapped = error.get_ref().and_then(|inner| inner.downcast_ref::<ureq::Error>());
-    error.kind() == io::ErrorKind::TimedOut || matches!(wrapped, Some(ureq::Error::Timeout(_)))
-}
-
-/// Failures before any response: DNS, refused or reset connections, TLS, timeouts.
-fn unreachable(_error: ureq::Error) -> ErrorCode {
-    ErrorCode::Unreachable
-}
-
-#[cfg(test)]
-#[path = "../../tests/support/http.rs"]
-mod test_server;
 
 #[cfg(test)]
 mod tests {
@@ -119,8 +54,9 @@ mod tests {
     use flate2::Compression;
     use flate2::write::GzEncoder;
 
-    use super::test_server::{Reply, Server};
     use super::*;
+    use crate::services::test_server::{Reply, Server};
+    use crate::session::web::{ACCEPT, MAX_REDIRECTS};
 
     const LIMIT: u64 = 1024;
 
@@ -129,7 +65,7 @@ mod tests {
     }
 
     fn get(url: &str) -> Result<Fetched, ErrorCode> {
-        fetch(&Url::parse(url).unwrap(), &limits())
+        fetch(&Url::parse(url).unwrap(), &limits(), Origin::Trusted)
     }
 
     fn source(url: &str) -> Result<String, ErrorCode> {
@@ -182,7 +118,7 @@ mod tests {
         });
         let quick = Limits { overall: Duration::from_millis(400), ..limits() };
         let started = Instant::now();
-        let result = fetch(&Url::parse(&server.url("/a.md")).unwrap(), &quick).map(|f| f.source);
+        let result = fetch(&Url::parse(&server.url("/a.md")).unwrap(), &quick, Origin::Trusted).map(|f| f.source);
         assert_eq!(result, Err(ErrorCode::Unreachable));
         assert!(server.requests().len() < 4, "stopped by the deadline, not the hop limit");
         assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
@@ -254,7 +190,7 @@ mod tests {
         let url = Url::parse(&format!("http://{}/a.md", silent.local_addr().unwrap())).unwrap();
         let quick = Limits { overall: Duration::from_millis(300), ..limits() };
         let started = Instant::now();
-        assert_eq!(fetch(&url, &quick).map(|f| f.source), Err(ErrorCode::Unreachable));
+        assert_eq!(fetch(&url, &quick, Origin::Trusted).map(|f| f.source), Err(ErrorCode::Unreachable));
         let waited = started.elapsed();
         assert!(waited >= Duration::from_millis(250) && waited < Duration::from_secs(3), "{waited:?}");
     }
@@ -264,7 +200,7 @@ mod tests {
         let stalled = serve(Reply::markdown("# Hi").cut_short(100, Duration::from_secs(5)));
         let quick = Limits { overall: Duration::from_millis(300), ..limits() };
         let started = Instant::now();
-        let result = fetch(&Url::parse(&stalled.url("/a.md")).unwrap(), &quick).map(|f| f.source);
+        let result = fetch(&Url::parse(&stalled.url("/a.md")).unwrap(), &quick, Origin::Trusted).map(|f| f.source);
         assert_eq!(result, Err(ErrorCode::Unreachable));
         assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
     }

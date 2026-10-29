@@ -36,7 +36,8 @@ Each phase has its own plan. This is the order, not a commitment to dates.
 1. **Local browsing** (built): addresses, links, back/forward, History, bundled reading fonts.
 2. **Remote browsing**, in two parts:
    - **2a, remote documents** (built): `http(s)` with an `Accept` header that prefers Markdown, redirects, and links between `.md` pages across sites. Raw HTML is stripped (ADR-002); fetching uses ureq (ADR-003).
-   - **2b, images**: local and remote images, next.
+   - **2b, images** (built): local and remote Markdown images, drawn in the page, with a Web images setting (automatic, on click, off). ADR-004.
+   - **2c, settings and home**: a Settings panel (font, images, home page) and a home page, next.
 3. **Shared front matter**: act on the community vocabulary, including a byline from `author` and `pubDate`, previous/next navigation from `urlPrev` and `urlNext`, `description`, `image`, `inlineImage` and `metaImage`, an `enclosure` link, and `source` (the post's feed). Unknown keys are ignored.
 4. **Reader controls**: text size, spacing and colours (including a dark palette), beyond the typeface choice.
 5. **Discovery**: `llms.txt` as a site index, RSS 2.0 feeds and OPML.
@@ -94,7 +95,8 @@ Detail and test methods are in `vector/research/assumptions/`.
 ## Open Questions
 - ~~HTML in documents: strip it or show it literally?~~ Resolved by ADR-002 (2026-10-29): strip tags, comments and declarations, and keep the text between them, matching markdownWeb.
 - **Image semantics.** What exactly do `image`, `inlineImage` and `metaImage` mean, and where should each appear? They are undocumented, so ask in markdownWeb issue #1.
-- **Remote images: load, click-to-load, or block?** (Phase 2b.) Real posts depend on them (examples 2 and 3), which argues for loading by default with a reader setting.
+- ~~Remote images: load, click-to-load, or block?~~ Resolved in phase 2b (2026-10-29): load automatically by default, with "on click" and "off" in the Web images menu.
+- **Leading images and tall images.** scripting.com floats a paragraph's leading image to the right; mdbrowser stacks it above the text, so posts read differently from the source site. This is the open item against the ship criterion "renders the scripting.com archive". A very tall image can also fill the window above a post's first line. Float layout, a maximum image height, or both?
 - **Marking plain `http`.** The address bar shows the full URL with its scheme, but nothing labels an `http` page as not secure. Is a label worth adding?
 - **Certificate failures.** A bad certificate shows as `unreachable`, the same as a site that is down. Should it get its own error, so an intercepted connection is visible?
 - **Enclosures.** Link out to the system player, or play audio in the browser?
@@ -109,6 +111,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 | Rendering spike | Done (2026-10-28) | `./vector/research/2026-10-28-spike-findings.md` |
 | Phase 1 (local browsing) | Built (2026-10-28) | `features/browse.feature`, `features/reading.feature` |
 | Phase 2a (remote documents) | Built (2026-10-29) | `features/remote.feature`, `vector/plans/phase-2a-remote-documents.md` |
+| Phase 2b (images) | Built (2026-10-29) | `features/images.feature`, `vector/plans/phase-2b-images.md` |
 | Interviews | 1, draft. The markdownWeb readme was treated as a transcript: a published manifesto, not a live session. | `./vector/research/interviews/INT-001.json` |
 | Assumptions | 6, draft | `./vector/research/assumptions/` |
 | Community examples | Not yet in the corpus | [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |

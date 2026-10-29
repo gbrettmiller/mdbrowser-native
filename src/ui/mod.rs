@@ -4,5 +4,8 @@ pub mod app;
 mod body;
 pub mod document;
 mod history;
+pub mod images;
+mod keys;
 pub mod pages;
 mod toolbar;
+mod viewport;

@@ -55,7 +55,11 @@ pub(super) fn split_reference(reference: &str) -> (String, Option<String>) {
 
 /// `file://[localhost]/abs/path[#fragment]` → (path, fragment). Other hosts aren't local.
 pub(super) fn parse_file_url(url: &str) -> Option<(String, Option<String>)> {
-    let rest = url.get("file://".len()..)?;
+    let prefix = url.get(.."file://".len())?;
+    if !prefix.eq_ignore_ascii_case("file://") {
+        return None; // `file:/x` or `file:x`: not the form we read
+    }
+    let rest = &url["file://".len()..];
     let slash = rest.find('/')?;
     let host = &rest[..slash];
     (host.is_empty() || host.eq_ignore_ascii_case("localhost")).then(|| {
@@ -92,7 +96,7 @@ pub(super) fn normalise(path: &Path) -> PathBuf {
     })
 }
 
-fn expand_home(path: &str, home: &Path) -> PathBuf {
+pub(super) fn expand_home(path: &str, home: &Path) -> PathBuf {
     match path.strip_prefix('~') {
         Some("") => home.to_path_buf(),
         Some(rest) if rest.starts_with('/') => home.join(&rest[1..]),
