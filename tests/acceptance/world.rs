@@ -6,9 +6,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use mdbrowser::services::runner;
 use mdbrowser::services::store::Store;
 use mdbrowser::services::web::Limits;
+use mdbrowser::services::{images, runner};
 use mdbrowser::session::location::Location;
 use mdbrowser::session::visits::Visit;
 use mdbrowser::session::web::Origin;
@@ -173,6 +173,7 @@ impl Browser {
                     self.finish_load(request_id, location, origin);
                 }
             }
+            Effect::LoadImage { location, origin } => self.finish_image(location, origin),
             Effect::OpenExternal(url) => {
                 if self.opener_fails {
                     self.send(Event::OpenerFailed);
@@ -200,6 +201,18 @@ impl Browser {
         self.clock += 1;
         let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() }, origin);
         self.send(Event::Loaded { request_id, result, now: self.clock });
+    }
+
+    /// Loads an image through the app's own `services::images::load`.
+    fn finish_image(&mut self, location: Location, origin: Origin) {
+        match &location {
+            Location::File(path) => self.reads.push(path.clone()),
+            Location::Web(url) => {
+                assert_eq!(url.host_str(), Some("127.0.0.1"), "scenarios never leave the test server: {url}")
+            }
+        }
+        let result = images::load(location.clone(), origin);
+        self.send(Event::ImageLoaded { location, result });
     }
 
     pub fn hold(&mut self, name: &str) {

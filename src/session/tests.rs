@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::session::address::native;
-use crate::session::images::ImageLoading;
+use crate::session::images::{ImageLoading, Note, Problem, View};
 use crate::session::web::Origin;
 
 fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
@@ -242,4 +242,118 @@ fn links_from_local_files_and_local_pages_are_trusted() {
         Event::Follow("https://x.org/b.md".into()),
     ]);
     assert_eq!(load_origins(&effects), [Origin::Trusted]);
+}
+
+fn image_loads(effects: &[Effect]) -> Vec<(Location, Origin)> {
+    effects
+        .iter()
+        .filter_map(|effect| match effect {
+            Effect::LoadImage { location, origin } => Some((location.clone(), *origin)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn picture() -> crate::session::images::Picture {
+    let handle = iced::advanced::image::Handle::from_rgba(1, 1, vec![0; 4]);
+    crate::session::images::Picture { width: 1, height: 1, handle }
+}
+
+#[test]
+fn a_ready_page_loads_its_images_with_its_origin() {
+    let (_, effects) =
+        run([Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "![x](x.png)")]);
+    assert_eq!(image_loads(&effects), [(web("https://x.org/x.png"), Origin::Public)]);
+    let (_, effects) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "![x](x.png)")]);
+    assert_eq!(image_loads(&effects), [(Location::file(native("/d/x.png")), Origin::Trusted)]);
+}
+
+#[test]
+fn a_finished_image_starts_the_next_and_shows() {
+    let source = "![1](1.png) ![2](2.png) ![3](3.png) ![4](4.png) ![5](5.png)";
+    let (state, effects) = run([Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", source)]);
+    assert_eq!(image_loads(&effects).len(), 4);
+    let done = Event::ImageLoaded { location: web("https://x.org/1.png"), result: Ok(picture()) };
+    let (state, effects) = step(state, done);
+    assert_eq!(image_loads(&effects), [(web("https://x.org/5.png"), Origin::Public)]);
+    assert_eq!(state.images.view("1.png"), View::Shown((1, 1)));
+}
+
+#[test]
+fn leaving_a_page_drops_its_waiting_loads() {
+    let source = "![1](1.png) ![2](2.png) ![3](3.png) ![4](4.png) ![5](5.png)";
+    let (state, _) = run([
+        Event::Enter("https://x.org/a.md".into()),
+        fetched(1, "https://x.org/a.md", source),
+        Event::Enter("https://x.org/b.md".into()),
+    ]);
+    let done = Event::ImageLoaded { location: web("https://x.org/1.png"), result: Ok(picture()) };
+    let (_, effects) = step(state, done);
+    assert!(image_loads(&effects).is_empty());
+}
+
+fn opened_with(mode: ImageLoading, source: &str) -> State {
+    let (state, _) = run([
+        Event::ChooseImageLoading(mode),
+        Event::Enter("https://x.org/a.md".into()),
+        fetched(1, "https://x.org/a.md", source),
+    ]);
+    state
+}
+
+fn public(path: &str) -> (Location, Origin) {
+    (web(&format!("https://x.org/{path}")), Origin::Public)
+}
+
+#[test]
+fn off_loads_nothing_until_the_shortcut_which_keeps_the_setting() {
+    let state = opened_with(ImageLoading::Off, "![x](x.png) ![y](y.png)");
+    let (state, effects) = step(state, Event::LoadPageImages);
+    assert_eq!(image_loads(&effects), [public("x.png"), public("y.png")]);
+    assert_eq!(state.settings.images, ImageLoading::Off);
+}
+
+#[test]
+fn switching_to_automatic_loads_the_page_and_saves_the_setting() {
+    let state = opened_with(ImageLoading::Off, "![x](x.png) ![y](y.png)");
+    let (_, effects) = step(state, Event::ChooseImageLoading(ImageLoading::Automatic));
+    assert_eq!(image_loads(&effects), [public("x.png"), public("y.png")]);
+    let saved = Settings { images: ImageLoading::Automatic, ..Settings::default() };
+    assert!(effects.contains(&Effect::PersistSettings(saved)));
+}
+
+#[test]
+fn a_click_loads_one_waiting_image_and_off_ignores_clicks() {
+    let state = opened_with(ImageLoading::OnClick, "![x](x.png) ![y](y.png)");
+    let (_, effects) = step(state, Event::LoadImage(web("https://x.org/x.png")));
+    assert_eq!(image_loads(&effects), [public("x.png")]);
+    let state = opened_with(ImageLoading::Off, "![x](x.png)");
+    let (_, effects) = step(state, Event::LoadImage(web("https://x.org/x.png")));
+    assert!(image_loads(&effects).is_empty());
+}
+
+#[test]
+fn switching_off_cancels_nothing_that_is_running() {
+    let state = opened_with(ImageLoading::Automatic, "![x](x.png)");
+    let (state, effects) = step(state, Event::ChooseImageLoading(ImageLoading::Off));
+    assert!(image_loads(&effects).is_empty());
+    let done = Event::ImageLoaded { location: web("https://x.org/x.png"), result: Ok(picture()) };
+    let (state, _) = step(state, done);
+    assert_eq!(state.images.view("x.png"), View::Shown((1, 1)));
+}
+
+#[test]
+fn a_failed_image_shows_its_note_and_refused_sources_load_nothing() {
+    let state = opened_with(ImageLoading::Automatic, "![x](x.png) ![f](file:///etc/x.png)");
+    let failed = Event::ImageLoaded { location: web("https://x.org/x.png"), result: Err(Problem::Unavailable) };
+    let (state, effects) = step(state, failed);
+    assert!(image_loads(&effects).is_empty());
+    assert_eq!(state.images.view("x.png"), View::Note(Note::Failed, true));
+    assert_eq!(state.images.view("file:///etc/x.png"), View::Note(Note::Refused, false));
+}
+
+#[test]
+fn a_local_file_loads_web_images_as_the_readers_own() {
+    let (_, effects) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "![w](https://x.org/w.png)")]);
+    assert_eq!(image_loads(&effects), [(web("https://x.org/w.png"), Origin::Trusted)]);
 }

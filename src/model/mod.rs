@@ -82,6 +82,23 @@ pub fn text_of(spans: &[Span]) -> String {
 
 impl Document {
     /// All visible text, blocks separated by newlines (for tests and search).
+    /// Every image block's source, in reading order, however deeply nested.
+    pub fn image_sources(&self) -> Vec<String> {
+        fn collect(blocks: &[Block], out: &mut Vec<String>) {
+            for block in blocks {
+                match block {
+                    Block::Image { src, .. } => out.push(src.clone()),
+                    Block::Quote(inner) => collect(inner, out),
+                    Block::List { items, .. } => items.iter().for_each(|item| collect(&item.blocks, out)),
+                    _ => {}
+                }
+            }
+        }
+        let mut sources = Vec::new();
+        collect(&self.blocks, &mut sources);
+        sources
+    }
+
     pub fn plain_text(&self) -> String {
         blocks_text(&self.blocks).join("\n")
     }
@@ -370,6 +387,12 @@ mod tests {
     #[test]
     fn an_image_right_after_a_heading_is_its_own_block() {
         assert_eq!(blocks("# H\n![a](a.png)"), [heading(1, "H", "h"), image("a.png", "a")]);
+    }
+
+    #[test]
+    fn image_sources_are_listed_in_reading_order_however_deep() {
+        let doc = parse("![a](1.png)\n\n> ![b](2.png)\n\n- x ![c](3.png)\n\n# ![d](h.png)");
+        assert_eq!(doc.image_sources(), ["1.png", "2.png", "3.png"]);
     }
 
     #[test]

@@ -1,9 +1,12 @@
 //! Images in a document: where each comes from, which load and when, and the
 //! limits that bound them (ADR-004).
 
+mod cache;
 pub mod limits;
+mod planner;
 mod resolve;
 
+pub use planner::{Images, View};
 pub use resolve::{Refusal, resolve};
 
 use iced::advanced::image::Handle;

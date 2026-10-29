@@ -91,6 +91,15 @@ pub enum Event {
     ClearHistory,
     ChooseFont(ReadingFont),
     ChooseImageLoading(images::ImageLoading),
+    /// An image load finished.
+    ImageLoaded {
+        location: Location,
+        result: Result<images::Picture, images::Problem>,
+    },
+    /// A click on a waiting or failed image.
+    LoadImage(Location),
+    /// Ctrl/Cmd+Shift+I: load this page's images, whatever the setting.
+    LoadPageImages,
     DismissNotice(u64),
     FragmentHandled,
     Restore {
@@ -102,6 +111,7 @@ pub enum Event {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
     Load { request_id: u64, location: Location, origin: web::Origin },
+    LoadImage { location: Location, origin: web::Origin },
     OpenExternal(String),
     PersistVisits(Vec<Visit>),
     PersistSettings(Settings),
@@ -120,6 +130,8 @@ pub struct State {
     pub notices: Vec<Notice>,
     pub notice_seq: u64,
     pub settings: Settings,
+    /// Images: their states, the current page's sources, and the cache.
+    pub images: images::Images,
 }
 
 impl State {
@@ -135,6 +147,7 @@ impl State {
             notices: Vec::new(),
             notice_seq: 0,
             settings: Settings::default(),
+            images: images::Images::new(),
         }
     }
 

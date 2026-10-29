@@ -533,7 +533,7 @@ In ARCHITECTURE.md:
 **Files**: `Cargo.toml`, `src/session/web/{mod,body}.rs`, `src/services/{files,images,mod,runner}.rs`, `src/services/web/*`
 **Commit**: `feat(services): read, fetch and decode images within limits`
 
-### Step 6: The image planner and cache
+### Step 6: The image planner and cache — done
 
 **Complexity**: complex (state machine)
 **RED**: Reducer and planner tests, with concrete inputs.
