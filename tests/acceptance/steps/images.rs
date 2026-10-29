@@ -126,6 +126,7 @@ fn file_with_web_image(w: &mut Browser, name: String, path: String) {
     fs::write(w.path(&name), format!("![{description}]({})", w.url(&path))).unwrap();
 }
 
+#[given(expr = "the image {string} is shown at {int} by {int}")]
 #[then(expr = "the image {string} is shown at {int} by {int}")]
 fn image_shown_at(w: &mut Browser, alt: String, width: u32, height: u32) {
     let src = source_of(w, &alt);
@@ -193,4 +194,84 @@ fn select_and_copy(w: &mut Browser) {
 #[then(expr = "the copied text is {string}")]
 fn copied_text(w: &mut Browser, expected: String) {
     assert_eq!(w.copied.as_deref(), Some(unescape(&expected).as_str()));
+}
+
+#[given(expr = "a file {string} linking an image to {string} and an image to the URL of {string}")]
+fn file_with_two_images(w: &mut Browser, name: String, local: String, path: String) {
+    let remote = path.rsplit('/').next().unwrap_or_default().to_string();
+    fs::write(w.path(&name), format!("![{local}]({local})\n\n![{remote}]({})", w.url(&path))).unwrap();
+}
+
+#[given(expr = "the site serves {string} with images {string} to {string}")]
+fn site_serves_gallery(w: &mut Browser, path: String, first: String, last: String) {
+    // "/img/slow-1.png" to "/img/slow-6.png": the number between the last '-' and '.'.
+    let number =
+        |name: &str| name.rsplit('-').next().and_then(|n| n.split('.').next()).unwrap().parse::<u32>().unwrap();
+    let stem = first.rsplit_once('-').unwrap().0.to_string();
+    let markdown: String = (number(&first)..=number(&last)).map(|n| format!("![{n}]({stem}-{n}.png)\n\n")).collect();
+    let mut routes = w.routes.lock().expect("routes");
+    for n in number(&first)..=number(&last) {
+        let image = Reply::new(200).header("Content-Type", "image/png").body(fixtures::png(40, 20));
+        routes.insert(format!("{stem}-{n}.png"), image);
+    }
+    routes.insert(path, Reply::markdown(&markdown));
+}
+
+#[given(expr = "loading each image under {string} is slow")]
+fn images_are_slow(w: &mut Browser, prefix: String) {
+    w.hold_images_under(&prefix);
+}
+
+#[when("every slow image finishes loading")]
+fn every_image_finishes(w: &mut Browser) {
+    w.release_images();
+}
+
+/// Requests the site answered for images, plus image loads started and still waiting.
+#[then(expr = "the site has seen {int} image requests")]
+fn image_requests_seen(w: &mut Browser, count: usize) {
+    let answered =
+        w.server.requests().iter().filter(|r| r.headers.get("accept").is_some_and(|a| a.starts_with("image/"))).count();
+    assert_eq!(answered + w.waiting_images(), count);
+}
+
+#[given(expr = "the image cache has room for one {int} by {int} image")]
+fn cache_room(w: &mut Browser, width: u64, height: u64) {
+    w.set_image_budget(width * height * 4);
+}
+
+#[then(expr = "clicking the note under {string} does nothing")]
+fn note_does_nothing(w: &mut Browser, alt: String) {
+    let src = source_of(w, &alt);
+    let page = laid_page(w);
+    assert!(
+        page.fragments.iter().all(|fragment| fragment.action.as_deref() != Some(&src)),
+        "{src} has a clickable note"
+    );
+}
+
+#[when("I load this page's images")]
+fn load_page_images(w: &mut Browser) {
+    w.send(Event::LoadPageImages);
+}
+
+/// As a click lands on the drawn image: the link it sits in, if any.
+#[when(expr = "I click the image {string}")]
+fn click_image(w: &mut Browser, alt: String) {
+    let src = source_of(w, &alt);
+    let page = laid_page(w);
+    let laid = page.images.iter().find(|laid| laid.src == src).expect("a drawn image");
+    let centre = iced::Point::new(laid.bounds.x + laid.bounds.width / 2.0, laid.bounds.y + laid.bounds.height / 2.0);
+    let link = page.link_at(centre).expect("the image is linked").to_string();
+    w.send(Event::Follow(link));
+}
+
+/// As a click lands on a placeholder's description.
+#[when(expr = "I click the description {string}")]
+fn click_description(w: &mut Browser, alt: String) {
+    let page = laid_page(w);
+    let description = mdbrowser::model::image_description(&alt);
+    let fragment = page.fragments.iter().find(|f| f.text == description).expect("a description");
+    let link = fragment.link.clone().expect("the description is linked");
+    w.send(Event::Follow(link));
 }

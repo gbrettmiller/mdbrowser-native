@@ -13,6 +13,7 @@ use super::{enter, shown_title, unescape};
 use crate::http::Reply;
 use crate::world::Browser;
 
+#[given(expr = "I enter the URL of {string}")]
 #[when(expr = "I enter the URL of {string}")]
 fn enter_url(w: &mut Browser, path: String) {
     let url = w.url(&path);
@@ -60,6 +61,11 @@ fn follow_url(w: &mut Browser, path: String) {
 fn follow_file_url(w: &mut Browser, name: String) {
     let url = w.file_url(&name);
     w.send(Event::Follow(url));
+}
+
+#[given(expr = "I entered the URL of {string}")]
+fn entered_url(w: &mut Browser, path: String) {
+    enter_url(w, path);
 }
 
 #[given(expr = "I entered the URL of {string} and see the error {string}")]
@@ -162,6 +168,7 @@ fn told_markdown_first(w: &mut Browser) {
     assert!(others.iter().all(|range| weight(range) < top), "{accept}");
 }
 
+#[given(regex = r#"^the site has seen (\d+) requests? for "([^"]+)"$"#)]
 #[then(regex = r#"^the site has seen (\d+) requests? for "([^"]+)"$"#)]
 fn requests_seen(w: &mut Browser, count: usize, path: String) {
     let seen = w.server.requests().iter().filter(|request| request.path == path).count();

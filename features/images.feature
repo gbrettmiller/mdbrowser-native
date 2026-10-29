@@ -127,3 +127,110 @@ Feature: Images
     When I enter the URL of "/post.md"
     Then no image is shown
     And the site has seen 0 requests for "/img/red.png"
+
+  # ── step 9: the setting, clicks, links, loading and the cache ──────────────
+
+  Scenario: On click: web images wait, local images load
+    Given I set web images to "on click"
+    And an image file "pic.png" of 12 by 8 pixels
+    And a file "both.md" linking an image to "pic.png" and an image to the URL of "/img/red.png"
+    When I view "both.md"
+    Then the image "pic.png" is shown at 12 by 8
+    And the image "red.png" is not shown and says "Click to load"
+    And the site has seen 0 requests for "/img/red.png"
+    When I click the note under "red.png"
+    Then the image "red.png" is shown at 40 by 20
+    And the site has seen 1 request for "/img/red.png"
+
+  Scenario: Off: web images are not requested and can't be clicked
+    Given I set web images to "off"
+    And the site serves "/post.md" containing "![red](img/red.png)"
+    When I enter the URL of "/post.md"
+    Then the image "red" is not shown and says "Web images are off. Press Ctrl+Shift+I to load this page's."
+    And clicking the note under "red" does nothing
+    And the site has seen 0 requests for "/img/red.png"
+
+  Scenario Outline: Switching to automatic loads the images on the page
+    Given I set web images to "<mode>"
+    And the site serves "/post.md" containing "![red](img/red.png)"
+    And I am viewing the URL of "/post.md"
+    And the site has seen 0 requests for "/img/red.png"
+    When I set web images to "automatic"
+    Then the image "red" is shown at 40 by 20
+    Examples:
+      | mode     |
+      | on click |
+      | off      |
+
+  Scenario: Switching off keeps images already shown
+    Given the site serves "/post.md" containing "![red](img/red.png)"
+    And I am viewing the URL of "/post.md"
+    When I set web images to "off"
+    Then the image "red" is shown at 40 by 20
+
+  Scenario: Switching from off to on click makes images clickable
+    Given I set web images to "off"
+    And the site serves "/post.md" containing "![red](img/red.png)"
+    And I am viewing the URL of "/post.md"
+    When I set web images to "on click"
+    Then the image "red" is not shown and says "Click to load"
+
+  Scenario: Loading this page's images leaves the setting alone
+    Given I set web images to "off"
+    And the site serves "/post.md" containing "![red](img/red.png)"
+    And I am viewing the URL of "/post.md"
+    When I load this page's images
+    Then the image "red" is shown at 40 by 20
+    And web images are set to "off"
+
+  Scenario: A linked image follows its link
+    Given the site serves "/post.md" containing "[![red](img/red.png)](https://example.com/)"
+    And I am viewing the URL of "/post.md"
+    When I click the image "red"
+    Then the system opened "https://example.com/"
+
+  Scenario: A linked image waiting for a click
+    Given I set web images to "on click"
+    And the site serves "/post.md" containing "[![red](img/red.png)](https://example.com/)"
+    And I am viewing the URL of "/post.md"
+    When I click the note under "red"
+    Then the image "red" is shown at 40 by 20
+    And nothing is opened externally
+    When I click the description "red"
+    Then the system opened "https://example.com/"
+
+  Scenario: At most four images load at once
+    Given the site serves "/gallery.md" with images "/img/slow-1.png" to "/img/slow-6.png"
+    And loading each image under "/img/slow-" is slow
+    When I enter the URL of "/gallery.md"
+    Then the site has seen 4 image requests
+    When "/img/slow-1.png" finishes loading
+    Then the site has seen 5 image requests
+
+  Scenario: Leaving a page drops its waiting loads
+    Given the site serves "/gallery.md" with images "/img/slow-1.png" to "/img/slow-6.png"
+    And loading each image under "/img/slow-" is slow
+    And I entered the URL of "/gallery.md"
+    When I enter the URL of "/index.md"
+    And every slow image finishes loading
+    Then the site has seen 4 image requests
+    And I see the document titled "Remote Home"
+    And no image is shown
+
+  Scenario: Going back shows cached images without fetching again
+    Given the site serves "/post.md" containing "![red](img/red.png)"
+    And I am viewing the URL of "/post.md"
+    And the image "red" is shown at 40 by 20
+    And I enter the URL of "/index.md"
+    When I go back
+    Then the image "red" is shown at 40 by 20
+    And the site has seen 1 request for "/img/red.png"
+
+  Scenario: An image dropped from the cache is fetched again
+    Given the image cache has room for one 40 by 20 image
+    And the site serves "/a.md" containing "![red](img/red.png)"
+    And the site serves "/b.md" containing "![photo](img/photo.jpg)"
+    And I viewed the URL of "/a.md" then the URL of "/b.md"
+    When I go back
+    Then the image "red" is shown at 40 by 20
+    And the site has seen 2 requests for "/img/red.png"

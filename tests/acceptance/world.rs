@@ -98,6 +98,9 @@ pub struct Browser {
     /// Loads of these locations wait until released.
     held: HashSet<Location>,
     parked: Vec<(u64, Location, Origin)>,
+    /// Web image loads under these paths wait; started ones wait here.
+    slow_images: Vec<String>,
+    parked_images: Vec<(Location, Origin)>,
     pub server: Server,
     /// What the server answers, by path; anything else is a 404.
     pub routes: Arc<Mutex<HashMap<String, Reply>>>,
@@ -139,6 +142,8 @@ impl Browser {
             opener_fails: false,
             held: HashSet::new(),
             parked: Vec::new(),
+            slow_images: Vec::new(),
+            parked_images: Vec::new(),
             server,
             routes,
             store,
@@ -225,12 +230,56 @@ impl Browser {
 
     /// Loads an image through the app's own `services::images::load`.
     fn finish_image(&mut self, location: Location, origin: Origin) {
+        let held = match &location {
+            Location::Web(url) => self.slow_images.iter().any(|prefix| url.path().starts_with(prefix.as_str())),
+            Location::File(_) => false,
+        };
+        if held {
+            self.parked_images.push((location, origin));
+        } else {
+            self.fetch_image(location, origin);
+        }
+    }
+
+    fn fetch_image(&mut self, location: Location, origin: Origin) {
         match &location {
             Location::File(path) => self.reads.push(path.clone()),
             Location::Web(url) => assert!(on_test_server(url), "scenarios never leave the test server: {url}"),
         }
         let result = images::load(location.clone(), origin);
         self.send(Event::ImageLoaded { location, result });
+    }
+
+    /// Web image loads whose path starts with `prefix` wait until released.
+    pub fn hold_images_under(&mut self, prefix: &str) {
+        self.slow_images.push(prefix.to_string());
+    }
+
+    /// Image loads started and not yet finished.
+    pub fn waiting_images(&self) -> usize {
+        self.parked_images.len()
+    }
+
+    /// Lets every waiting image load finish, in the order they started.
+    pub fn release_images(&mut self) {
+        self.slow_images.clear();
+        let waiting = std::mem::take(&mut self.parked_images);
+        waiting.into_iter().for_each(|(location, origin)| self.fetch_image(location, origin));
+    }
+
+    /// Lets the waiting load of one image finish; returns false if none was waiting.
+    fn release_image(&mut self, path: &str) -> bool {
+        let location = self.web(path);
+        let Some(index) = self.parked_images.iter().position(|(held, _)| *held == location) else { return false };
+        let (location, origin) = self.parked_images.remove(index);
+        self.fetch_image(location, origin); // loads it starts are still held
+        true
+    }
+
+    /// The session's image cache, with room for `bytes` of pixels.
+    pub fn set_image_budget(&mut self, bytes: u64) {
+        let state = self.state.take().expect("state");
+        self.state = Some(State { images: mdbrowser::session::images::Images::with_budget(bytes), ..state });
     }
 
     pub fn hold(&mut self, name: &str) {
@@ -240,6 +289,9 @@ impl Browser {
 
     /// Lets a held load complete, with the request id it was issued under.
     pub fn release(&mut self, name: &str) {
+        if name.starts_with('/') && self.release_image(name) {
+            return;
+        }
         let location = self.location_named(name);
         self.held.remove(&location);
         let (ready, still): (Vec<_>, Vec<_>) = self.parked.drain(..).partition(|(_, held, _)| *held == location);

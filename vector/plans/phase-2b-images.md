@@ -597,7 +597,7 @@ Also:
 **Files**: `src/ui/{document,pages,app,toolbar}.rs`, `src/services/runner.rs`, `tests/acceptance/**`, `features/images.feature`
 **Commit**: `feat(ui): draw images in the page`
 
-### Step 9: Setting, clicks, links and loading, end to end
+### Step 9: Setting, clicks, links and loading, end to end — done
 
 **Complexity**: complex (cross-layer)
 **RED**: The step-9 scenarios. World additions:
