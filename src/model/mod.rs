@@ -3,6 +3,7 @@
 
 mod blocks;
 mod frontmatter;
+mod html;
 mod inlines;
 pub mod slug;
 
@@ -210,12 +211,41 @@ mod tests {
     }
 
     #[test]
-    fn html_is_shown_as_literal_text_not_interpreted() {
-        assert_eq!(paragraph_text("x <b>y</b>"), "x <b>y</b>");
-        assert_eq!(
-            blocks("<script>alert(1)</script>"),
-            vec![Block::Code { lang: None, text: "<script>alert(1)</script>".into() }]
-        );
+    fn inline_html_is_stripped_and_its_text_kept() {
+        assert_eq!(paragraph_text("x <b>y</b>"), "x y");
+        assert_eq!(paragraph_text("[<i>x</i>](u)"), "x");
+        assert_eq!(paragraph_text("a <a title='p>q'>b</a>"), "a b");
+    }
+
+    #[test]
+    fn html_blocks_become_their_text_or_nothing() {
+        assert_eq!(blocks("<script>alert(1)</script>"), vec![Block::Paragraph(vec![plain("alert(1)")])]);
+        assert_eq!(blocks("<div>\nhello\nthere\n</div>"), vec![Block::Paragraph(vec![plain("hello there")])]);
+        assert_eq!(blocks("<!-- note -->\n\npara"), vec![Block::Paragraph(vec![plain("para")])]);
+        assert_eq!(blocks("<div></div>"), vec![]);
+        // An unclosed comment's HTML block runs to the end of the document, so it hides what follows.
+        assert_eq!(blocks("a\n\n<!-- unclosed\n\nb"), vec![Block::Paragraph(vec![plain("a")])]);
+    }
+
+    #[test]
+    fn html_blocks_inside_quotes_and_lists_are_stripped() {
+        assert_eq!(parse("> <div>q</div>").plain_text(), "q");
+        assert_eq!(parse("- <div>item</div>").plain_text(), "item");
+    }
+
+    #[test]
+    fn html_in_headings_lists_and_tables_is_stripped() {
+        let doc = parse("# <b>Title</b>\n\n- <i>item</i>\n\n| <u>cell</u> |\n|-|\n| y |");
+        assert_eq!(doc.blocks[0], heading(1, "Title", "title"));
+        assert_eq!(doc.title("t.md"), "Title");
+        assert_eq!(doc.plain_text(), "Title\nitem\ncell\ny");
+    }
+
+    #[test]
+    fn code_is_never_stripped() {
+        assert_eq!(paragraph_text("`<b>code</b>` stays"), "<b>code</b> stays");
+        assert_eq!(blocks("    <b>indented</b>\n"), vec![Block::Code { lang: None, text: "<b>indented</b>\n".into() }]);
+        assert_eq!(blocks("```\n<b>x</b>\n```"), vec![Block::Code { lang: None, text: "<b>x</b>\n".into() }]);
     }
 
     #[test]

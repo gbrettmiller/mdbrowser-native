@@ -2,7 +2,7 @@
 source: src/layout/golden.rs
 expression: "geometry(&page_at(source, ReadingFont::Literata, WIDTH))"
 ---
-height 1143.0, 39 fragments, anchors [("tables-and-code", 32.0), ("table", 167.5), ("code-block", 623.0)]
+height 1069.0, 37 fragments, anchors [("tables-and-code", 32.0), ("table", 167.5), ("code-block", 623.0)]
    32.0   32.0  273.9 "Tables and code"
   109.0   32.0   66.2 "Back to "
   109.0   98.2   80.2 "the index"
@@ -39,6 +39,4 @@ height 1143.0, 39 fragments, anchors [("tables-and-code", 32.0), ("table", 167.5
   827.0   46.0    9.5 "}"
   896.0   46.0  180.6 "Indented code block"
   921.0   46.0  133.1 "with two lines"
-  990.0   46.0   47.5 "<div>"
- 1015.0   46.0  389.7 "  An HTML block is shown as literal text."
- 1040.0   46.0   57.0 "</div>"
+  976.0   32.0  318.4 "An HTML block is stripped to its text."

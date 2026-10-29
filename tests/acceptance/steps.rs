@@ -186,11 +186,10 @@ fn nothing_read(w: &mut Browser) {
     assert!(w.reads.is_empty(), "read {:?}", w.reads);
 }
 
-#[then(expr = "the document text contains {string}")]
-fn text_contains(w: &mut Browser, content: String) {
+#[then(expr = "the document text is {string}")]
+fn text_is(w: &mut Browser, expected: String) {
     let Status::Ready(shown) = &w.state().status else { panic!("no document: {:?}", w.state().status) };
-    let text = shown.document.plain_text();
-    assert!(text.contains(&unescape(&content)), "{content:?} not in {text:?}");
+    assert_eq!(shown.document.plain_text(), unescape(&expected));
 }
 
 #[then(expr = "I am still viewing {string}")]

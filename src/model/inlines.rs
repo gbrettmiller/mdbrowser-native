@@ -3,7 +3,7 @@
 use pulldown_cmark::{Event, Tag, TagEnd};
 
 use super::blocks::Events;
-use super::{Span, Style};
+use super::{Span, Style, html};
 
 fn is_inline_tag(tag: &Tag) -> bool {
     matches!(
@@ -70,8 +70,9 @@ pub fn inlines(events: &mut Events) -> Vec<Span> {
         let style = depth.style();
         let link = links.last();
         match events.next().expect("peeked") {
-            // Inline HTML is literal text, never interpreted.
-            Event::Text(t) | Event::InlineHtml(t) => push(&mut spans, &t, style, link),
+            Event::Text(t) => push(&mut spans, &t, style, link),
+            // Raw HTML is stripped, never interpreted (ADR-002).
+            Event::InlineHtml(t) => push(&mut spans, &html::strip(&t), style, link),
             Event::Code(t) | Event::InlineMath(t) | Event::DisplayMath(t) => {
                 push(&mut spans, &t, Style { code: true, ..style }, link)
             }

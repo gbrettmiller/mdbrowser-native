@@ -9,7 +9,7 @@ Plain, **strong**, *emphasis*, ***both***, ~~struck through~~, and `inline code`
 Hard line breaks work:  
 this sentence started on a new line.
 
-Inline HTML is not interpreted: <span style="color:red">this stays literal</span>. That's the point: the browser owns presentation.
+Inline HTML is never interpreted: <span style="color:red">these words keep no colour</span>, because the tags are stripped. The browser owns presentation.
 
 ## Headings
 
