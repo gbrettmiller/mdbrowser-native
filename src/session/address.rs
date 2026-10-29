@@ -17,6 +17,11 @@ pub(super) fn scheme_of(reference: &str) -> Option<String> {
     valid.then(|| scheme.to_ascii_lowercase())
 }
 
+/// Whether `input` starts with a URL scheme (`https:`, `file:`), not a drive letter.
+pub fn has_scheme(input: &str) -> bool {
+    scheme_of(input.trim()).is_some()
+}
+
 /// Percent-decodes; malformed or non-UTF-8 input is returned unchanged.
 pub(crate) fn decode(text: &str) -> String {
     let bytes = text.as_bytes();
