@@ -6,7 +6,10 @@ mod frontmatter;
 mod inlines;
 pub mod slug;
 
-use pulldown_cmark::{Event, MetadataBlockKind, Options, Parser, Tag};
+#[cfg(test)]
+mod corpus;
+
+use pulldown_cmark::{Event, Options, Parser};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Style {
@@ -91,20 +94,11 @@ fn blocks_text(blocks: &[Block]) -> Vec<String> {
         .collect()
 }
 
-fn frontmatter_source(events: &[Event]) -> Option<String> {
-    events.windows(2).find_map(|pair| match pair {
-        [Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle)), Event::Text(yaml)] => Some(yaml.to_string()),
-        _ => None,
-    })
-}
-
 pub fn parse(source: &str) -> Document {
-    let options = Options::ENABLE_TABLES
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_YAML_STYLE_METADATA_BLOCKS;
-    let events: Vec<Event> = Parser::new_ext(source, options).collect();
-    let frontmatter_title = frontmatter_source(&events).and_then(|yaml| frontmatter::title(&yaml));
+    let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
+    let (yaml, body) = frontmatter::split(source);
+    let events: Vec<Event> = Parser::new_ext(body, options).collect();
+    let frontmatter_title = yaml.and_then(frontmatter::title);
     let blocks = blocks::blocks(&mut blocks::Events::new(events));
     Document { blocks, frontmatter_title }
 }
