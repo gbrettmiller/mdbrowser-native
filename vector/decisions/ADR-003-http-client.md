@@ -90,6 +90,7 @@ Fetch settings, all owned by `services::web` and passed as `Limits`:
 - About 2 MB more binary.
 - Corporate MITM proxies with private roots fail as `unreachable`. If readers report this, revisit it with ureq's `platform-verifier` feature (the OS trust store).
 - **Accepted risk: private-network fetches.** A remote page can link to `http://192.168.x.x/…` or `http://localhost/…`. The browser fetches it only when the reader clicks the link, with no cookies or credentials, and it shows only Markdown. The risk is tracked as a follow-up, which could block private addresses for links from public pages.
+- **Redirects can't widen that risk.** A redirect's target is invisible before the click. So `next_hop` refuses one that goes from a public host to a loopback, private, link-local or unspecified address, or to `localhost`. It checks the parsed host, so `0x7f.1` and `[::ffff:127.0.0.1]` count. A public *name* that resolves to a private address (DNS rebinding) is not caught. That needs a check at connect time, which belongs to the same follow-up.
 - No HTTP/2. No proxy support beyond what ureq reads from the environment.
 
 **Neutral:**

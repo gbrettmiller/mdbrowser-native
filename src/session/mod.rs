@@ -8,6 +8,7 @@ pub mod location;
 pub mod navigation;
 mod reducer;
 pub mod visits;
+pub mod web;
 
 pub use reducer::step;
 

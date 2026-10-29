@@ -32,7 +32,12 @@ Decisions already made by the product owner (2026-10-29):
    - An empty 2xx body is a valid, empty document.
 3. [ ] **Open in browser.** On `notMarkdown` for any web location (typed or followed), the error offers **Open in browser**, which hands the URL to the system browser. Local files never offer it.
 4. [ ] **Redirects.** Statuses 301, 302, 303, 307 and 308 are followed up to 5 hops. The address bar, History and relative links use the final URL.
-   - These give `badRedirect`: a 6th hop, https→http, a non-http(s) target, or a missing `Location` header.
+   - These give `badRedirect`:
+     - a 6th hop
+     - https→http
+     - a non-http(s) target
+     - a missing or empty `Location` header
+     - a public host redirecting to a loopback, private or link-local address, or to `localhost` (ADR-003)
    - Any other 3xx gives `serverError`. Any 2xx is a success.
    - User names and passwords in a redirect target are dropped, never sent.
 5. [ ] **Failures.**
@@ -364,7 +369,7 @@ The existing file tests still pass.
 **Files**: `Cargo.toml`, `src/session/location.rs`, `src/session/links.rs`, `src/services/runner.rs`, `src/ui/*` call sites
 **Commit**: `refactor(session): let a location be a file or a web URL`
 
-### Step 5: Web response policy, pure
+### Step 5: Web response policy, pure — done
 
 **Complexity**: complex (security-sensitive)
 **RED**: Unit tests in `session::web`:
@@ -391,7 +396,13 @@ The existing file tests still pass.
 - a silent server times out as `unreachable`, using a short test timeout
 - a refused connection is `unreachable`: bind port 0, drop it, connect at once
 - **cookies:** the first response sets `Set-Cookie` and redirects, and the second request carries no `Cookie`
+- **from the step 5 security review:**
+  - a gzip body that inflates past the test limit is `unreadable`, because the cap applies after decompression
+  - a typed `https://user:pw@host/` sends no `Authorization` to a redirect target on another host; every hop is a fresh request carrying only `Accept`
+  - a `Location` header that isn't valid UTF-8 is `badRedirect`
 **GREEN**: Implement `fetch` with ureq. It does I/O only and calls `session::web` for every decision.
+- The hop number comes from the loop itself (`1..=MAX_REDIRECTS + 1`), so it can't be skipped.
+- Bytes are decoded with `String::from_utf8`, never unchecked; a UTF-8 BOM is dropped.
 **REFACTOR**: Share `MAX_BYTES` with `files`.
 **Files**: `Cargo.toml`, `src/services/{web,mod}.rs`, `tests/support/http.rs`
 **Commit**: `feat(services): fetch Markdown over http(s)`
