@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::session::address::native;
+use crate::session::images::ImageLoading;
 
 fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
     events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))
@@ -174,8 +175,16 @@ fn notices_accumulate_and_dismiss_by_id() {
 #[test]
 fn choosing_a_font_persists_it_and_restore_brings_it_back() {
     let (state, effects) = run([Event::ChooseFont(ReadingFont::Inter)]);
-    let settings = Settings { font: ReadingFont::Inter };
+    let settings = Settings { font: ReadingFont::Inter, ..Settings::default() };
     assert_eq!((state.settings, effects), (settings, vec![Effect::PersistSettings(settings)]));
     let (restored, _) = run([Event::Restore { visits: vec![], settings }]);
     assert_eq!(restored.settings.font, ReadingFont::Inter);
+}
+
+#[test]
+fn choosing_how_web_images_load_persists_it_and_keeps_the_font() {
+    let (state, effects) =
+        run([Event::ChooseFont(ReadingFont::Inter), Event::ChooseImageLoading(ImageLoading::OnClick)]);
+    let settings = Settings { font: ReadingFont::Inter, images: ImageLoading::OnClick };
+    assert_eq!((state.settings, effects), (settings, vec![Effect::PersistSettings(settings)]));
 }

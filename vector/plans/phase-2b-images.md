@@ -485,7 +485,7 @@ In ARCHITECTURE.md:
 **Files**: `src/session/{href,mod}.rs`, `src/session/images/*`, `src/session/links/{mod,page}.rs`
 **Commit**: `feat(session): resolve image sources by the link rules`
 
-### Step 4: The image setting
+### Step 4: The image setting — done
 
 **Complexity**: standard
 **RED**:

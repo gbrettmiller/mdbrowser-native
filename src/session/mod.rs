@@ -28,6 +28,7 @@ use visits::Visit;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Settings {
     pub font: ReadingFont,
+    pub images: images::ImageLoading,
 }
 
 /// What a load found: the source, and where it was finally found (after redirects).
@@ -89,6 +90,7 @@ pub enum Event {
     OpenHistory(String),
     ClearHistory,
     ChooseFont(ReadingFont),
+    ChooseImageLoading(images::ImageLoading),
     DismissNotice(u64),
     FragmentHandled,
     Restore {

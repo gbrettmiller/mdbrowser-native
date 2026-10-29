@@ -36,9 +36,9 @@ pub fn step(state: State, event: Event) -> Step {
             None => none(state),
         },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
-        Event::ChooseFont(font) => {
-            let settings = Settings { font };
-            (State { settings, ..state }, vec![Effect::PersistSettings(settings)])
+        Event::ChooseFont(font) => persist_settings(State { settings: Settings { font, ..state.settings }, ..state }),
+        Event::ChooseImageLoading(images) => {
+            persist_settings(State { settings: Settings { images, ..state.settings }, ..state })
         }
         Event::DismissNotice(id) => {
             let notices = state.notices.iter().copied().filter(|n| n.id != id).collect();
@@ -131,5 +131,10 @@ fn notice(state: State, kind: NoticeKind) -> Step {
 
 fn persist_visits(state: State) -> Step {
     let effects = vec![Effect::PersistVisits(state.visits.clone())];
+    (state, effects)
+}
+
+fn persist_settings(state: State) -> Step {
+    let effects = vec![Effect::PersistSettings(state.settings)];
     (state, effects)
 }

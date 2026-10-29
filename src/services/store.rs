@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::session::Settings;
+use crate::session::images::ImageLoading;
 use crate::session::visits::{self, Visit};
 use crate::theme::ReadingFont;
 
@@ -65,14 +66,16 @@ impl Store {
 
     pub fn load_settings(&self) -> Settings {
         let stored = std::fs::read_to_string(self.file(SETTINGS)).ok();
-        let font = stored
-            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
-            .and_then(|json| json.get("font").and_then(|font| font.as_str()).and_then(ReadingFont::from_key));
-        Settings { font: font.unwrap_or_default() }
+        let json = stored.and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok());
+        let key = |name: &str| json.as_ref().and_then(|json| json.get(name)).and_then(|value| value.as_str());
+        Settings {
+            font: key("font").and_then(ReadingFont::from_key).unwrap_or_default(),
+            images: key("images").and_then(ImageLoading::from_key).unwrap_or_default(),
+        }
     }
 
     pub fn save_settings(&self, ticket: Ticket, settings: Settings) -> std::io::Result<()> {
-        let json = serde_json::json!({ "font": settings.font.key() });
+        let json = serde_json::json!({ "font": settings.font.key(), "images": settings.images.key() });
         self.save(SETTINGS, ticket, &json.to_string())
     }
 }
@@ -115,9 +118,25 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::at(dir.path().join("mdbrowser"));
         store.save_visits(store.ticket(), &[visit("/a.md"), visit("/b.md")]).unwrap();
-        store.save_settings(store.ticket(), Settings { font: ReadingFont::Quattro }).unwrap();
+        store.save_settings(store.ticket(), Settings { font: ReadingFont::Quattro, ..Settings::default() }).unwrap();
         assert_eq!(store.load_visits(), vec![visit("/a.md"), visit("/b.md")]);
         assert_eq!(store.load_settings().font, ReadingFont::Quattro);
+    }
+
+    #[test]
+    fn the_image_setting_round_trips_and_falls_back_to_automatic() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::at(dir.path());
+        assert_eq!(store.load_settings().images, ImageLoading::Automatic);
+        for images in ImageLoading::ALL {
+            let settings = Settings { font: ReadingFont::Inter, images };
+            store.save_settings(store.ticket(), settings).unwrap();
+            assert_eq!(store.load_settings(), settings);
+        }
+        std::fs::write(dir.path().join("settings.json"), r#"{"font":"inter","images":"sometimes"}"#).unwrap();
+        assert_eq!(store.load_settings(), Settings { font: ReadingFont::Inter, images: ImageLoading::Automatic });
+        std::fs::write(dir.path().join("settings.json"), r#"{"font":"inter"}"#).unwrap();
+        assert_eq!(store.load_settings().images, ImageLoading::Automatic);
     }
 
     #[test]
@@ -148,7 +167,7 @@ mod tests {
         store.save_visits(older, &[visit("/stale.md")]).unwrap();
         assert_eq!(store.load_visits(), vec![]);
         let (older, newer) = (store.ticket(), store.ticket());
-        store.save_settings(newer, Settings { font: ReadingFont::Inter }).unwrap();
+        store.save_settings(newer, Settings { font: ReadingFont::Inter, ..Settings::default() }).unwrap();
         store.save_settings(older, Settings::default()).unwrap();
         assert_eq!(store.load_settings().font, ReadingFont::Inter);
     }

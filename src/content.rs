@@ -2,6 +2,7 @@
 
 use crate::session::NoticeKind;
 use crate::session::error::ErrorCode;
+use crate::session::images::{ImageLoading, Note};
 use crate::theme::ReadingFont;
 
 pub fn error(code: ErrorCode) -> &'static str {
@@ -54,6 +55,31 @@ pub fn notice(kind: NoticeKind) -> &'static str {
     }
 }
 
+/// The Web images menu, one entry per mode.
+pub fn image_loading(mode: ImageLoading) -> &'static str {
+    match mode {
+        ImageLoading::Automatic => "Web images: automatic",
+        ImageLoading::OnClick => "Web images: on click",
+        ImageLoading::Off => "Web images: off",
+    }
+}
+
+/// The key that goes with Shift+I to load this page's images.
+const SHORTCUT_MODIFIER: &str = if cfg!(target_os = "macos") { "Cmd" } else { "Ctrl" };
+
+/// The line under an image that isn't shown.
+pub fn image_note(note: Note) -> String {
+    match note {
+        Note::Loading => "Loading image…".into(),
+        Note::ClickToLoad => "Click to load".into(),
+        Note::Off => format!("Web images are off. Press {SHORTCUT_MODIFIER}+Shift+I to load this page's."),
+        Note::Failed => "Couldn't load this image. Click to try again.".into(),
+        Note::Unsupported => "This image's format isn't supported.".into(),
+        Note::TooLarge => "This image is too large to show.".into(),
+        Note::Refused => "This page can't show this image.".into(),
+    }
+}
+
 pub fn font_name(font: ReadingFont) -> &'static str {
     match font {
         ReadingFont::Literata => "Literata",
@@ -102,6 +128,22 @@ mod tests {
         distinct_and_non_empty(&ErrorCode::ALL.map(error));
         distinct_and_non_empty(&ErrorCode::ALL.map(ErrorCode::key));
         distinct_and_non_empty(&NoticeKind::ALL.map(notice));
+    }
+
+    #[test]
+    fn the_web_images_menu_and_image_notes() {
+        let labels = ImageLoading::ALL.map(image_loading);
+        assert_eq!(labels, ["Web images: automatic", "Web images: on click", "Web images: off"]);
+        let notes = Note::ALL.map(image_note);
+        distinct_and_non_empty(&notes.each_ref().map(String::as_str));
+        assert_eq!(image_note(Note::Loading), "Loading image…");
+        assert_eq!(image_note(Note::ClickToLoad), "Click to load");
+        assert_eq!(image_note(Note::Failed), "Couldn't load this image. Click to try again.");
+        assert_eq!(image_note(Note::Unsupported), "This image's format isn't supported.");
+        assert_eq!(image_note(Note::TooLarge), "This image is too large to show.");
+        assert_eq!(image_note(Note::Refused), "This page can't show this image.");
+        let modifier = if cfg!(target_os = "macos") { "Cmd" } else { "Ctrl" };
+        assert_eq!(image_note(Note::Off), format!("Web images are off. Press {modifier}+Shift+I to load this page's."));
     }
 
     #[test]

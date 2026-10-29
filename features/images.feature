@@ -17,3 +17,15 @@ Feature: Images
     When I view "h.md"
     Then I see the document titled "Title [image: logo]"
     And no image is shown
+
+  Scenario: Web images load automatically on first run
+    Then web images are set to "automatic"
+
+  Scenario Outline: The image setting is remembered
+    Given I set web images to "<mode>"
+    When I restart the app
+    Then web images are set to "<mode>"
+    Examples:
+      | mode     |
+      | on click |
+      | off      |

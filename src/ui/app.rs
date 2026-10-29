@@ -47,7 +47,7 @@ pub enum Message {
     Submit,
     Hover(Option<String>),
     Key(keyboard::Event),
-    Resized,
+    Resized(f32),
     Relayout,
     ToggleHistory,
     /// Try to scroll to this pending anchor; the count bounds the retries.
@@ -64,6 +64,8 @@ pub struct App {
     pages: RefCell<Pages>,
     /// Last laid-out width, for scrolling to anchors outside `view`.
     width: Cell<f32>,
+    /// The window's width, for the toolbar's layout.
+    window_width: f32,
     settling: Cell<bool>,
     /// The document the view has laid out at its settled width. Weak, so the
     /// allocation (and its address) can't be reused by a later document.
@@ -87,6 +89,7 @@ impl App {
             history_open: false,
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
             width: Cell::new(WINDOW_SIZE.0 - SCROLLBAR),
+            window_width: WINDOW_SIZE.0,
             settling: Cell::new(false),
             laid_out: RefCell::new(Weak::new()),
             width_since: Cell::new(Instant::now()),
@@ -179,7 +182,10 @@ impl App {
                 Task::none()
             }
             Message::Key(event) => self.shortcut(event),
-            Message::Resized => self.schedule_relayout(),
+            Message::Resized(width) => {
+                self.window_width = width;
+                self.schedule_relayout()
+            }
             Message::Relayout => {
                 self.relayout_scheduled = false;
                 if self.settling.get() { self.schedule_relayout() } else { Task::none() }
@@ -221,7 +227,10 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        Subscription::batch([keyboard::listen().map(Message::Key), window::resize_events().map(|_| Message::Resized)])
+        Subscription::batch([
+            keyboard::listen().map(Message::Key),
+            window::resize_events().map(|(_, size)| Message::Resized(size.width)),
+        ])
     }
 
     fn title(&self) -> String {
@@ -269,7 +278,7 @@ impl App {
             if self.history_open { row![page, super::history::panel(state)].into() } else { page.into() };
         let status = self.hover.clone().unwrap_or_default();
         column![
-            toolbar::toolbar(state, &self.draft),
+            toolbar::toolbar(state, &self.draft, self.window_width),
             body::notices(&state.notices),
             content,
             container(text(status).size(12)).padding([2, 8]),
