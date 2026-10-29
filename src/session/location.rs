@@ -116,6 +116,13 @@ pub(super) fn parse_file_url(url: &str) -> Option<(String, Option<String>)> {
     (host.is_empty() || host.eq_ignore_ascii_case("localhost")).then(|| split_reference(&rest[slash..]))
 }
 
+/// `//host/…` or `\\\\host\\…` in any mix of slashes: a network share, not a local file.
+/// Opening one can leak credentials to the host (SMB on Windows), so documents never may.
+pub(super) fn is_network_path(path: &str) -> bool {
+    let mut chars = path.chars();
+    matches!((chars.next(), chars.next()), (Some('/' | '\\'), Some('/' | '\\')))
+}
+
 /// Lexically resolves `.` and `..` (the target may not exist yet).
 pub(super) fn normalise(path: &Path) -> PathBuf {
     path.components().fold(PathBuf::new(), |mut acc, part| {
@@ -152,6 +159,9 @@ pub fn parse_address(input: &str, home: &Path) -> Result<Target, ErrorCode> {
             (expand_home(&path, home).display().to_string(), fragment)
         }
     };
+    if is_network_path(&path) {
+        return Err(ErrorCode::NotAbsolute);
+    }
     let path = Path::new(&path);
     if !path.is_absolute() {
         return Err(ErrorCode::NotAbsolute);
@@ -210,6 +220,14 @@ mod tests {
         assert_eq!(parse("file:///x/a.md#intro"), ok("/x/a.md", Some("intro")));
         assert_eq!(parse("/x/a.md#caf%C3%A9"), ok("/x/a.md", Some("café")));
         assert_eq!(parse("/x/../y/./a.md"), ok("/y/a.md", None));
+    }
+
+    #[test]
+    fn network_paths_are_not_local_files() {
+        for input in ["//server/share/a.md", "\\\\server\\share\\a.md", "file:////server/share/a.md", "/\\server/a.md"]
+        {
+            assert_eq!(parse(input), Err(ErrorCode::NotAbsolute), "{input}");
+        }
     }
 
     #[test]

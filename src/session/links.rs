@@ -2,7 +2,9 @@
 
 use std::path::Path;
 
-use super::location::{Location, Target, decode, is_markdown, normalise, parse_file_url, scheme_of, split_reference};
+use super::location::{
+    Location, Target, decode, is_markdown, is_network_path, normalise, parse_file_url, scheme_of, split_reference,
+};
 
 const EXTERNAL_SCHEMES: [&str; 3] = ["http", "https", "mailto"];
 
@@ -20,15 +22,15 @@ pub enum Link {
 
 /// A local reference (relative, absolute or `file://`) resolved against the current document.
 fn local_target(reference: &str, current: &Location) -> Option<(String, Option<String>)> {
-    if reference.starts_with("//") {
-        return None; // protocol-relative: not a local file
+    if is_network_path(reference) {
+        return None; // protocol-relative or a network share: not a local file
     }
     let (path, fragment) = match scheme_of(reference).as_deref() {
         Some("file") => parse_file_url(reference)?,
         Some(_) => return None,
         None => split_reference(reference),
     };
-    if path.is_empty() {
+    if path.is_empty() || is_network_path(&path) {
         return None;
     }
     let directory = current.path().parent().unwrap_or(Path::new("/"));
@@ -100,6 +102,9 @@ mod tests {
             "data.txt",
             "pic.png",
             "//host/x.md",
+            "\\\\host\\share\\x.md",
+            "\\/host/x.md",
+            "file:////host/share/x.md",
         ];
         for href in hrefs {
             assert_eq!(classify(href, &here()), Link::Unsupported, "{href:?}");
