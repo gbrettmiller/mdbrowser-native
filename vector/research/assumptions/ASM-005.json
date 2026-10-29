@@ -1,0 +1,12 @@
+{
+  "id": "ASM-005",
+  "version": "0.1",
+  "created": "2026-10-28",
+  "status": "draft",
+  "assumption": "Readers want full control of appearance (typeface, size, spacing, colours) and do not miss writer-controlled styling.",
+  "category": "user",
+  "confidence": "medium",
+  "evidence": "INT-001 states it as the core reader promise. Reader modes and RSS readers show demand. Phase 1 offers typeface choice only.",
+  "test_method": "Ship size, spacing and a dark palette; watch which settings people change and whether anyone asks for author styling.",
+  "result": ""
+}

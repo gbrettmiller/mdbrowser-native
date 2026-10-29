@@ -1,0 +1,39 @@
+{
+  "id": "INT-001",
+  "version": "0.1",
+  "created": "2026-10-28",
+  "status": "draft",
+  "participant": "Dave Winer",
+  "role": "Originator of the Web of Markdown proposal; author of the markdownWeb repo, Scripting News and RSS 2.0",
+  "date": "2026-10-28",
+  "source": "https://github.com/scripting/markdownWeb/blob/main/readme.md (with examples/readme.md and three sample posts from examples/scriptingInMarkdown/archive). A published manifesto treated as an interview transcript, not a live session.",
+  "key_quotes": [
+    "The goal is to create a simple web that works better for both writers and readers.",
+    "Writers have full control over the written word. They can link to other Markdown pages, locally or on other sites. They can use whatever editor they like for all their writing.",
+    "Readers have full control over appearance -- e.g. font, size, spacing, colors -- everything having to do with how text is displayed, so there is a consistency with stories written by all authors and that is totally determined by the reader.",
+    "We strip any HTML from the files. And front matter we don't understand is ignored.",
+    "The YAML vocabulary we use comes from RSS 2.0, including title, author, pubDate, description, generator, source and enclosure. I've added others ... including urlPrev, urlNext, image, inlineImage, metaImage.",
+    "If your files have the same concepts as ours, please use the ones we've defined for maximum interop.",
+    "Interop is what it's about. And getting back to the original idea of the web as a place for writing and reading.",
+    "Writers have no say in how it looks beyond simple styling -- bold, italic. And they can't create apps with logic ... This is a medium for reading and writing only. But you are free to add scripting to your client.",
+    "Any Markdown file will work. But it does not do anything with HTML files. This is the web of Markdown, not HTML.",
+    "Obviously we're going to make this work extremely well with RSS 2.0 and OPML."
+  ],
+  "jobs_observed": [
+    "As a reader, read stories from many authors in one consistent presentation that I chose.",
+    "As a reader, tune font, size, spacing and colours for comfort.",
+    "As a writer, publish with whatever editor I already use (Obsidian, Jekyll, Hugo, Eleventy, Astro) and have my words arrive intact.",
+    "As a writer, link to other Markdown pages, on my site or elsewhere.",
+    "As a reader, move through a blog in order (urlPrev / urlNext) and see who wrote a post and when (author, pubDate).",
+    "As a reader, find what a site has to read (llms.txt index, RSS feed via source).",
+    "As a reader, play a post's podcast enclosure.",
+    "As a builder, interoperate with other Markdown-web browsers and tools through shared conventions rather than invented ones."
+  ],
+  "pain_points": [
+    "HTML pages carry writer-controlled styling and scripts: readers can't control appearance and the web is less safe.",
+    "Each publishing tool invents its own front matter names, so metadata doesn't travel between tools.",
+    "No agreement on what 'text' is across social apps, so writing can't move between Twitter, Mastodon and Bluesky (POSSE).",
+    "No documentation yet for the front matter vocabulary; semantics of image, inlineImage and metaImage are shown only by example."
+  ],
+  "synthesis": "The Web of Markdown is a documents-only web: writers own the words, readers own the presentation, and HTML, CSS and JavaScript from the writer are out. It already matches our principles 1 and 2. The new direction it adds: (1) interop is the point, so we should adopt the community's front matter vocabulary (RSS 2.0 names plus urlPrev/urlNext/image/inlineImage/metaImage) and discovery conventions (llms.txt, RSS 2.0, OPML) rather than invent our own; (2) reader control goes beyond the typeface to size, spacing and colours; (3) real content (the scripting.com archive, 2017-2026) needs remote images, relative links between .md files over http(s), prev/next navigation and enclosures. One divergence: markdownWeb strips HTML, while we currently show it as literal text."
+}

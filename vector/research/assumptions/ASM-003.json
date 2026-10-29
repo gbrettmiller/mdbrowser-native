@@ -1,0 +1,12 @@
+{
+  "id": "ASM-003",
+  "version": "0.1",
+  "created": "2026-10-28",
+  "status": "draft",
+  "assumption": "Re-layout and painting stay smooth for 200 KB+ documents.",
+  "category": "technical",
+  "confidence": "medium",
+  "evidence": "Painting is culled and text shaped once, but a full re-layout of the 206 KB spec takes 150-230 ms, so resizes defer it until the width settles. Blog posts (INT-001) are far smaller, so the common case is fast.",
+  "test_method": "Timing test on corpus/spec.md; incremental or off-thread layout if resize lag is noticed in use.",
+  "result": ""
+}
