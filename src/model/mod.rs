@@ -58,6 +58,11 @@ pub fn text_of(spans: &[Span]) -> String {
 }
 
 impl Document {
+    /// All visible text, blocks separated by newlines (for tests and search).
+    pub fn plain_text(&self) -> String {
+        blocks_text(&self.blocks).join("\n")
+    }
+
     /// Frontmatter `title`, else the first heading, else the caller's fallback (the file name).
     pub fn title(&self, fallback: &str) -> String {
         let first_heading = || {
@@ -68,6 +73,22 @@ impl Document {
         };
         self.frontmatter_title.clone().or_else(first_heading).unwrap_or_else(|| fallback.to_string())
     }
+}
+
+fn blocks_text(blocks: &[Block]) -> Vec<String> {
+    blocks
+        .iter()
+        .flat_map(|block| match block {
+            Block::Heading { spans, .. } | Block::Paragraph(spans) => vec![text_of(spans)],
+            Block::Code { text, .. } => vec![text.trim_end_matches('\n').to_string()],
+            Block::Quote(inner) => blocks_text(inner),
+            Block::List { items, .. } => items.iter().flat_map(|item| blocks_text(&item.blocks)).collect(),
+            Block::Table { rows, .. } => {
+                rows.iter().map(|row| row.iter().map(|cell| text_of(cell)).collect::<Vec<_>>().join(" ")).collect()
+            }
+            Block::Rule => vec![],
+        })
+        .collect()
 }
 
 fn frontmatter_source(events: &[Event]) -> Option<String> {
@@ -206,6 +227,12 @@ mod tests {
     #[test]
     fn images_show_alt_text() {
         assert_eq!(paragraph_text("![a cat](cat.png)"), "[image: a cat]");
+    }
+
+    #[test]
+    fn plain_text_covers_nested_blocks() {
+        let doc = parse("# T\n\n> - *a*\n\n```\n<b>c</b>\n```\n\n| x |\n|-|\n| y |");
+        assert_eq!(doc.plain_text(), "T\na\n<b>c</b>\nx\ny");
     }
 
     #[test]

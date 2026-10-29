@@ -13,9 +13,16 @@ serde_json = "1.0.154"
 yaml-rust2 = "0.13.0"
 
 [dev-dependencies]
+cucumber = "0.23.0"
+futures = "0.3.34"
 insta = "1.49.0"
 tempfile = "3.27.0"
 
 # Shaping and rendering crates are unusably slow unoptimised; our own code stays debuggable.
 [profile.dev.package."*"]
 opt-level = 2
+
+[[test]]
+name = "acceptance"
+path = "tests/acceptance/main.rs"
+harness = false
