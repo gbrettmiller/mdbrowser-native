@@ -95,17 +95,26 @@ fn expand_home(path: &str, home: &Path) -> PathBuf {
     }
 }
 
-const WEB_SCHEMES: [&str; 2] = ["http", "https"];
+pub(super) const WEB_SCHEMES: [&str; 2] = ["http", "https"];
 
-/// An http(s) address. Any extension may be Markdown (the server says), so only
-/// a host is required. Credentials are dropped; the fragment moves to the target.
-pub(super) fn parse_web_url(input: &str) -> Result<Target, ErrorCode> {
-    let mut url = Url::parse(input).map_err(|_| ErrorCode::NotAbsolute)?;
-    let fragment = url.fragment().map(decode).filter(|fragment| !fragment.is_empty());
+/// The URL without a user name or password, which are never sent anywhere.
+pub(super) fn without_credentials(mut url: Url) -> Url {
     // Infallible for http(s) URLs, which always have a host.
     let _ = url.set_username("");
     let _ = url.set_password(None);
-    Ok(Target { location: Location::web(url), fragment })
+    url
+}
+
+/// An http(s) URL as a target: credentials dropped, the fragment decoded onto the target.
+pub(super) fn web_target(url: Url) -> Target {
+    let fragment = url.fragment().map(decode).filter(|fragment| !fragment.is_empty());
+    Target { location: Location::web(without_credentials(url)), fragment }
+}
+
+/// An http(s) address. Any extension may be Markdown (the server says), so only
+/// a host is required.
+fn parse_web_url(input: &str) -> Result<Target, ErrorCode> {
+    Url::parse(input).map(web_target).map_err(|_| ErrorCode::NotAbsolute)
 }
 
 /// Validation order: empty → scheme → absolute → extension. Nothing touches the disk.

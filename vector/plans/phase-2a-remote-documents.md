@@ -47,7 +47,7 @@ Decisions already made by the product owner (2026-10-29):
    - A body over 16 MiB, invalid UTF-8, or a declared charset other than UTF-8 or US-ASCII → `unreadable`.
    - Every web error shows the address it was for, plus a hint: a non-empty sentence saying what to try next. The content test asserts this for every web error code.
 6. [ ] **Links in a remote page.** Relative, root-relative and scheme-relative links resolve against the page's final URL. `.md`/`.markdown` links open in the app; other `http(s)` and `mailto:` links go to the system browser; `#fragment` links scroll.
-7. [ ] **Remote pages can't reach the disk.** `file:` links, drive-letter paths (`C:\x.md`) and UNC paths (`\\host\x.md`) are refused with the notice "Web pages can't open files on your computer." The page stays put, and nothing is read from disk. Bare absolute paths resolve as URLs on the same site.
+7. [ ] **Remote pages can't reach the disk.** `file:` links, drive-letter paths (`C:\x.md`) and UNC paths (`\\host\x.md`) are refused with the notice "Web pages can't open files on your computer." The page stays put, and nothing is read from disk. Bare absolute paths resolve as URLs on the same site. A public page's Markdown link into the local network (loopback, private, link-local, `localhost`, however spelled) is refused with "Web pages can't open addresses on your local network." (added in step 8).
 8. [ ] **Links in a local file.** An `http(s)` link to `.md`/`.markdown` opens in the app. Other web links still go to the system browser.
 9. [ ] **History and navigation.** Back, forward and reload work across files and pages, and between pages. Reload re-fetches. Remote visits go into History under their final URL and can be reopened from there.
 10. [ ] **Stale loads.** A fetch still running when the reader navigates away is ignored when it finishes.
@@ -438,7 +438,7 @@ The existing file tests still pass.
 **Files**: `src/session/{address,reducer,navigation,mod}.rs`, `src/services/runner.rs`, `src/content.rs`, `src/ui/app.rs`, `tests/acceptance/*`, `features/remote.feature`
 **Commit**: `feat(session): open Markdown by http(s) address`
 
-### Step 8: Links across sites
+### Step 8: Links across sites — done
 
 **Complexity**: complex (security-sensitive)
 **RED**: `links::classify` unit tests.
@@ -503,7 +503,7 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
   - scripting.com served HTML at `/` and reset the connection on a guessed `.md` path
 
   `application/octet-stream` is not accepted. If the manual check finds real pages served that way, widening the rule is a deliberate, test-first change.
-- **Private-network fetches.** These are accepted for 2a and recorded in ADR-003 as a follow-up (see step 2).
+- **Private-network fetches.** Narrowed in step 8 at the product owner's call: a public page can't open local-network addresses in the app, by link or redirect. Local files still may, and DNS rebinding is not caught (ADR-003, a follow-up).
 - **Plain `http`.** The full URL with its scheme is always in the address bar, but there is no "not secure" label yet. That label is a candidate follow-up, tracked in VECTOR open questions in step 10.
 - **No cache.** Back and forward re-fetch, so the reader sees "Loading…" briefly, and scroll position resets to the fragment or the top. That is fine for blog-sized posts.
 - **No stop button.** Navigating away makes a fetch stale, and the overall timeout is 30 s.

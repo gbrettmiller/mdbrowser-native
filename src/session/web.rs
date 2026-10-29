@@ -63,7 +63,7 @@ pub fn next_hop(from: &Url, location: Option<&str>, hop: u32) -> Result<Url, Err
 /// Loopback, private, link-local and unspecified hosts. The url crate has already
 /// normalised spellings like `0x7f.1` to `127.0.0.1`. Names that merely resolve to
 /// such addresses can only be caught when connecting.
-fn is_local_network(url: &Url) -> bool {
+pub(super) fn is_local_network(url: &Url) -> bool {
     match url.host() {
         Some(Host::Domain(name)) => {
             let name = name.trim_end_matches('.');

@@ -6,7 +6,8 @@ Feature: Browse remote Markdown
 
   # Fixture: a std-only HTTP server on 127.0.0.1:0, fresh per scenario. It records each
   # request (path and headers). Routes:
-  #   /index.md      text/markdown   "# Remote Home", "## Intro"
+  #   /index.md      text/markdown   "# Remote Home", "## Intro"; links notes/a.md, /notes/b.md, #intro,
+  #                                  /missing.md, https://example.com/about, mailto:a@b.co
   #   /notes/a.md    text/markdown   "# Remote Note"        /notes/b.md   text/markdown "# Note B"
   #   /post          text/markdown   "# Post Without Extension"
   #   /plain.md      text/plain      "# Plain Served"       /plain.txt    text/plain    "# Not this"
@@ -120,3 +121,77 @@ Feature: Browse remote Markdown
     Then I see the document titled "Remote Home"
     And the address shows the URL of "/index.md"
     And the site has seen 1 request for "/slow.md"
+
+  Scenario Outline: Links in a remote page resolve against its address
+    Given I am viewing the URL of "/notes/a.md"
+    When I follow "<href>"
+    Then I see the document titled "<title>"
+    And the address shows the URL of "<path>"
+    Examples:
+      | href         | title       | path        |
+      | b.md         | Note B      | /notes/b.md |
+      | ../index.md  | Remote Home | /index.md   |
+      | /notes/b.md  | Note B      | /notes/b.md |
+
+  Scenario: A fragment link in a remote page scrolls
+    Given I am viewing the URL of "/index.md"
+    When I follow "#intro"
+    Then the pending fragment is "intro"
+    And the address shows the URL of "/index.md"
+
+  Scenario: A link to a missing page shows an error, and back returns
+    Given I am viewing the URL of "/index.md"
+    When I follow "/missing.md"
+    Then I see the error "notFound"
+    When I go back
+    Then I see the document titled "Remote Home"
+
+  Scenario Outline: Non-Markdown links leave the app
+    Given I am viewing the URL of "/index.md"
+    When I follow "<href>"
+    Then the system opened "<href>"
+    And I am still viewing the URL of "/index.md"
+    Examples:
+      | href                      |
+      | https://example.com/about |
+      | mailto:a@b.co             |
+
+  Scenario Outline: A remote page can't open local files
+    Given a file "secret.md" containing "# Secret"
+    And I am viewing the URL of "/index.md"
+    When I follow <link>
+    Then I am told "Web pages can't open files on your computer."
+    And I am still viewing the URL of "/index.md"
+    And nothing was read from disk
+    Examples:
+      | link                                 |
+      | the file:// URL of "secret.md"       |
+      | "C:\\secret.md"                     |
+      | "\\\\host\\share\\secret.md"         |
+
+  Scenario: An absolute path in a remote page is a path on the same site
+    Given I am viewing the URL of "/index.md"
+    When I follow "/etc/hosts.md"
+    Then I see the error "notFound"
+    And the site has seen 1 request for "/etc/hosts.md"
+    And nothing was read from disk
+
+  Scenario: A local file links to a remote page
+    Given a file "links.md" linking to the URL of "/index.md"
+    And I am viewing "links.md"
+    When I follow the URL of "/index.md"
+    Then I see the document titled "Remote Home"
+
+  Scenario: A local file's non-Markdown web link goes to the system browser
+    Given a file "web.md" linking to "https://example.com/"
+    And I am viewing "web.md"
+    When I follow "https://example.com/"
+    Then the system opened "https://example.com/"
+
+  Scenario: Back and forward between files and pages
+    Given a file "links.md" linking to the URL of "/index.md"
+    And I viewed "links.md" then the URL of "/index.md"
+    When I go back
+    Then the address shows the absolute path of "links.md"
+    When I go forward
+    Then I see the document titled "Remote Home"

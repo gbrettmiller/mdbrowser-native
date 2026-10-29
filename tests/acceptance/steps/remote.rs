@@ -1,5 +1,6 @@
 //! Steps for pages on the test server: features/remote.feature.
 
+use std::fs;
 use std::net::TcpListener;
 
 use cucumber::{given, then, when};
@@ -28,6 +29,37 @@ fn viewing_url(w: &mut Browser, path: String) {
 fn viewed_two_urls(w: &mut Browser, first: String, second: String) {
     viewing_url(w, first);
     viewing_url(w, second);
+}
+
+#[given(expr = "I viewed {string} then the URL of {string}")]
+fn viewed_file_then_url(w: &mut Browser, name: String, path: String) {
+    let address = w.absolute(&name);
+    enter(w, address);
+    assert!(shown_title(w).is_some(), "{name}: {:?}", w.state().status);
+    viewing_url(w, path);
+}
+
+#[given(expr = "a file {string} linking to the URL of {string}")]
+fn file_linking_to_url(w: &mut Browser, name: String, path: String) {
+    let url = w.url(&path);
+    file_linking_to(w, name, url);
+}
+
+#[given(expr = "a file {string} linking to {string}")]
+fn file_linking_to(w: &mut Browser, name: String, href: String) {
+    fs::write(w.path(&name), format!("# Links\n\n[there]({href})\n")).unwrap();
+}
+
+#[when(expr = "I follow the URL of {string}")]
+fn follow_url(w: &mut Browser, path: String) {
+    let url = w.url(&path);
+    w.send(Event::Follow(url));
+}
+
+#[when(expr = "I follow the file:\\/\\/ URL of {string}")]
+fn follow_file_url(w: &mut Browser, name: String) {
+    let url = w.file_url(&name);
+    w.send(Event::Follow(url));
 }
 
 #[given(expr = "I entered the URL of {string} and see the error {string}")]
@@ -63,6 +95,17 @@ fn slow_url(w: &mut Browser, path: String) {
 #[when(expr = "{string} finishes loading")]
 fn finishes_loading(w: &mut Browser, name: String) {
     w.release(&name);
+}
+
+#[then(expr = "I am still viewing the URL of {string}")]
+fn still_viewing_url(w: &mut Browser, path: String) {
+    assert_eq!(w.state().current_location(), Some(&w.web(&path)));
+    assert!(shown_title(w).is_some(), "{:?}", w.state().status);
+}
+
+#[then(expr = "the system opened {string}")]
+fn system_opened(w: &mut Browser, href: String) {
+    assert_eq!(w.opened, [href]);
 }
 
 #[then(expr = "the address shows the URL of {string}")]

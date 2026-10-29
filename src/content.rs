@@ -50,6 +50,7 @@ pub fn notice(kind: NoticeKind) -> &'static str {
         NoticeKind::OpenFailed => "Couldn't open this link.",
         NoticeKind::UnsupportedLink => "Can't open this kind of link yet",
         NoticeKind::LocalFromWeb => "Web pages can't open files on your computer.",
+        NoticeKind::LocalNetworkFromWeb => "Web pages can't open addresses on your local network.",
     }
 }
 

@@ -54,11 +54,12 @@ pub enum NoticeKind {
     OpenFailed,
     UnsupportedLink,
     LocalFromWeb,
+    LocalNetworkFromWeb,
 }
 
 impl NoticeKind {
     /// Every kind, for exhaustive content tests.
-    pub const ALL: [Self; 3] = [Self::OpenFailed, Self::UnsupportedLink, Self::LocalFromWeb];
+    pub const ALL: [Self; 4] = [Self::OpenFailed, Self::UnsupportedLink, Self::LocalFromWeb, Self::LocalNetworkFromWeb];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -260,6 +261,16 @@ mod tests {
     fn links_do_nothing_until_a_document_is_showing() {
         let (state, effects) = run([Event::Enter(native("/d/a.md")), Event::Follow("https://x.org".into())]);
         assert!(effects.is_empty() && state.notices.is_empty());
+    }
+
+    #[test]
+    fn links_a_page_may_not_open_become_notices() {
+        let opened = [Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")];
+        let (state, _) = run(opened.clone().into_iter().chain([Event::Follow("file:///etc/x.md".into())]));
+        assert_eq!(state.notices.last().map(|n| n.kind), Some(NoticeKind::LocalFromWeb));
+        let (state, _) = run(opened.into_iter().chain([Event::Follow("http://127.0.0.1/x.md".into())]));
+        assert_eq!(state.notices.last().map(|n| n.kind), Some(NoticeKind::LocalNetworkFromWeb));
+        assert_eq!(state.address(), "https://x.org/a.md");
     }
 
     #[test]

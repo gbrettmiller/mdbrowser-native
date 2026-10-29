@@ -113,6 +113,8 @@ fn follow(state: State, href: &str) -> Step {
         Link::Navigate(target) => navigate_to(state, Entry { input: target.location.address(), target: Some(target) }),
         Link::Scroll(fragment) => none(State { fragment: Some(fragment), ..state }),
         Link::External(url) => (state, vec![Effect::OpenExternal(url)]),
+        Link::LocalFromWeb => notice(state, NoticeKind::LocalFromWeb),
+        Link::LocalNetworkFromWeb => notice(state, NoticeKind::LocalNetworkFromWeb),
         Link::Unsupported => notice(state, NoticeKind::UnsupportedLink),
     }
 }

@@ -36,7 +36,13 @@ const NOTE_A: &str = "# Note A
 /// Small enough that `/huge.md` can exceed it cheaply.
 const SIZE_LIMIT: u64 = 4096;
 
-const REMOTE_INDEX: &str = "# Remote Home\n\n## Intro\n";
+const REMOTE_INDEX: &str = "# Remote Home
+
+## Intro
+
+[A](notes/a.md) [B](/notes/b.md) [intro](#intro) [gone](/missing.md)
+[about](https://example.com/about) [mail](mailto:a@b.co)
+";
 
 /// The routes described at the top of features/remote.feature.
 fn routes() -> HashMap<String, Reply> {
