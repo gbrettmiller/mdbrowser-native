@@ -1,13 +1,17 @@
-//! Step definitions for features/browse.feature. Steps assert on session state
+//! Step definitions for features/browse.feature and features/reading.feature. Steps assert on session state
 //! and recorded effects, never on pixels.
 
+use std::collections::BTreeSet;
 use std::fs;
 
 use cucumber::{given, then, when};
+use iced::advanced::graphics::text::font_system;
 use mdbrowser::content;
+use mdbrowser::layout;
 use mdbrowser::session::location::Location;
 use mdbrowser::session::visits::Visit;
 use mdbrowser::session::{Event, Status};
+use mdbrowser::theme::{self, ReadingFont, fonts};
 
 use crate::world::Browser;
 
@@ -290,5 +294,62 @@ fn first_in_history(w: &mut Browser, title: String) {
 #[then("History is empty")]
 fn history_empty(w: &mut Browser) {
     assert!(w.state().visits.is_empty());
-    assert_eq!(w.stored_visits, "[]");
+    assert!(w.store.load_visits().is_empty());
+}
+
+// ── Reading font ────────────────────────────────────────────────────────────
+
+/// The font whose menu label is `name`.
+fn font_named(name: &str) -> ReadingFont {
+    ReadingFont::ALL.into_iter().find(|font| content::font_name(*font) == name).expect("a font menu label")
+}
+
+#[when(expr = "I choose the reading font {string}")]
+#[given(expr = "I chose the reading font {string}")]
+fn choose_font(w: &mut Browser, name: String) {
+    w.send(Event::ChooseFont(font_named(&name)));
+}
+
+#[given(expr = "the stored reading font is {string}")]
+fn stored_font(w: &mut Browser, key: String) {
+    let path = w.home.path().join(".mdbrowser/settings.json");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, format!(r#"{{"font":"{key}"}}"#)).unwrap();
+}
+
+#[then(expr = "the reading font is {string}")]
+fn reading_font_is(w: &mut Browser, name: String) {
+    assert_eq!(w.state().settings.font, font_named(&name));
+}
+
+/// The family name inside each bundled font file, independent of the app's own mapping.
+fn family_in_file(menu_label: &str) -> &'static str {
+    match menu_label {
+        "Literata" => "Literata",
+        "Source Serif 4" => "Source Serif 4",
+        "iA Writer Quattro" => "iA Writer Quattro S",
+        "Inter" => "Inter",
+        other => panic!("no such font: {other}"),
+    }
+}
+
+/// Checks the faces that actually shaped the page's glyphs, so a wrong
+/// mapping or a silent fallback to another family fails.
+#[then(expr = "the document is set in {string}")]
+fn set_in(w: &mut Browser, name: String) {
+    let Status::Ready(shown) = &w.state().status else { panic!("no document: {:?}", w.state().status) };
+    fonts::install();
+    let page = layout::layout(&shown.document.blocks, &theme::reading(w.state().settings.font), 720.0);
+    let mut system = font_system().write().unwrap();
+    let db = system.raw().db();
+    let families: BTreeSet<String> = page
+        .texts
+        .iter()
+        .flat_map(|text| {
+            text.buffer.layout_runs().flat_map(|run| run.glyphs.iter().map(|g| g.font_id)).collect::<Vec<_>>()
+        })
+        .filter_map(|id| db.face(id).map(|face| face.families[0].0.clone()))
+        .filter(|family| family != theme::MONO_FAMILY)
+        .collect();
+    assert_eq!(families, BTreeSet::from([family_in_file(&name).to_string()]));
 }

@@ -6,8 +6,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use mdbrowser::services::files;
-use mdbrowser::session::visits::{self, Visit};
-use mdbrowser::session::{Effect, Event, Settings, State, step};
+use mdbrowser::services::store::Store;
+use mdbrowser::session::visits::Visit;
+use mdbrowser::session::{Effect, Event, State, step};
 use tempfile::TempDir;
 
 const INDEX: &str = "---
@@ -38,9 +39,8 @@ pub struct Browser {
     /// Loads for these paths wait until released.
     pub held: HashSet<PathBuf>,
     parked: Vec<(u64, PathBuf)>,
-    /// What the store holds, as serialised JSON.
-    pub stored_visits: String,
-    pub stored_settings: Option<Settings>,
+    /// The real store, kept in the temporary home.
+    pub store: Store,
     clock: u64,
 }
 
@@ -52,6 +52,7 @@ impl Browser {
         fs::write(home.path().join("notes/a.md"), NOTE_A).unwrap();
         fs::write(home.path().join("data.txt"), "not markdown").unwrap();
         let state = State::new(home.path());
+        let store = Store::at(home.path().join(".mdbrowser"));
         Browser {
             home,
             state: Some(state),
@@ -60,8 +61,7 @@ impl Browser {
             opener_fails: false,
             held: HashSet::new(),
             parked: Vec::new(),
-            stored_visits: "[]".into(),
-            stored_settings: None,
+            store,
             clock: 0,
         }
     }
@@ -101,8 +101,8 @@ impl Browser {
                     self.opened.push(url);
                 }
             }
-            Effect::PersistVisits(visits) => self.stored_visits = visits::to_stored(&visits),
-            Effect::PersistSettings(settings) => self.stored_settings = Some(settings),
+            Effect::PersistVisits(visits) => self.store.save_visits(&visits).expect("save history"),
+            Effect::PersistSettings(settings) => self.store.save_settings(settings).expect("save settings"),
         }
     }
 
@@ -124,13 +124,13 @@ impl Browser {
 
     pub fn restart(&mut self) {
         self.state = Some(State::new(self.home.path()));
-        let visits = visits::parse_stored(&self.stored_visits);
-        let settings = self.stored_settings.unwrap_or_default();
+        let visits = self.store.load_visits();
+        let settings = self.store.load_settings();
         self.send(Event::Restore { visits, settings });
     }
 
     pub fn seed_history(&mut self, visits: Vec<Visit>) {
-        self.stored_visits = visits::to_stored(&visits);
+        self.store.save_visits(&visits).expect("seed history");
         self.restart();
     }
 
