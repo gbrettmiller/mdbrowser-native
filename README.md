@@ -16,22 +16,48 @@ Writers own the words. Readers own the presentation. The document chooses nothin
 - Select text with the mouse and copy it with Ctrl+C.
 - `http`, `https` and `mailto` links open in your system's handler. Other schemes are blocked.
 
-## Build and run
+## Build from source
 
-Needs Rust 1.88 or newer.
+mdbrowser builds and passes its tests on Linux (x64 and ARM64), macOS and Windows. CI checks all four on every change.
+
+### Prerequisites
+
+- **Rust 1.88 or newer**, installed with [rustup](https://rustup.rs).
+- **Linux:** a C toolchain (`build-essential` on Debian and Ubuntu, `base-devel` on Arch). It runs under Wayland or X11.
+- **macOS:** the Xcode Command Line Tools (`xcode-select --install`).
+- **Windows:** the Visual Studio C++ Build Tools. rustup offers to install them.
+
+### Build and run
 
 ```sh
+git clone https://github.com/gbrettmiller/mdbrowser-native.git
+cd mdbrowser-native
 cargo run --release -- corpus/index.md
 ```
 
-| Key | Action |
-|---|---|
-| Alt+← / Alt+→ | Back / forward |
-| Ctrl+R or F5 | Reload |
-| Ctrl+L | Focus the address bar |
-| Ctrl+H | Show or hide History |
+The first build takes a few minutes. The app ends up at `target/release/mdbrowser` (`mdbrowser.exe` on Windows); pass it a path to a `.md` file, or start it with none and type a path in the address bar.
 
-History and settings are stored in your data directory under `mdbrowser/` (for example `~/.local/share/mdbrowser` on Linux). Set `MDBROWSER_DATA_DIR` to use another location.
+### Keyboard
+
+| Action | Linux and Windows | macOS |
+|---|---|---|
+| Back / forward | Alt+← / Alt+→ | Option+← / Option+→ |
+| Reload | Ctrl+R or F5 | Cmd+R or F5 |
+| Focus the address bar | Ctrl+L | Cmd+L |
+| Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
+| Select all / copy | Ctrl+A / Ctrl+C | Cmd+A / Cmd+C |
+
+### Where your data lives
+
+History and settings are kept in an `mdbrowser` folder in your user data directory:
+
+| OS | Folder |
+|---|---|
+| Linux | `~/.local/share/mdbrowser` (or `$XDG_DATA_HOME/mdbrowser`) |
+| macOS | `~/Library/Application Support/mdbrowser` |
+| Windows | `%APPDATA%\mdbrowser` |
+
+To use another folder, set `MDBROWSER_DATA_DIR`: `MDBROWSER_DATA_DIR=/tmp/mdb cargo run` in a Unix shell, or `$env:MDBROWSER_DATA_DIR = "C:\temp\mdb"` in PowerShell before running.
 
 ## Develop
 
@@ -44,7 +70,7 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-CI runs the same gates on every pull request. Acceptance scenarios live in [`features/`](features/).
+CI runs the same gates on every pull request: formatting once, then lint, tests and a release build on Linux x64, Linux ARM64, macOS and Windows. Acceptance scenarios live in [`features/`](features/).
 
 ## Documentation
 
