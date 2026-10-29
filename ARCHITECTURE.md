@@ -1,12 +1,26 @@
 # Architecture
 
-**Last Updated:** 2026-10-28
+**Last Updated:** 2026-10-29
 
 This file is the technical specification: layers, stack, conventions, structure and import rules. For project intent and direction, see VECTOR.md. Read VECTOR.md first, then this file, before writing code. `/invest-architecture` audits the codebase against what is declared here.
 
 ## Stack
 
-Rust (edition 2024). UI shell: iced 0.14, with the document drawn by our own widget. Text shaping and line breaking: cosmic-text, used through iced's shared font system so that measuring and painting agree. Markdown: pulldown-cmark with tables, strikethrough, task lists and YAML metadata enabled. Unit tests: `cargo test`. Acceptance: Gherkin in `features/` (runner: the `cucumber` crate, added with the first acceptance steps). Lint: rustfmt (`rustfmt.toml`) and clippy with `-D warnings`. Rationale: ADR-001.
+Rust (edition 2024). Rationale: ADR-001.
+
+| Concern | Crate |
+|---|---|
+| UI shell; the document is our own widget | iced 0.14 |
+| Text shaping and line breaking | cosmic-text, through iced's shared font system so that measuring and painting agree |
+| Markdown | pulldown-cmark, with tables, strikethrough, task lists and YAML metadata |
+| Frontmatter | yaml-rust2 |
+| History and settings files | serde, serde_json |
+| Per-user data directory | dirs |
+| Unit tests | `cargo test` (built-in), insta for golden layout snapshots |
+| Acceptance | Gherkin in `features/`, run by the `cucumber` crate (`tests/acceptance/`), with tempfile and futures |
+| Lint | rustfmt (`rustfmt.toml`) and clippy with `-D warnings` |
+
+Fonts are bundled: `assets/fonts/` holds static Literata, Source Serif 4, iA Writer Quattro, Inter and JetBrains Mono (each with its OFL licence), embedded at build time. `theme::fonts::install()` evicts host faces with the same family names and corrects variant metadata that upstream files get wrong.
 
 ## Rendering pipeline
 
@@ -22,11 +36,11 @@ bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, wi
 |-------|----------|------|
 | **Model** | `src/model/` | Markdown source → owned document tree. Pure. Depends only on pulldown-cmark. |
 | **Layout** | `src/layout/` | Tree + theme + width → `Page`; hit-testing, carets, selection and copy text. Pure apart from reading the shared font database. |
-| **Session** | `src/session/` | Location parsing, link resolution, back/forward/history reducers. Pure, `std` only. |
+| **Session** | `src/session/` | Address parsing, link classification, back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
 | **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) and bundled fonts. Data only. |
 | **Content** | `src/content.rs` | All user-facing strings. |
-| **Services** | `src/services/` | All I/O: reading files, HTTP (later), the external opener, persisting history. The only layer that touches `std::fs`, `std::net` or `std::process`. |
-| **UI** | `src/ui/` | The iced application: the toolbar, the document widget (paints a `Page`, turns input into messages) and wiring. Owns no business logic. |
+| **Services** | `src/services/` | All I/O: reading files, the external opener, the store (History and settings), and `runner`, which turns effects into iced tasks that report back as events. The only layer that touches `std::fs`, `std::net` or `std::process`. |
+| **UI** | `src/ui/` | The iced application: dispatches events to the reducer, runs effects through `services::runner`, and draws state. Holds the document widget (paints a `Page`, turns input into messages) and the page cache. Owns no browsing logic. |
 
 Every module belongs to exactly one layer. If you're unsure where something goes, and it can be pure, put it in `model`, `layout` or `session`.
 
@@ -35,7 +49,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `ui` may use every other layer.
 - `services` may use `model` and `session` types, never `ui`.
 - `layout` may use `model` and `theme`.
-- `model`, `session` and `theme` use nothing else from this crate.
+- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` (settings).
 - Pure layers (`model`, `layout`, `session`, `theme`) never perform I/O and never use iced's runtime (`Task`, `Element`). Iced *value* types (`Color`, `Font`, `Rectangle`) are allowed.
 
 ## How to Add a Feature
@@ -66,8 +80,10 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 
 ## Project Structure
 
-- `src/` — the crate, one directory per layer (created as each layer arrives)
+- `src/` — the crate, one directory per layer; `lib.rs` exposes the layers, `main.rs` only starts `ui::app`
+- `assets/fonts/` — bundled typefaces and their licences
 - `features/` — Gherkin acceptance scenarios
 - `corpus/` — sample Markdown documents for golden tests and manual checks
+- `scripts/shoot.sh` — screenshots documents in each font (Hyprland + grim). It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
 - `vector/` — Investiture doctrine tree: `decisions/`, `research/`, `schemas/`
 - `.github/workflows/` — CI: fmt → clippy → test → build

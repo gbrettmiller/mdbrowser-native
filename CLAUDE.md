@@ -20,7 +20,7 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-`cargo run --release -- <path.md>` runs the app.
+`cargo run --release -- <path.md>` runs the app. `scripts/shoot.sh -f "literata inter" corpus/index.md` screenshots documents in each font, using a scratch store. Read the screenshots to check rendering.
 
 ## Language notes
 
