@@ -300,7 +300,7 @@ Feature: Browse remote Markdown
 - **New `ErrorCode`s** are `ServerError`, `Unreachable` and `BadRedirect`. Their keys and strings arrive in the same step as the codes, with an exhaustive content test.
 - **New `NoticeKind`**: `LocalFromWeb`, with the string "Web pages can't open files on your computer."
 - **Loading** already shows `content::LOADING` in the body. For pages it becomes "Loading example.com…". The address bar keeps the typed text on failure (as it does today), and Reload retries from an error.
-- **Shared test server**: `tests/support/http.rs`, std-only and about 80 lines. The acceptance world includes it with `mod`, and `services::web`'s unit tests include it with `#[cfg(test)] #[path = "../../tests/support/http.rs"]`. This avoids a test-only public API in the library and adds no dev-dependency.
+- **Shared test server**: `tests/support/http.rs`, std-only, about 120 lines. The acceptance world includes it with `mod`, and `services::web`'s unit tests include it with `#[cfg(test)] #[path = "../../tests/support/http.rs"]`. This avoids a test-only public API in the library and the server itself adds no dev-dependency (the gzip test in step 6 uses flate2).
 
 ## Steps
 
@@ -382,7 +382,7 @@ The existing file tests still pass.
 **Files**: `src/session/web.rs` (new), `src/session/mod.rs`
 **Commit**: `feat(session): decide which web responses are Markdown`
 
-### Step 6: Fetch service
+### Step 6: Fetch service — done
 
 **Complexity**: complex (I/O, network, security)
 **RED**: Add `tests/support/http.rs`. Tests in `services::web` against it:
@@ -404,7 +404,7 @@ The existing file tests still pass.
 - The hop number comes from the loop itself (`1..=MAX_REDIRECTS + 1`), so it can't be skipped.
 - Bytes are decoded with `String::from_utf8`, never unchecked; a UTF-8 BOM is dropped.
 **REFACTOR**: Share `MAX_BYTES` with `files`.
-**Files**: `Cargo.toml`, `src/services/{web,mod}.rs`, `tests/support/http.rs`
+**Files**: `Cargo.toml` (ureq; flate2 as a dev-dependency for the gzip test, already in the tree through ureq), `src/services/{web,mod,runner}.rs`, `src/session/web.rs` (`decode`), `tests/support/http.rs`
 **Commit**: `feat(services): fetch Markdown over http(s)`
 
 ### Step 7: Typed web addresses load
@@ -511,6 +511,8 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 - **The link's destination isn't shown before clicking** (in the app or in the browser). That is phase 4 or later.
 - **Addresses without a scheme** (`example.com/x.md`) stay `notAbsolute`. Auto-prefixing `https://` is a possible small follow-up.
 - **Script and style text** stays visible after stripping (ADR-002, accepted).
+- **Certificate failures look like outages** (step 6 security review). Every failure before a response, a bad certificate included, is `unreachable`. A separate `insecure` error would make a MITM visible; it is a follow-up, beside ADR-003's corporate-proxy note.
+- **Slow DNS leaves a thread behind.** ureq resolves on its own thread when a global timeout is set, so a stuck lookup outlives the fetch until the system resolver gives up. Bounded, and irrelevant at one fetch per click.
 - **Windows CI and loopback servers.** A refused connection is asserted with a bind-and-drop port. Timeouts are unit-tested only, with short test limits.
 
 ## Plan Review Summary

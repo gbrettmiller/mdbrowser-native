@@ -101,6 +101,25 @@ pub fn body_policy(content_type: Option<&str>, final_url: &Url) -> Result<(), Er
     if readable { Ok(()) } else { Err(ErrorCode::Unreadable) }
 }
 
+/// Whether a body arrived as plain bytes. The client decodes gzip itself and then
+/// drops the header, so any encoding still declared was not decoded.
+pub fn encoding_policy(content_encoding: Option<&str>) -> Result<(), ErrorCode> {
+    match content_encoding.map(str::trim) {
+        None | Some("") => Ok(()),
+        Some(encoding) if encoding.eq_ignore_ascii_case("identity") => Ok(()),
+        Some(_) => Err(ErrorCode::Unreadable),
+    }
+}
+
+/// A body as text: strict UTF-8, without a leading byte-order mark.
+pub fn decode(bytes: Vec<u8>) -> Result<String, ErrorCode> {
+    let text = String::from_utf8(bytes).map_err(|_| ErrorCode::Unreadable)?;
+    Ok(match text.strip_prefix('\u{feff}') {
+        Some(rest) => rest.to_string(),
+        None => text,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,6 +306,29 @@ mod tests {
             hop("http://127.0.0.1/a.md", Some("https://example.com/b.md"), 1),
             Ok("https://example.com/b.md".into())
         );
+    }
+
+    #[test]
+    fn only_unencoded_bodies_are_readable() {
+        for encoding in [None, Some(""), Some("identity"), Some(" Identity ")] {
+            assert_eq!(encoding_policy(encoding), Ok(()), "{encoding:?}");
+        }
+        for encoding in ["gzip", "br", "deflate", "gzip, gzip", "identity, br"] {
+            assert_eq!(encoding_policy(Some(encoding)), Err(ErrorCode::Unreadable), "{encoding}");
+        }
+    }
+
+    #[test]
+    fn bodies_decode_as_strict_utf8_without_a_bom() {
+        assert_eq!(decode(b"# Hi".to_vec()), Ok("# Hi".into()));
+        assert_eq!(decode("\u{feff}# Hi".into()), Ok("# Hi".into()));
+        assert_eq!(decode("a\u{feff}b".into()), Ok("a\u{feff}b".into()));
+        assert_eq!(decode(Vec::new()), Ok(String::new()));
+        assert_eq!(decode(b"\xef\xbb\xbf".to_vec()), Ok(String::new()));
+        assert_eq!(decode("\u{feff}\u{feff}x".into()), Ok("\u{feff}x".into()));
+        for bytes in [&b"caf\xe9"[..], b"\xff\xfe#\x00", b"\xe2\x82", b"\xc0\xaf", b"\xed\xa0\x80"] {
+            assert_eq!(decode(bytes.to_vec()), Err(ErrorCode::Unreadable), "{bytes:?}");
+        }
     }
 
     /// q of each media range in a header like `a/b, c/d;q=0.5`, in order.

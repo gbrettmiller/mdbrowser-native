@@ -7,8 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use iced::Task;
 
 use super::store::{Store, Ticket};
-use super::{background, files, opener};
-use crate::session::error::ErrorCode;
+use super::{background, files, opener, web};
 use crate::session::location::Location;
 use crate::session::{Effect, Event};
 
@@ -41,7 +40,7 @@ pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
         Effect::Load { request_id, location } => {
             let load = move || match location {
                 Location::File(path) => files::read_markdown(&path),
-                Location::Web(_) => Err(ErrorCode::Unreachable), // fetching arrives with services::web
+                Location::Web(url) => web::fetch(&url, &web::Limits::default()).map(|fetched| fetched.source),
             };
             Task::perform(background::run_blocking(load), move |result| {
                 Some(Event::Loaded { request_id, result, now: now() })
