@@ -40,7 +40,7 @@ pub fn is_local_ip(ip: IpAddr) -> bool {
     }
 }
 
-pub fn is_local_ipv4(ip: Ipv4Addr) -> bool {
+fn is_local_ipv4(ip: Ipv4Addr) -> bool {
     let [a, b, c, _] = ip.octets();
     let this_network = a == 0; // 0.0.0.0/8
     let shared = a == 100 && (b & 0xc0) == 64; // 100.64.0.0/10: carrier NAT, Tailscale
@@ -57,7 +57,7 @@ pub fn is_local_ipv4(ip: Ipv4Addr) -> bool {
         || protocol_assignments
 }
 
-pub fn is_local_ipv6(ip: Ipv6Addr) -> bool {
+fn is_local_ipv6(ip: Ipv6Addr) -> bool {
     let s = ip.segments();
     let site_local = (s[0] & 0xffc0) == 0xfec0; // fec0::/10, deprecated but still routed
     let local_itself = ip.is_loopback()

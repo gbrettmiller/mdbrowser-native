@@ -26,7 +26,8 @@ pub struct Viewport {
     /// The image generation the drawn page was laid out with. Newer images wait
     /// for `ImagesArrived`, which lays out again from `update` so the scroll can follow.
     applied_images: Cell<u64>,
-    pub images_pending: bool,
+    /// An `ImagesArrived` relayout is scheduled.
+    images_pending: bool,
     scroll_y: Cell<f32>,
     /// An anchor the view was scrolled to, and where: re-applied as images arrive,
     /// until the reader scrolls away.
@@ -75,6 +76,19 @@ impl Viewport {
     pub fn ready_for_anchor(&self, document: &Arc<Document>) -> bool {
         let laid_out = self.laid_out.borrow().upgrade().is_some_and(|doc| Arc::ptr_eq(&doc, document));
         laid_out && self.width_since.get().elapsed() >= ANCHOR_STABLE
+    }
+
+    /// Images changed to `image_generation`: whether to schedule a relayout. One at a
+    /// time, so a burst of arrivals costs one layout and one scroll correction.
+    pub fn begin_images(&mut self, image_generation: u64) -> bool {
+        let start = image_generation != self.applied_images.get() && !self.images_pending;
+        self.images_pending |= start;
+        start
+    }
+
+    /// The scheduled relayout found no page to lay out.
+    pub fn cancel_images(&mut self) {
+        self.images_pending = false;
     }
 
     /// A new page, laid out with its images as they are now, from the top.
@@ -155,6 +169,20 @@ mod tests {
         viewport.hold_anchor("later".into(), before.scroll_offset_for("later", gutter).unwrap());
         viewport.scrolled(0.0);
         assert_eq!(viewport.images_arrived(&before, &after, gutter, 1), None, "at the top, the top stays put");
+    }
+
+    #[test]
+    fn image_relayouts_are_scheduled_one_at_a_time() {
+        let mut viewport = Viewport::new(600.0);
+        assert!(!viewport.begin_images(0), "nothing new");
+        assert!(viewport.begin_images(1));
+        assert!(!viewport.begin_images(2), "one is already scheduled");
+        let (before, after) = (page(10), page(10));
+        viewport.images_arrived(&before, &after, 0.0, 2);
+        assert!(!viewport.begin_images(2), "applied");
+        assert!(viewport.begin_images(3));
+        viewport.cancel_images();
+        assert!(viewport.begin_images(3));
     }
 
     #[test]

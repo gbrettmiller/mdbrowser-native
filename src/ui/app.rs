@@ -125,11 +125,10 @@ impl App {
     /// Images changed what the page shows: lay out again once arrivals settle, so a
     /// burst of them costs one layout and one scroll correction.
     fn schedule_images(&mut self) -> Task<Message> {
-        let changed = self.session().images.generation() != self.viewport.applied_images();
-        if !changed || self.viewport.images_pending || self.shown().is_none() {
+        let generation = self.session().images.generation();
+        if self.shown().is_none() || !self.viewport.begin_images(generation) {
             return Task::none();
         }
-        self.viewport.images_pending = true;
         Task::perform(background::after(SETTLE), |_| Message::ImagesArrived)
     }
 
@@ -150,7 +149,7 @@ impl App {
     /// stays put, or so a held anchor stays at the top.
     fn images_arrived(&mut self) -> Task<Message> {
         let Some(shown) = self.shown() else {
-            self.viewport.images_pending = false;
+            self.viewport.cancel_images();
             return Task::none();
         };
         let width = self.viewport.width();
