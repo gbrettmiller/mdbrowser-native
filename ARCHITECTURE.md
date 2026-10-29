@@ -1,6 +1,6 @@
 # Architecture
 
-**Last Updated:** 2026-10-28
+**Last Updated:** 2026-10-29
 
 This file is the technical specification: layers, stack, conventions, structure and import rules. For project intent and direction, see VECTOR.md. Read VECTOR.md first, then this file, before writing code. `/invest-architecture` audits the codebase against what is declared here.
 
@@ -73,7 +73,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 
 ## What Not to Do
 
-- **Never produce or interpret HTML.** Raw HTML in a document is shown as literal text.
+- **Never produce or interpret HTML.** Raw HTML in a document is stripped: tags, comments and declarations are removed, and the text between them is kept (ADR-002). Code spans and code blocks are never stripped.
 - No I/O outside `services`.
 - No hardcoded colours, sizes or fonts outside `theme`.
 - No inline user-facing strings outside `content`.
