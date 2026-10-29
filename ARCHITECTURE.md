@@ -89,4 +89,4 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `corpus/` — sample Markdown documents for golden tests and manual checks
 - `scripts/shoot.sh` — screenshots documents in each font (Hyprland + grim). It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
 - `vector/` — Investiture doctrine tree: `decisions/`, `research/`, `schemas/`
-- `.github/workflows/` — CI: fmt → clippy → test → build
+- `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check
