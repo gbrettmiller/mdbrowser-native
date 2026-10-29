@@ -8,6 +8,18 @@ use super::address::decode;
 
 const MARKDOWN_EXTENSIONS: [&str; 2] = ["md", "markdown"];
 
+/// The only schemes fetched or shown in the app.
+pub const WEB_SCHEMES: [&str; 2] = ["http", "https"];
+pub const FILE_SCHEME: &str = "file";
+
+/// The URL without a user name or password, which are never sent anywhere.
+pub fn without_credentials(mut url: Url) -> Url {
+    // Infallible for http(s) URLs, which always have a host.
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    url
+}
+
 /// A Markdown document's home: a local file or a web page. Build web locations
 /// with `Location::web`, which keeps the fragment out (it lives on `Target`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

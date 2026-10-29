@@ -1,6 +1,6 @@
 //! Why an address or load failed.
 
-/// `key()` names the user-facing string.
+/// `key()` is a stable identifier; `content` holds the words.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     Empty,

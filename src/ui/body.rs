@@ -7,7 +7,8 @@ use iced::{Element, Fill};
 use super::app::Message;
 use crate::content;
 use crate::session::error::ErrorCode;
-use crate::session::{Event, Notice};
+use crate::session::location::Location;
+use crate::session::{Event, Notice, State};
 use crate::theme;
 
 pub fn message<'a>(message: impl text::IntoFragment<'a>) -> Element<'a, Message> {
@@ -16,15 +17,10 @@ pub fn message<'a>(message: impl text::IntoFragment<'a>) -> Element<'a, Message>
 
 /// The failure, a hint for pages on the web, the address it was for, and the
 /// system browser when the session offers it.
-pub fn error<'a>(
-    code: ErrorCode,
-    address: String,
-    web: bool,
-    browser_offered: bool,
-    theme: &theme::Theme,
-) -> Element<'a, Message> {
+pub fn error<'a>(code: ErrorCode, state: &State, theme: &theme::Theme) -> Element<'a, Message> {
     let muted = theme.muted;
-    let (message, hint) = content::failure(code, web);
+    let (message, hint) = content::failure(code, state.current_location().is_some_and(Location::is_web));
+    let (address, browser_offered) = (state.address(), state.browser_offer().is_some());
     let open = button(content::OPEN_IN_BROWSER).on_press(Message::Session(Event::OpenInBrowser));
     column![text(message).size(20)]
         .push(hint.map(|hint| text(hint).size(16)))

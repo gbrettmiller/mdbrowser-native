@@ -1,5 +1,6 @@
 //! The back/forward stack. Entries keep what was typed, so an address that
-//! failed to parse can still be revisited (and fail again) like any other.
+//! failed to parse can still be revisited (and fail again) like any other,
+//! until a redirect settles an entry on its final address.
 
 use super::location::{Location, Target};
 

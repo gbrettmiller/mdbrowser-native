@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use url::Url;
 
 use super::error::ErrorCode;
-use super::location::{Location, Target, is_markdown};
+use super::location::{FILE_SCHEME, Location, Target, WEB_SCHEMES, is_markdown, without_credentials};
 
 /// `scheme:` per RFC 3986, lowercased. Single letters are Windows drives, not schemes.
 pub(super) fn scheme_of(reference: &str) -> Option<String> {
@@ -100,16 +100,6 @@ fn expand_home(path: &str, home: &Path) -> PathBuf {
     }
 }
 
-pub(super) const WEB_SCHEMES: [&str; 2] = ["http", "https"];
-
-/// The URL without a user name or password, which are never sent anywhere.
-pub(super) fn without_credentials(mut url: Url) -> Url {
-    // Infallible for http(s) URLs, which always have a host.
-    let _ = url.set_username("");
-    let _ = url.set_password(None);
-    url
-}
-
 /// An http(s) URL as a target: credentials dropped, the fragment decoded onto the target.
 pub(super) fn web_target(url: Url) -> Target {
     let fragment = url.fragment().map(decode).filter(|fragment| !fragment.is_empty());
@@ -130,7 +120,7 @@ pub fn parse_address(input: &str, home: &Path) -> Result<Target, ErrorCode> {
     }
     let (path, fragment) = match scheme_of(input).as_deref() {
         Some(scheme) if WEB_SCHEMES.contains(&scheme) => return parse_web_url(input),
-        Some("file") => parse_file_url(input).ok_or(ErrorCode::NotAbsolute)?,
+        Some(FILE_SCHEME) => parse_file_url(input).ok_or(ErrorCode::NotAbsolute)?,
         Some(_) => return Err(ErrorCode::UnsupportedScheme),
         None => {
             let (path, fragment) = split_reference(input);
