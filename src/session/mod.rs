@@ -96,8 +96,8 @@ pub enum Event {
         location: Location,
         result: Result<images::Picture, images::Problem>,
     },
-    /// A click on a waiting or failed image.
-    LoadImage(Location),
+    /// A click on the note of a waiting or failed image, by its source on the page.
+    LoadImage(String),
     /// Ctrl/Cmd+Shift+I: load this page's images, whatever the setting.
     LoadPageImages,
     DismissNotice(u64),

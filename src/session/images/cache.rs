@@ -27,6 +27,26 @@ impl Cache {
         self.last_used.remove(location);
     }
 
+    /// Forgets every location `keep` rejects.
+    pub(super) fn retain(&mut self, keep: impl Fn(&Location) -> bool) {
+        self.last_used.retain(|location, _| keep(location));
+    }
+
+    pub(super) const fn within_budget(&self, bytes: u64) -> bool {
+        bytes <= self.budget
+    }
+
+    /// Locations with a last use recorded.
+    #[cfg(test)]
+    pub(super) fn tracked(&self) -> usize {
+        self.last_used.len()
+    }
+
+    #[cfg(test)]
+    pub(super) fn locations(&self) -> impl Iterator<Item = &Location> {
+        self.last_used.keys()
+    }
+
     /// The shown pictures to drop, least recently used first, until the total is
     /// within budget. Pinned ones are never chosen, so they can hold it over.
     pub(super) fn victims(&self, shown: &[(Location, u64)], pinned: &HashSet<Location>) -> Vec<Location> {

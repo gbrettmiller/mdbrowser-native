@@ -4,7 +4,7 @@
 use iced::Rectangle;
 use iced::advanced::graphics::text::cosmic_text as ct;
 
-use super::flow::{Flow, Ink};
+use super::flow::{Column, Flow, Ink};
 use super::{Fragment, Joint, LaidImage};
 use crate::model::{Align, Span, Style, image_description};
 
@@ -13,8 +13,24 @@ use crate::model::{Align, Span, Style, image_description};
 pub enum ImageView {
     /// Decoded, at this size in pixels.
     Shown { width: u32, height: u32 },
-    /// Not shown: the description, then this note, if any; `true` if clicking it acts.
-    Placeholder { note: Option<(String, bool)> },
+    /// Not shown: the description, then this note, if any.
+    Placeholder { note: Option<ImageNote> },
+}
+
+/// The line under a placeholder's description, in the words `content` gives it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageNote {
+    pub text: String,
+    /// Clicking it acts on the image (loads or retries it).
+    pub clickable: bool,
+}
+
+/// An image block's source, description and enclosing link.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Source<'a> {
+    pub src: &'a str,
+    pub alt: &'a str,
+    pub link: &'a Option<String>,
 }
 
 /// Every image as its bare description: for callers with no images to show.
@@ -22,35 +38,31 @@ pub fn no_images(_: &str) -> ImageView {
     ImageView::Placeholder { note: None }
 }
 
-/// The note under a placeholder is smaller than the text.
-const NOTE_SCALE: f32 = 0.85;
-
 impl Flow<'_> {
-    pub(super) fn image(&mut self, src: &str, alt: &str, link: &Option<String>, x: f32, width: f32, ink: Ink) {
-        match (self.images)(src) {
-            ImageView::Shown { width: own, height } => self.picture(src, alt, link, (x, width), (own, height), ink),
+    pub(super) fn image(&mut self, source: Source, column: Column, ink: Ink) {
+        match (self.images)(source.src) {
+            ImageView::Shown { width, height } => self.picture(source, column, (width, height), ink),
             ImageView::Placeholder { note } => {
                 let style = Style { emphasis: true, ..Style::default() };
-                let description = [Span { text: image_description(alt), style, link: link.clone() }];
-                self.text(&description, x, width, ink, Align::Left, ct::Wrap::WordOrGlyph);
-                if let Some((note, clickable)) = note {
-                    self.note(src, &note, clickable, x, width, ink);
+                let description = [Span { text: image_description(source.alt), style, link: source.link.clone() }];
+                self.text(&description, column.x, column.width, ink, Align::Left, ct::Wrap::WordOrGlyph);
+                if let Some(note) = note {
+                    self.note(source.src, &note, column, ink);
                 }
             }
         }
     }
 
-    /// Never scaled up; scaled down to the column (`x` and its width), aspect kept,
-    /// in whole pixels.
-    fn picture(&mut self, src: &str, alt: &str, link: &Option<String>, column: (f32, f32), size: (u32, u32), ink: Ink) {
-        let (x, column) = column;
-        let (own_width, own_height) = (size.0 as f32, size.1 as f32);
-        let width = own_width.min(column.floor());
+    /// Never scaled up; scaled down to the column, aspect kept, in whole pixels.
+    fn picture(&mut self, source: Source, column: Column, (own_width, own_height): (u32, u32), ink: Ink) {
+        let (own_width, own_height) = (own_width as f32, own_height as f32);
+        let width = own_width.min(column.width.floor());
         let height = (own_height * width / own_width).round().max(1.0);
-        let bounds = Rectangle { x, y: self.y, width, height };
-        self.page.images.push(LaidImage { src: src.to_string(), bounds, link: link.clone() });
+        let bounds = Rectangle { x: column.x, y: self.y, width, height };
+        let link = source.link;
+        self.page.images.push(LaidImage { src: source.src.to_string(), bounds, link: link.clone() });
         // Paints nothing: the box takes part in selection, copying and link clicks.
-        let text = image_description(alt);
+        let text = image_description(source.alt);
         let stops = vec![(0.0, 0), (width, text.len())];
         self.page.fragments.push(Fragment {
             bounds,
@@ -72,14 +84,14 @@ impl Flow<'_> {
 
     /// The second line. A clickable note borrows the link look (colour, underline)
     /// but acts on the image, never as a link.
-    fn note(&mut self, src: &str, note: &str, clickable: bool, x: f32, width: f32, ink: Ink) {
-        let small = Ink { size: (ink.size * NOTE_SCALE).round(), color: self.theme.muted, ..ink };
-        let look = clickable.then(|| src.to_string());
+    fn note(&mut self, src: &str, note: &ImageNote, column: Column, ink: Ink) {
+        let small = Ink { size: (ink.size * self.theme.note_scale).round(), color: self.theme.muted, ..ink };
+        let look = note.clickable.then(|| src.to_string());
         let first = self.page.fragments.len();
         self.text(
-            &[Span { text: note.to_string(), style: Style::default(), link: look }],
-            x,
-            width,
+            &[Span { text: note.text.clone(), style: Style::default(), link: look }],
+            column.x,
+            column.width,
             small,
             Align::Left,
             ct::Wrap::WordOrGlyph,
@@ -112,8 +124,7 @@ mod tests {
     }
 
     fn column() -> f32 {
-        let theme = reading(ReadingFont::Literata);
-        (WIDTH - 2.0 * theme.gutter).min(theme.measure).max(80.0)
+        reading(ReadingFont::Literata).column_width(WIDTH)
     }
 
     fn size(page: &Page) -> (f32, f32) {
@@ -160,8 +171,9 @@ mod tests {
 
     #[test]
     fn a_placeholder_is_its_description_then_its_note() {
-        let note =
-            |clickable| move |_: &str| ImageView::Placeholder { note: Some(("Click to load".into(), clickable)) };
+        let note = |clickable| {
+            move |_: &str| ImageView::Placeholder { note: Some(ImageNote { text: "Click to load".into(), clickable }) }
+        };
         let p = page_with("![a cat](a.png)", note(true));
         let texts: Vec<&str> = p.fragments.iter().map(|f| f.text.as_str()).collect();
         assert_eq!(texts, ["[image: a cat]", "Click to load"]);
@@ -177,7 +189,9 @@ mod tests {
 
     #[test]
     fn copying_across_a_placeholder_copies_its_description_but_not_its_note() {
-        let view = |_: &str| ImageView::Placeholder { note: Some(("Click to load".into(), true)) };
+        let view = |_: &str| ImageView::Placeholder {
+            note: Some(ImageNote { text: "Click to load".into(), clickable: true }),
+        };
         let p = page_with("Before\n\n![a red box](a.png)\n\nafter", view);
         let last = p.fragments.len() - 1;
         let all = p.selected_text(
@@ -189,7 +203,9 @@ mod tests {
 
     #[test]
     fn a_linked_placeholder_keeps_its_link_on_the_description() {
-        let view = |_: &str| ImageView::Placeholder { note: Some(("Click to load".into(), true)) };
+        let view = |_: &str| ImageView::Placeholder {
+            note: Some(ImageNote { text: "Click to load".into(), clickable: true }),
+        };
         let p = page_with("[![a](a.png)](https://x.org/)", view);
         assert_eq!(p.fragments[0].link.as_deref(), Some("https://x.org/"));
         assert_eq!(p.fragments[1].action.as_deref(), Some("a.png"));
@@ -197,7 +213,9 @@ mod tests {
 
     #[test]
     fn a_point_on_a_clickable_note_names_its_image_and_elsewhere_nothing() {
-        let clickable = |_: &str| ImageView::Placeholder { note: Some(("Click to load".into(), true)) };
+        let clickable = |_: &str| ImageView::Placeholder {
+            note: Some(ImageNote { text: "Click to load".into(), clickable: true }),
+        };
         let p = page_with("![a](a.png)", clickable);
         let note = p.fragments[1].bounds;
         let on_note = Point::new(note.x + 2.0, note.y + note.height / 2.0);
@@ -205,7 +223,9 @@ mod tests {
         assert_eq!(p.link_at(on_note), None);
         let description = p.fragments[0].bounds;
         assert_eq!(p.action_at(Point::new(description.x + 2.0, description.y + 2.0)), None);
-        let off = |_: &str| ImageView::Placeholder { note: Some(("Web images are off.".into(), false)) };
+        let off = |_: &str| ImageView::Placeholder {
+            note: Some(ImageNote { text: "Web images are off.".into(), clickable: false }),
+        };
         let p = page_with("![a](a.png)", off);
         let note = p.fragments[1].bounds;
         assert_eq!(p.action_at(Point::new(note.x + 2.0, note.y + note.height / 2.0)), None);

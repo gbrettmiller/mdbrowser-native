@@ -112,7 +112,7 @@ Option A is the only one that keeps decoding off the render thread and bounded b
 - **Binary size:** the four codecs add to the release binary: 32.6 MB before 2b, 34.7 MB after (Linux x64, 2026-10-29), about 2.1 MB.
 
 **Neutral:**
-- `iced::widget::image::Handle` is held in session state as a value type: reference-counted, compared by id and cheap to clone. ARCHITECTURE.md's import rules name it.
+- `iced::advanced::image::Handle` (the same type as `iced::widget::image::Handle`) is held in session state as a value type: reference-counted, compared by id and cheap to clone. ARCHITECTURE.md's import rules name it.
 - Front matter image fields (`image`, `inlineImage`, `metaImage`) are not covered here. They are phase 3 (VECTOR.md, "Image semantics").
 
 ## Related Decisions

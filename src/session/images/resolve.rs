@@ -8,8 +8,8 @@ use url::Url;
 use crate::session::address::{expand_home, is_network_path, normalise, scheme_of, split_reference};
 use crate::session::href::{OnPage, as_browsers_read, join_on_page, local_target};
 use crate::session::location::{FILE_SCHEME, Location, WEB_SCHEMES, without_credentials};
-use crate::session::network::is_local_network;
-use crate::session::web::BAD_PORTS;
+use crate::session::network::crosses_into_local_network;
+use crate::session::web::is_blocked_port;
 
 /// Why an image source won't be loaded. The reader sees one note for all of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,10 +27,7 @@ pub enum Refusal {
 
 /// A web image location, unless its port is one browsers refuse.
 fn web_image(url: Url) -> Result<Location, Refusal> {
-    match url.port() {
-        Some(port) if BAD_PORTS.contains(&port) => Err(Refusal::Port),
-        _ => Ok(Location::web(without_credentials(url))),
-    }
+    if is_blocked_port(&url) { Err(Refusal::Port) } else { Ok(Location::web(without_credentials(url))) }
 }
 
 /// Resolves an image `src` found in the document at `current`. `home` expands `~/`.
@@ -73,7 +70,7 @@ fn from_page(reference: &str, page: &Url) -> Result<Location, Refusal> {
     match join_on_page(reference, page) {
         OnPage::Disk => Err(Refusal::Disk),
         OnPage::Unsupported => Err(Refusal::Scheme),
-        OnPage::Web(url) if is_local_network(&url) && !is_local_network(page) => Err(Refusal::LocalNetwork),
+        OnPage::Web(url) if crosses_into_local_network(page, &url) => Err(Refusal::LocalNetwork),
         OnPage::Web(url) => web_image(url),
     }
 }

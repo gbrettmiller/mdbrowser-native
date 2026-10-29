@@ -48,7 +48,10 @@ pub fn step(state: State, event: Event) -> Step {
             (state, effects)
         }
         Event::ImageLoaded { location, result } => with_images(state, |images| images.loaded(location, result)),
-        Event::LoadImage(location) => with_images(state, |images| images.click(&location)),
+        Event::LoadImage(src) => match state.images.location(&src).cloned() {
+            Some(location) => with_images(state, |images| images.click(&location)),
+            None => none(state),
+        },
         Event::LoadPageImages => with_images(state, Images::load_page),
         Event::DismissNotice(id) => {
             let notices = state.notices.iter().copied().filter(|n| n.id != id).collect();

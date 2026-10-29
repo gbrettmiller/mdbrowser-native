@@ -25,7 +25,7 @@ pub fn keep(old: &Page, new: &Page, scroll: f32) -> f32 {
 mod tests {
     use super::super::{Page, layout};
     use super::*;
-    use crate::layout::{ImageView, no_images};
+    use crate::layout::{ImageNote, ImageView, no_images};
     use crate::model::parse;
     use crate::theme::{ReadingFont, fonts, reading};
 
@@ -58,7 +58,9 @@ mod tests {
 
     #[test]
     fn a_placeholder_becoming_an_image_inside_the_view_keeps_the_top_line() {
-        let before = page(POST, &|_| ImageView::Placeholder { note: Some(("Loading image…".into(), false)) });
+        let before = page(POST, &|_| ImageView::Placeholder {
+            note: Some(ImageNote { text: "Loading image…".into(), clickable: false }),
+        });
         let after = page(POST, &|_| ImageView::Shown { width: 100, height: 300 });
         let scroll = y_of(&before, "Intro") + 2.0;
         let kept = keep(&before, &after, scroll);
@@ -70,7 +72,9 @@ mod tests {
 
     #[test]
     fn a_view_starting_at_the_image_itself_keeps_the_image_there() {
-        let before = page(POST, &|_| ImageView::Placeholder { note: Some(("Loading image…".into(), false)) });
+        let before = page(POST, &|_| ImageView::Placeholder {
+            note: Some(ImageNote { text: "Loading image…".into(), clickable: false }),
+        });
         let after = page(POST, &|_| ImageView::Shown { width: 100, height: 300 });
         let scroll = y_of(&before, "[image: pic]") - 4.0;
         let kept = keep(&before, &after, scroll);

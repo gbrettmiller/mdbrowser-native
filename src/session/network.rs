@@ -1,5 +1,6 @@
-//! Whether a URL points into the reader's own machine or network. Links and
-//! redirects from a public page may not lead there (ADR-003).
+//! Whether a URL points into the reader's own machine or network. Links, image
+//! sources and redirects from a public page may not lead there (ADR-003, ADR-004);
+//! services::web also checks resolved addresses with `is_local_ip` when connecting.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -7,6 +8,12 @@ use url::{Host, Url};
 
 /// Names that only mean something inside a home or office network.
 const LOCAL_SUFFIXES: [&str; 5] = ["localhost", "local", "home.arpa", "internal", "lan"];
+
+/// A public page (`from`) reaching into the reader's own machine or network (`to`):
+/// the one boundary links, image sources and redirects share.
+pub fn crosses_into_local_network(from: &Url, to: &Url) -> bool {
+    is_local_network(to) && !is_local_network(from)
+}
 
 /// Hosts that lead into the reader's own machine or network, as written in the URL.
 /// The url crate has already normalised spellings like `0x7f.1` to `127.0.0.1`.
@@ -81,6 +88,14 @@ mod tests {
 
     fn local(url: &str) -> bool {
         is_local_network(&Url::parse(url).unwrap())
+    }
+
+    #[test]
+    fn only_a_public_page_reaching_a_local_host_crosses_into_the_local_network() {
+        let url = |text: &str| Url::parse(text).unwrap();
+        assert!(crosses_into_local_network(&url("https://x.org/"), &url("http://192.168.0.1/")));
+        assert!(!crosses_into_local_network(&url("http://router/"), &url("http://192.168.0.1/")));
+        assert!(!crosses_into_local_network(&url("https://x.org/"), &url("https://y.org/")));
     }
 
     #[test]

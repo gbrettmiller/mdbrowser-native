@@ -101,8 +101,8 @@ pub struct Picture {
 
 impl Picture {
     /// Bytes of RGBA held in memory, for the cache budget.
-    pub const fn bytes(&self) -> u64 {
-        self.width as u64 * self.height as u64 * 4
+    pub const fn pixel_bytes(&self) -> u64 {
+        self.width as u64 * self.height as u64 * limits::RGBA_BYTES_PER_PIXEL
     }
 }
 

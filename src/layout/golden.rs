@@ -44,7 +44,7 @@ fn images_as_placeholders() {
 /// and every Markdown image in it becomes an image block.
 #[test]
 fn every_corpus_image_becomes_a_block_and_lays_out() {
-    use crate::layout::{ImageView, layout};
+    use crate::layout::{ImageNote, ImageView, layout};
     use crate::model::parse;
     use crate::theme::reading;
     let mut files = vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus")];
@@ -61,7 +61,9 @@ fn every_corpus_image_becomes_a_block_and_lays_out() {
         let document = parse(&source);
         let images = document.image_sources().len();
         let shown = |_: &str| ImageView::Shown { width: 640, height: 480 };
-        let placeholder = |_: &str| ImageView::Placeholder { note: Some(("Loading image…".into(), false)) };
+        let placeholder = |_: &str| ImageView::Placeholder {
+            note: Some(ImageNote { text: "Loading image…".into(), clickable: false }),
+        };
         for view in [&shown as &dyn Fn(&str) -> ImageView, &placeholder] {
             let page = layout(&document.blocks, &reading(ReadingFont::Literata), WIDTH, view);
             assert!(page.height > 0.0, "{path:?}");

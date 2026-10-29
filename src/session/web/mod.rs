@@ -8,7 +8,7 @@ use url::Url;
 
 use super::error::ErrorCode;
 use super::location::{Location, WEB_SCHEMES, without_credentials};
-use super::network::is_local_network;
+use super::network::{crosses_into_local_network, is_local_network};
 
 /// Markdown first; plain text next, since many hosts serve `.md` files as `text/plain`.
 pub const ACCEPT: &str = "text/markdown, text/x-markdown;q=0.9, text/plain;q=0.5, */*;q=0.1";
@@ -17,7 +17,7 @@ pub const ACCEPT: &str = "text/markdown, text/x-markdown;q=0.9, text/plain;q=0.5
 pub const IMAGE_ACCEPT: &str = "image/png, image/jpeg, image/gif, image/webp, image/*;q=0.8, */*;q=0.1";
 
 /// The Fetch standard's blocked ports, plus Redis (6379), which it doesn't list.
-pub const BAD_PORTS: [u16; 82] = [
+const BAD_PORTS: [u16; 82] = [
     1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110,
     111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
     540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061,
@@ -36,6 +36,14 @@ impl Want {
         match self {
             Self::Page => ACCEPT,
             Self::Image => IMAGE_ACCEPT,
+        }
+    }
+
+    /// Whether a response of this type is taken, from `final_url` after redirects.
+    pub fn check_type(self, content_type: Option<&str>, final_url: &Url) -> Result<(), FetchError> {
+        match self {
+            Self::Page => body_policy(content_type, final_url),
+            Self::Image => image_policy(content_type),
         }
     }
 }
@@ -124,6 +132,11 @@ pub fn classify_status(status: u16) -> Result<StatusClass, FetchError> {
     }
 }
 
+/// A port browsers block, where mail, chat and other servers listen.
+pub fn is_blocked_port(url: &Url) -> bool {
+    url.port().is_some_and(|port| BAD_PORTS.contains(&port))
+}
+
 /// Where redirect number `hop` (from 1) leads. Never to another scheme than
 /// http(s), never from https down to http, never from a public host into the
 /// reader's own machine or network, never to a port browsers block, and never
@@ -135,10 +148,10 @@ pub fn next_hop(from: &Url, location_header: Option<&str>, hop: u32) -> Result<U
     }
     let to = from.join(location.ok_or(FetchError::BadRedirect)?).map_err(|_| FetchError::BadRedirect)?;
     let downgrade = from.scheme() == "https" && to.scheme() == "http";
-    // Links and redirects share this refusal (ADR-003): a public page must not steer
-    // the app into the reader's own machine or network.
-    let into_local_network = is_local_network(&to) && !is_local_network(from);
-    let bad_port = to.port().is_some_and(|port| BAD_PORTS.contains(&port));
+    // Links, images and redirects share this refusal (ADR-003): a public page must
+    // not steer the app into the reader's own machine or network.
+    let into_local_network = crosses_into_local_network(from, &to);
+    let bad_port = is_blocked_port(&to);
     if !WEB_SCHEMES.contains(&to.scheme()) || downgrade || into_local_network || bad_port {
         return Err(FetchError::BadRedirect);
     }
@@ -151,6 +164,21 @@ mod tests {
 
     fn url(text: &str) -> Url {
         Url::parse(text).unwrap()
+    }
+
+    #[test]
+    fn each_want_takes_its_own_types() {
+        let page = url("https://x.org/a.md");
+        assert_eq!(Want::Page.check_type(Some("text/markdown"), &page), Ok(()));
+        assert_eq!(Want::Image.check_type(Some("image/png"), &page), Ok(()));
+        assert_eq!(Want::Image.check_type(Some("text/markdown"), &page), Err(FetchError::WrongType));
+    }
+
+    #[test]
+    fn blocked_ports_are_named_by_the_url() {
+        assert!(is_blocked_port(&url("http://x.org:25/")));
+        assert!(!is_blocked_port(&url("http://x.org:8080/")));
+        assert!(!is_blocked_port(&url("http://x.org/")));
     }
 
     #[test]

@@ -7,7 +7,7 @@ use super::{Link, MAIL_SCHEME};
 use crate::session::address::{scheme_of, web_target};
 use crate::session::href::{OnPage, join_on_page};
 use crate::session::location::{is_markdown_name, without_credentials};
-use crate::session::network::is_local_network;
+use crate::session::network::crosses_into_local_network;
 
 /// Resolved as a browser would against the page's URL (`href::join_on_page`).
 pub(super) fn classify(reference: &str, page: &Url) -> Link {
@@ -18,7 +18,7 @@ pub(super) fn classify(reference: &str, page: &Url) -> Link {
         OnPage::Disk => Link::LocalFromWeb,
         OnPage::Unsupported => Link::Unsupported,
         OnPage::Web(url) if !is_markdown_name(url.path()) => Link::External(without_credentials(url).to_string()),
-        OnPage::Web(url) if is_local_network(&url) && !is_local_network(page) => Link::LocalNetworkFromWeb,
+        OnPage::Web(url) if crosses_into_local_network(page, &url) => Link::LocalNetworkFromWeb,
         OnPage::Web(url) => Link::Navigate(web_target(url)),
     }
 }

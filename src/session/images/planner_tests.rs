@@ -6,7 +6,7 @@ use iced::advanced::image::Handle;
 use url::Url;
 
 use super::*;
-use crate::session::images::limits::MAX_LOADING;
+use crate::session::images::limits::MAX_CONCURRENT_LOADS;
 use crate::session::images::{ImageLoading, Note, Problem};
 
 fn page() -> Location {
@@ -41,12 +41,12 @@ fn view(images: &Images, src: &str) -> View {
 fn a_page_starts_four_loads_and_each_finished_one_starts_the_next() {
     let names = ["1.png", "2.png", "3.png", "4.png", "5.png", "6.png"];
     let (images, loads) = open(Images::new(), &names, ImageLoading::Automatic);
-    assert_eq!(loads.len(), MAX_LOADING);
+    assert_eq!(loads.len(), MAX_CONCURRENT_LOADS);
     assert_eq!(loads, ["1.png", "2.png", "3.png", "4.png"].map(at));
-    assert_eq!(view(&images, "5.png"), View::Note(Note::Loading, false));
+    assert_eq!(view(&images, "5.png"), View::Note { note: Note::Loading, clickable: false });
     let (images, next) = images.loaded(at("1.png"), Ok(picture(2, 2)));
     assert_eq!(next, [at("5.png")]);
-    assert_eq!(view(&images, "1.png"), View::Shown((2, 2)));
+    assert_eq!(view(&images, "1.png"), View::Shown { width: 2, height: 2 });
     let (_, next) = images.loaded(at("2.png"), Err(Problem::Unavailable));
     assert_eq!(next, [at("6.png")]);
 }
@@ -67,7 +67,7 @@ fn the_cap_holds_across_pages_and_leaving_drops_the_queue() {
     assert!(loads.is_empty(), "four are still running");
     let (images, next) = images.loaded(at("1.png"), Ok(picture(1, 1)));
     assert_eq!(next, [at("b.png")], "the old page's queue was dropped");
-    assert_eq!(images.loading(), 4);
+    assert_eq!(images.loading_count(), 4);
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn a_result_for_another_page_is_cached_but_changes_nothing_on_screen() {
     let images = images.leave_page();
     let (images, loads) = open(images, &["a.png"], ImageLoading::Automatic);
     assert!(loads.is_empty(), "cached");
-    assert_eq!(view(&images, "a.png"), View::Shown((1, 1)));
+    assert_eq!(view(&images, "a.png"), View::Shown { width: 1, height: 1 });
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn a_result_for_this_page_bumps_the_generation() {
 fn on_click_waits_and_a_click_loads_once() {
     let (images, loads) = open(Images::new(), &["a.png"], ImageLoading::OnClick);
     assert!(loads.is_empty());
-    assert_eq!(view(&images, "a.png"), View::Note(Note::ClickToLoad, true));
+    assert_eq!(view(&images, "a.png"), View::Note { note: Note::ClickToLoad, clickable: true });
     let (images, loads) = images.click(&at("a.png"));
     assert_eq!(loads, [at("a.png")]);
     let (_, loads) = images.click(&at("a.png"));
@@ -107,7 +107,7 @@ fn on_click_waits_and_a_click_loads_once() {
 fn off_requests_nothing_and_ignores_clicks() {
     let (images, loads) = open(Images::new(), &["a.png"], ImageLoading::Off);
     assert!(loads.is_empty());
-    assert_eq!(view(&images, "a.png"), View::Note(Note::Off, false));
+    assert_eq!(view(&images, "a.png"), View::Note { note: Note::Off, clickable: false });
     let (_, loads) = images.click(&at("a.png"));
     assert!(loads.is_empty());
 }
@@ -124,11 +124,11 @@ fn local_images_load_in_every_mode() {
 fn a_click_retries_a_failed_image_and_revisiting_retries_it_too() {
     let (images, _) = open(Images::new(), &["a.png"], ImageLoading::Automatic);
     let (images, _) = images.loaded(at("a.png"), Err(Problem::Unavailable));
-    assert_eq!(view(&images, "a.png"), View::Note(Note::Failed, true));
+    assert_eq!(view(&images, "a.png"), View::Note { note: Note::Failed, clickable: true });
     let (images, loads) = images.click(&at("a.png"));
     assert_eq!(loads, [at("a.png")]);
     let (images, _) = images.loaded(at("a.png"), Err(Problem::Unsupported));
-    assert_eq!(view(&images, "a.png"), View::Note(Note::Unsupported, false));
+    assert_eq!(view(&images, "a.png"), View::Note { note: Note::Unsupported, clickable: false });
     let images = images.leave_page();
     let (_, loads) = open(images, &["a.png"], ImageLoading::Automatic);
     assert_eq!(loads, [at("a.png")], "failures aren't cached");
@@ -138,7 +138,7 @@ fn a_click_retries_a_failed_image_and_revisiting_retries_it_too() {
 fn refused_sources_show_their_note_and_load_nothing() {
     let (images, loads) = open(Images::new(), &["file:///etc/x.png", ""], ImageLoading::Automatic);
     assert!(loads.is_empty());
-    assert_eq!(view(&images, "file:///etc/x.png"), View::Note(Note::Refused, false));
+    assert_eq!(view(&images, "file:///etc/x.png"), View::Note { note: Note::Refused, clickable: false });
 }
 
 #[test]
@@ -150,16 +150,16 @@ fn switching_modes_never_hides_or_cancels_and_moves_the_rest() {
     assert_eq!(started, [at("5.png")]);
     let (images, loads) = images.mode_changed(ImageLoading::Off);
     assert!(loads.is_empty());
-    assert_eq!(view(&images, "1.png"), View::Shown((1, 1)));
-    assert_eq!(view(&images, "5.png"), View::Note(Note::Loading, false), "still running");
-    assert_eq!(view(&images, "6.png"), View::Note(Note::Off, false));
+    assert_eq!(view(&images, "1.png"), View::Shown { width: 1, height: 1 });
+    assert_eq!(view(&images, "5.png"), View::Note { note: Note::Loading, clickable: false }, "still running");
+    assert_eq!(view(&images, "6.png"), View::Note { note: Note::Off, clickable: false });
     // off → on click: off become waiting.
     let (images, loads) = images.mode_changed(ImageLoading::OnClick);
     assert!(loads.is_empty());
-    assert_eq!(view(&images, "6.png"), View::Note(Note::ClickToLoad, true));
+    assert_eq!(view(&images, "6.png"), View::Note { note: Note::ClickToLoad, clickable: true });
     // on click → off: waiting become off.
     let (images, _) = images.mode_changed(ImageLoading::Off);
-    assert_eq!(view(&images, "6.png"), View::Note(Note::Off, false));
+    assert_eq!(view(&images, "6.png"), View::Note { note: Note::Off, clickable: false });
     // off → automatic: off are queued and start when there is room.
     let (images, loads) = images.mode_changed(ImageLoading::Automatic);
     assert!(loads.is_empty(), "four are still running");
@@ -172,7 +172,7 @@ fn automatic_to_on_click_turns_queued_images_into_waiting_ones() {
     let names = ["1.png", "2.png", "3.png", "4.png", "5.png"];
     let (images, _) = open(Images::new(), &names, ImageLoading::Automatic);
     let (images, _) = images.mode_changed(ImageLoading::OnClick);
-    assert_eq!(view(&images, "5.png"), View::Note(Note::ClickToLoad, true));
+    assert_eq!(view(&images, "5.png"), View::Note { note: Note::ClickToLoad, clickable: true });
     let (images, loads) = images.mode_changed(ImageLoading::Automatic);
     assert!(loads.is_empty());
     let (_, next) = images.loaded(at("1.png"), Ok(picture(1, 1)));
@@ -191,7 +191,7 @@ fn loading_this_pages_images_loads_waiting_off_and_failed_ones() {
 
 #[test]
 fn the_cache_evicts_the_least_recently_used_but_never_this_pages_images() {
-    let budget = picture(10, 10).bytes() * 2;
+    let budget = picture(10, 10).pixel_bytes() * 2;
     let mut images = Images::with_budget(budget);
     for name in ["a.png", "b.png", "c.png"] {
         let (opened, _) = open(images.leave_page(), &[name], ImageLoading::Automatic);
@@ -210,14 +210,14 @@ fn the_cache_evicts_the_least_recently_used_but_never_this_pages_images() {
 
 #[test]
 fn pinned_images_may_exceed_the_budget_while_shown() {
-    let images = Images::with_budget(picture(10, 10).bytes());
+    let images = Images::with_budget(picture(10, 10).pixel_bytes());
     let (images, _) = open(images, &["a.png", "b.png"], ImageLoading::Automatic);
     let (images, _) = images.loaded(at("a.png"), Ok(picture(10, 10)));
     let (images, _) = images.loaded(at("b.png"), Ok(picture(10, 10)));
-    assert_eq!(view(&images, "a.png"), View::Shown((10, 10)));
-    assert_eq!(view(&images, "b.png"), View::Shown((10, 10)));
+    assert_eq!(view(&images, "a.png"), View::Shown { width: 10, height: 10 });
+    assert_eq!(view(&images, "b.png"), View::Shown { width: 10, height: 10 });
     let images = images.leave_page();
-    assert!(images.unpinned_bytes() <= picture(10, 10).bytes(), "leaving evicts back to budget");
+    assert!(images.unpinned_bytes() <= picture(10, 10).pixel_bytes(), "leaving evicts back to budget");
 }
 
 #[test]
@@ -267,11 +267,11 @@ fn a_load_shared_by_two_pages_runs_once_and_lands_on_the_second() {
     let (images, _) = open(Images::new(), &["x.png"], ImageLoading::Automatic);
     let (images, loads) = open(images.leave_page(), &["x.png"], ImageLoading::Automatic);
     assert!(loads.is_empty(), "still running from the first page");
-    assert_eq!(images.loading(), 1);
+    assert_eq!(images.loading_count(), 1);
     let generation = images.generation();
     let (images, _) = images.loaded(at("x.png"), Err(Problem::Unavailable));
     assert!(images.generation() > generation);
-    assert_eq!(view(&images, "x.png"), View::Note(Note::Failed, true));
+    assert_eq!(view(&images, "x.png"), View::Note { note: Note::Failed, clickable: true });
 }
 
 #[test]
@@ -279,9 +279,9 @@ fn a_result_for_a_load_never_started_is_ignored() {
     let (images, _) = open(Images::new(), &["a.png"], ImageLoading::OnClick);
     let (images, loads) = images.loaded(at("a.png"), Ok(picture(1, 1)));
     assert!(loads.is_empty());
-    assert_eq!(view(&images, "a.png"), View::Note(Note::ClickToLoad, true));
+    assert_eq!(view(&images, "a.png"), View::Note { note: Note::ClickToLoad, clickable: true });
     let (images, _) = images.loaded(at("never.png"), Ok(picture(1, 1)));
-    assert_eq!(images.loading(), 0);
+    assert_eq!(images.loading_count(), 0);
     images.check();
 }
 
@@ -299,12 +299,12 @@ fn reopening_a_page_mid_load_starts_nothing_twice() {
 }
 
 /// Over random sequences of events, several seeds: the planner stays consistent
-/// (`Images::check`), never runs more than `MAX_LOADING`, keeps unpinned pictures
+/// (`Images::check`), never runs more than `MAX_CONCURRENT_LOADS`, keeps unpinned pictures
 /// within budget, and the run really reaches the cap, eviction and failures.
 #[test]
 fn invariants_hold_over_random_events() {
     let names: Vec<String> = (0..9).map(|i| format!("{i}.png")).collect();
-    let budget = picture(4, 4).bytes() * 3;
+    let budget = picture(4, 4).pixel_bytes() * 3;
     let (mut reached_cap, mut evicted, mut failed) = (false, false, false);
     for seed in [0x2b_u64, 7, 99, 2026, 31_337] {
         let mut seed = seed;
@@ -344,11 +344,22 @@ fn invariants_hold_over_random_events() {
             images = changed;
             running.extend(started);
             images.check();
-            assert!(images.loading() <= MAX_LOADING);
-            assert_eq!(images.loading(), running.len());
+            assert!(images.loading_count() <= MAX_CONCURRENT_LOADS);
+            assert_eq!(images.loading_count(), running.len());
             assert!(images.unpinned_bytes() <= budget);
-            reached_cap |= images.loading() == MAX_LOADING;
+            reached_cap |= images.loading_count() == MAX_CONCURRENT_LOADS;
         }
     }
     assert!(reached_cap && evicted && failed, "cap {reached_cap}, eviction {evicted}, failures {failed}");
+}
+
+#[test]
+fn the_cache_forgets_images_that_leave_the_table() {
+    let (images, _) = open(Images::new(), &["a.png", "b.png"], ImageLoading::OnClick);
+    let images = images.leave_page();
+    assert_eq!(images.cache.tracked(), 0, "waiting images left with their page");
+    let (images, _) = open(images, &["c.png"], ImageLoading::Automatic);
+    let images = images.leave_page();
+    let (images, _) = images.loaded(at("c.png"), Err(Problem::Unavailable));
+    assert_eq!(images.cache.tracked(), 0, "a failure off the page is forgotten");
 }

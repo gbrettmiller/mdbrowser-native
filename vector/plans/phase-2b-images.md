@@ -708,3 +708,17 @@ Four personas reviewed revision 1. The three with blockers re-reviewed revision 
 - AC 11 is covered by unit tests and the manual checklist, not acceptance.
 - Right-margin floats, captions, HiDPI, badges and the image viewer are under Risks.
 - Large textures are checked on CI.
+
+## Branch Review (pre-PR, 2026-10-29)
+
+`/code-review --since main` ran doc, arch, naming, structure, complexity, performance and a11y reviews (security ran per step). Changes made:
+
+- **Performance.** The cache's last-use table kept a key for every image ever opened, including ones that never showed; it now forgets whatever leaves the planner's table. Source lookups go through a map built when the page opens, the page's locations and pinned set are kept rather than rebuilt per event, the queue is a `VecDeque`, and running totals of loads and shown bytes let eviction return early when under budget. `Images::check` asserts the totals and the cache against the table.
+- **One boundary, one function.** `network::crosses_into_local_network` (links, images, redirects), `web::is_blocked_port` (images, redirects; `BAD_PORTS` is private) and `Want::check_type` (the content-type policy, out of the I/O loop).
+- **UI.** `ui/viewport.rs` holds the scroll position, held anchor and applied image generation, with tests; `ui/keys.rs` maps chords to commands, with tests; `ui/app/view.rs` holds the view. `app.rs` is back under 300 lines. `Event::LoadImage` carries the source and the reducer finds its location. `Document::new` takes a `Handlers` struct and its `update` delegates to `pressed`, `moved` and `command_key`.
+- **Layout.** The note size is the theme's `note_scale`; `Theme::column_width` is the one column formula; image layout takes `Source` and `Column` values.
+- **Naming.** `View::Shown { width, height }` and `View::Note { note, clickable }`; `ImageView::Placeholder { note: Option<ImageNote> }` (the design notes above said `(Note, bool)`; the UI supplies the words from `content`, so layout never sees `session`). `MAX_CONCURRENT_LOADS`, `RGBA_BYTES_PER_PIXEL`, `Picture::pixel_bytes`, `loading_count`.
+- **Accessibility.** The click-to-load and retry notes also name Ctrl/Cmd+Shift+I. The note wording in the tables and scenarios above predates this.
+- **Docs.** The toolbar menu is "Web images" (the steps above say "Images"). The `Handle` path in ARCHITECTURE.md and ADR-004 is the one the code imports.
+
+Left as follow-ups: the current page's pinned pictures have no upper bound beyond the cache budget (a product decision; see the PR); a hover status for a shown image's alt text; a stronger cue than the faint underline on clickable notes.

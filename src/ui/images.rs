@@ -4,14 +4,16 @@ use iced::Rectangle;
 use iced::advanced::image::Handle;
 
 use crate::content;
-use crate::layout::{ImageView, Page};
+use crate::layout::{ImageNote, ImageView, Page};
 use crate::session::images::{Images, View};
 
 /// How `src` shows on the current page, with the note's words from `content`.
 pub fn view(images: &Images, src: &str) -> ImageView {
     match images.view(src) {
-        View::Shown((width, height)) => ImageView::Shown { width, height },
-        View::Note(note, clickable) => ImageView::Placeholder { note: Some((content::image_note(note), clickable)) },
+        View::Shown { width, height } => ImageView::Shown { width, height },
+        View::Note { note, clickable } => {
+            ImageView::Placeholder { note: Some(ImageNote { text: content::image_note(note), clickable }) }
+        }
     }
 }
 

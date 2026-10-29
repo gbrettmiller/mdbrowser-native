@@ -52,10 +52,7 @@ fn fetch_via(
         match web::classify_status(response.status().as_u16())? {
             StatusClass::Body => {
                 let content_type = header(&response, "content-type");
-                match want {
-                    Want::Page => web::body_policy(content_type, &url)?,
-                    Want::Image => web::image_policy(content_type)?,
-                }
+                want.check_type(content_type, &url)?;
                 web::encoding_policy(header(&response, "content-encoding"))?;
                 let bytes = read_capped(response.body_mut(), limits.max_bytes)?;
                 return Ok((url, bytes));

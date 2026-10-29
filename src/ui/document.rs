@@ -20,10 +20,15 @@ pub struct Document<'a, Message> {
     /// Shown images: their page-space boxes and the pixels to draw there.
     pictures: Vec<(Rectangle, Handle)>,
     theme: theme::Theme,
-    on_follow: Box<dyn Fn(String) -> Message + 'a>,
+    on: Handlers<'a, Message>,
+}
+
+/// The messages the document sends.
+pub struct Handlers<'a, Message> {
+    pub follow: Box<dyn Fn(String) -> Message + 'a>,
     /// A click on an image's clickable note: the image source to load.
-    on_load: Box<dyn Fn(String) -> Message + 'a>,
-    on_hover: Box<dyn Fn(Option<String>) -> Message + 'a>,
+    pub load_image: Box<dyn Fn(String) -> Message + 'a>,
+    pub hover: Box<dyn Fn(Option<String>) -> Message + 'a>,
 }
 
 impl<'a, Message> Document<'a, Message> {
@@ -31,18 +36,9 @@ impl<'a, Message> Document<'a, Message> {
         page: Arc<Page>,
         pictures: Vec<(Rectangle, Handle)>,
         theme: theme::Theme,
-        on_follow: impl Fn(String) -> Message + 'a,
-        on_load: impl Fn(String) -> Message + 'a,
-        on_hover: impl Fn(Option<String>) -> Message + 'a,
+        on: Handlers<'a, Message>,
     ) -> Self {
-        Document {
-            page,
-            pictures,
-            theme,
-            on_follow: Box::new(on_follow),
-            on_load: Box::new(on_load),
-            on_hover: Box::new(on_hover),
-        }
+        Document { page, pictures, theme, on }
     }
 }
 
@@ -72,6 +68,62 @@ pub fn visible<'p, T>(
 }
 
 impl<Message> Document<'_, Message> {
+    /// A left press: follow a link, act on an image note, or start a selection.
+    fn pressed(&self, state: &mut State, point: Point, shell: &mut Shell<'_, Message>) {
+        if let Some(href) = self.page.link_at(point) {
+            shell.publish((self.on.follow)(href.to_string()));
+        } else if let Some(src) = self.page.action_at(point) {
+            shell.publish((self.on.load_image)(src.to_string()));
+        } else {
+            let caret = self.page.caret_at(point);
+            self.select(state, caret, caret);
+            state.dragging = true;
+            shell.request_redraw();
+        }
+        shell.capture_event();
+    }
+
+    /// The pointer moved: extend a drag selection, or report the link under it.
+    fn moved(
+        &self,
+        state: &mut State,
+        (position, cursor): (Point, mouse::Cursor),
+        bounds: Rectangle,
+        shell: &mut Shell<'_, Message>,
+    ) {
+        if state.dragging {
+            let head = self.page.caret_at(Self::local(position, bounds));
+            self.select(state, state.anchor, head);
+            shell.request_redraw();
+            return;
+        }
+        let hovered = cursor.position_in(bounds).and_then(|p| self.page.link_at(p));
+        if hovered != state.hovered.as_deref() {
+            state.hovered = hovered.map(str::to_string);
+            shell.publish((self.on.hover)(state.hovered.clone()));
+        }
+    }
+
+    /// Ctrl/Cmd+C copies the selection; Ctrl/Cmd+A selects everything.
+    fn command_key(&self, state: &mut State, key: &str, clipboard: &mut dyn Clipboard, shell: &mut Shell<'_, Message>) {
+        match key {
+            "c" => {
+                if let Some((a, b)) = self.selection(state) {
+                    clipboard.write(clipboard::Kind::Standard, self.page.selected_text(a, b));
+                    shell.capture_event();
+                }
+            }
+            "a" => {
+                if let Some((a, b)) = self.page.everything() {
+                    self.select(state, Some(a), Some(b));
+                    shell.request_redraw();
+                    shell.capture_event();
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn selection(&self, state: &State) -> Option<(Caret, Caret)> {
         state.anchor.zip(state.head).filter(|(a, b)| a != b)
     }
@@ -157,52 +209,18 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
         let bounds = layout.bounds();
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                let Some(point) = cursor.position_in(bounds) else { return };
-                if let Some(href) = self.page.link_at(point) {
-                    shell.publish((self.on_follow)(href.to_string()));
-                } else if let Some(src) = self.page.action_at(point) {
-                    shell.publish((self.on_load)(src.to_string()));
-                } else {
-                    let caret = self.page.caret_at(point);
-                    self.select(state, caret, caret);
-                    state.dragging = true;
-                    shell.request_redraw();
+                if let Some(point) = cursor.position_in(bounds) {
+                    self.pressed(state, point, shell);
                 }
-                shell.capture_event();
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => state.dragging = false,
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
-                if state.dragging {
-                    let head = self.page.caret_at(Self::local(*position, bounds));
-                    self.select(state, state.anchor, head);
-                    shell.request_redraw();
-                    return;
-                }
-                let hovered = cursor.position_in(bounds).and_then(|p| self.page.link_at(p));
-                if hovered != state.hovered.as_deref() {
-                    state.hovered = hovered.map(str::to_string);
-                    shell.publish((self.on_hover)(state.hovered.clone()));
-                }
+                self.moved(state, (*position, cursor), bounds, shell);
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key: Key::Character(c), modifiers, .. })
                 if modifiers.command() && !shell.is_event_captured() =>
             {
-                match c.as_str() {
-                    "c" => {
-                        if let Some((a, b)) = self.selection(state) {
-                            clipboard.write(clipboard::Kind::Standard, self.page.selected_text(a, b));
-                            shell.capture_event();
-                        }
-                    }
-                    "a" => {
-                        if let Some((a, b)) = self.page.everything() {
-                            self.select(state, Some(a), Some(b));
-                            shell.request_redraw();
-                            shell.capture_event();
-                        }
-                    }
-                    _ => {}
-                }
+                self.command_key(state, c, clipboard, shell);
             }
             _ => {}
         }

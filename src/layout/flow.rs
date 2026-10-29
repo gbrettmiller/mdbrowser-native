@@ -3,9 +3,17 @@
 use iced::advanced::graphics::text::cosmic_text as ct;
 use iced::{Color, Font, Rectangle};
 
+use super::image::Source;
 use super::{Fill, ImageView, Page};
 use crate::model::{Align, Block, Item, Span};
 use crate::theme::{Theme, bold};
+
+/// A column: its left edge and width.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Column {
+    pub x: f32,
+    pub width: f32,
+}
 
 /// Base look of a text block before per-span styling.
 #[derive(Debug, Clone, Copy)]
@@ -37,7 +45,7 @@ pub(super) fn run(
     width: f32,
     images: &dyn Fn(&str) -> ImageView,
 ) -> Page {
-    let content = (width - 2.0 * theme.gutter).min(theme.measure).max(80.0);
+    let content = theme.column_width(width);
     let x = (width - content) / 2.0;
     let mut flow = Flow { theme, fonts, images, page: Page::default(), y: theme.gutter, line: 0, block: 0, nesting: 0 };
     let ink = Ink { font: theme.body_font, size: theme.body_size, color: theme.ink };
@@ -64,7 +72,7 @@ impl Flow<'_> {
         let theme = self.theme;
         match block {
             Block::Paragraph(spans) => self.text(spans, x, width, ink, Align::Left, ct::Wrap::WordOrGlyph),
-            Block::Image { src, alt, link } => self.image(src, alt, link, x, width, ink),
+            Block::Image { src, alt, link } => self.image(Source { src, alt, link }, Column { x, width }, ink),
             Block::Heading { level, spans, slug } => {
                 let size = theme.body_size * theme.heading_scales[usize::from(*level).clamp(1, 6) - 1];
                 if self.y > theme.gutter {

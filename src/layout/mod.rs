@@ -17,7 +17,7 @@ use iced::advanced::graphics::text::cosmic_text::Buffer;
 use iced::advanced::graphics::text::font_system;
 use iced::{Color, Font, Point, Rectangle};
 
-pub use image::{ImageView, no_images};
+pub use image::{ImageNote, ImageView, no_images};
 
 use crate::model::Block;
 use crate::theme::Theme;

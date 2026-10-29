@@ -75,9 +75,9 @@ const SHORTCUT_MODIFIER: &str = if cfg!(target_os = "macos") { "Cmd" } else { "C
 pub fn image_note(note: Note) -> String {
     match note {
         Note::Loading => "Loading image…".into(),
-        Note::ClickToLoad => "Click to load".into(),
+        Note::ClickToLoad => format!("Click to load, or press {SHORTCUT_MODIFIER}+Shift+I for this page's."),
         Note::Off => format!("Web images are off. Press {SHORTCUT_MODIFIER}+Shift+I to load this page's."),
-        Note::Failed => "Couldn't load this image. Click to try again.".into(),
+        Note::Failed => format!("Couldn't load this image. Click or press {SHORTCUT_MODIFIER}+Shift+I to try again."),
         Note::Unsupported => "This image's format isn't supported.".into(),
         Note::TooLarge => "This image is too large to show.".into(),
         Note::Refused => "This page can't show this image.".into(),
@@ -142,12 +142,19 @@ mod tests {
         let notes = Note::ALL.map(image_note);
         distinct_and_non_empty(&notes.each_ref().map(String::as_str));
         assert_eq!(image_note(Note::Loading), "Loading image…");
-        assert_eq!(image_note(Note::ClickToLoad), "Click to load");
-        assert_eq!(image_note(Note::Failed), "Couldn't load this image. Click to try again.");
         assert_eq!(image_note(Note::Unsupported), "This image's format isn't supported.");
         assert_eq!(image_note(Note::TooLarge), "This image is too large to show.");
         assert_eq!(image_note(Note::Refused), "This page can't show this image.");
         let modifier = if cfg!(target_os = "macos") { "Cmd" } else { "Ctrl" };
+        // Each clickable note names the keyboard route too.
+        assert_eq!(
+            image_note(Note::ClickToLoad),
+            format!("Click to load, or press {modifier}+Shift+I for this page's.")
+        );
+        assert_eq!(
+            image_note(Note::Failed),
+            format!("Couldn't load this image. Click or press {modifier}+Shift+I to try again.")
+        );
         assert_eq!(image_note(Note::Off), format!("Web images are off. Press {modifier}+Shift+I to load this page's."));
     }
 

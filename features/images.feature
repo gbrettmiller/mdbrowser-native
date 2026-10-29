@@ -67,7 +67,7 @@ Feature: Images
       | src              | note                                           |
       | /img/logo.svg    | This image's format isn't supported.           |
       | /img/page.png    | This image's format isn't supported.           |
-      | /img/missing.png | Couldn't load this image. Click to try again.  |
+      | /img/missing.png | Couldn't load this image. Click or press Ctrl+Shift+I to try again. |
       | /img/tall.png    | This image is too large to show.               |
       | /img/huge.png    | This image is too large to show.               |
       | /img/to-file.png | This page can't show this image.               |
@@ -105,7 +105,7 @@ Feature: Images
   Scenario: A failed image can be tried again
     Given the site serves "/post.md" containing "![x](img/flaky.png)"
     And I am viewing the URL of "/post.md"
-    And the image "x" is not shown and says "Couldn't load this image. Click to try again."
+    And the image "x" is not shown and says "Couldn't load this image. Click or press Ctrl+Shift+I to try again."
     When I click the note under "x"
     Then the image "x" is shown at 40 by 20
 
@@ -136,7 +136,7 @@ Feature: Images
     And a file "both.md" linking an image to "pic.png" and an image to the URL of "/img/red.png"
     When I view "both.md"
     Then the image "pic.png" is shown at 12 by 8
-    And the image "red.png" is not shown and says "Click to load"
+    And the image "red.png" is not shown and says "Click to load, or press Ctrl+Shift+I for this page's."
     And the site has seen 0 requests for "/img/red.png"
     When I click the note under "red.png"
     Then the image "red.png" is shown at 40 by 20
@@ -173,7 +173,7 @@ Feature: Images
     And the site serves "/post.md" containing "![red](img/red.png)"
     And I am viewing the URL of "/post.md"
     When I set web images to "on click"
-    Then the image "red" is not shown and says "Click to load"
+    Then the image "red" is not shown and says "Click to load, or press Ctrl+Shift+I for this page's."
 
   Scenario: Loading this page's images leaves the setting alone
     Given I set web images to "off"

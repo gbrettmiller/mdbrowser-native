@@ -276,7 +276,7 @@ fn a_finished_image_starts_the_next_and_shows() {
     let done = Event::ImageLoaded { location: web("https://x.org/1.png"), result: Ok(picture()) };
     let (state, effects) = step(state, done);
     assert_eq!(image_loads(&effects), [(web("https://x.org/5.png"), Origin::Public)]);
-    assert_eq!(state.images.view("1.png"), View::Shown((1, 1)));
+    assert_eq!(state.images.view("1.png"), View::Shown { width: 1, height: 1 });
 }
 
 #[test]
@@ -325,11 +325,19 @@ fn switching_to_automatic_loads_the_page_and_saves_the_setting() {
 #[test]
 fn a_click_loads_one_waiting_image_and_off_ignores_clicks() {
     let state = opened_with(ImageLoading::OnClick, "![x](x.png) ![y](y.png)");
-    let (_, effects) = step(state, Event::LoadImage(web("https://x.org/x.png")));
+    let (_, effects) = step(state, Event::LoadImage("x.png".into()));
     assert_eq!(image_loads(&effects), [public("x.png")]);
     let state = opened_with(ImageLoading::Off, "![x](x.png)");
-    let (_, effects) = step(state, Event::LoadImage(web("https://x.org/x.png")));
+    let (_, effects) = step(state, Event::LoadImage("x.png".into()));
     assert!(image_loads(&effects).is_empty());
+}
+
+#[test]
+fn a_click_on_a_source_not_on_the_page_does_nothing() {
+    let state = opened_with(ImageLoading::OnClick, "![x](x.png)");
+    let (after, effects) = step(state.clone(), Event::LoadImage("other.png".into()));
+    assert!(effects.is_empty());
+    assert_eq!(after, state);
 }
 
 #[test]
@@ -339,7 +347,7 @@ fn switching_off_cancels_nothing_that_is_running() {
     assert!(image_loads(&effects).is_empty());
     let done = Event::ImageLoaded { location: web("https://x.org/x.png"), result: Ok(picture()) };
     let (state, _) = step(state, done);
-    assert_eq!(state.images.view("x.png"), View::Shown((1, 1)));
+    assert_eq!(state.images.view("x.png"), View::Shown { width: 1, height: 1 });
 }
 
 #[test]
@@ -348,8 +356,8 @@ fn a_failed_image_shows_its_note_and_refused_sources_load_nothing() {
     let failed = Event::ImageLoaded { location: web("https://x.org/x.png"), result: Err(Problem::Unavailable) };
     let (state, effects) = step(state, failed);
     assert!(image_loads(&effects).is_empty());
-    assert_eq!(state.images.view("x.png"), View::Note(Note::Failed, true));
-    assert_eq!(state.images.view("file:///etc/x.png"), View::Note(Note::Refused, false));
+    assert_eq!(state.images.view("x.png"), View::Note { note: Note::Failed, clickable: true });
+    assert_eq!(state.images.view("file:///etc/x.png"), View::Note { note: Note::Refused, clickable: false });
 }
 
 #[test]

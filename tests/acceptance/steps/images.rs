@@ -4,11 +4,11 @@ use std::fs;
 
 use cucumber::{given, then, when};
 use mdbrowser::content;
-use mdbrowser::layout::{self, ImageView, Page};
+use mdbrowser::layout::{self, Page};
 use mdbrowser::model::Block;
 use mdbrowser::session::images::{ImageLoading, Note, View};
 use mdbrowser::session::{Event, Status};
-use mdbrowser::theme;
+use mdbrowser::{theme, ui};
 
 use super::unescape;
 use crate::fixtures;
@@ -33,7 +33,7 @@ fn image_blocks(blocks: &[Block]) -> Vec<&Block> {
 #[then("no image is shown")]
 fn no_image_shown(w: &mut Browser) {
     let sources = image_sources(w);
-    assert!(sources.iter().all(|src| !matches!(w.state().images.view(src), View::Shown(_))), "{sources:?}");
+    assert!(sources.iter().all(|src| !matches!(w.state().images.view(src), View::Shown { .. })), "{sources:?}");
 }
 
 /// The mode whose menu entry reads "Web images: <name>".
@@ -84,11 +84,7 @@ fn source_of(w: &Browser, alt: &str) -> String {
 /// The page as the app lays it out: notes in the words `content` gives them.
 fn laid_page(w: &Browser) -> Page {
     let Status::Ready(shown) = &w.state().status else { panic!("no document: {:?}", w.state().status) };
-    let images = &w.state().images;
-    let view = |src: &str| match images.view(src) {
-        View::Shown((width, height)) => ImageView::Shown { width, height },
-        View::Note(note, clickable) => ImageView::Placeholder { note: Some((content::image_note(note), clickable)) },
-    };
+    let view = |src: &str| ui::images::view(&w.state().images, src);
     theme::fonts::install();
     layout::layout(&shown.document.blocks, &theme::reading(w.state().settings.font), WIDTH, &view)
 }
@@ -130,7 +126,7 @@ fn file_with_web_image(w: &mut Browser, name: String, path: String) {
 #[then(expr = "the image {string} is shown at {int} by {int}")]
 fn image_shown_at(w: &mut Browser, alt: String, width: u32, height: u32) {
     let src = source_of(w, &alt);
-    assert_eq!(w.state().images.view(&src), View::Shown((width, height)), "{src}");
+    assert_eq!(w.state().images.view(&src), View::Shown { width, height }, "{src}");
 }
 
 #[then(expr = "the image is shown at {int} by {int}")]
@@ -143,8 +139,8 @@ fn only_image_shown_at(w: &mut Browser, width: u32, height: u32) {
 fn image_not_shown(w: &mut Browser, alt: String, note: String) {
     let src = source_of(w, &alt);
     match w.state().images.view(&src) {
-        View::Note(shown, _) => assert_eq!(content::image_note(shown), on_this_platform(&note), "{src}"),
-        View::Shown(size) => panic!("{src} is shown at {size:?}"),
+        View::Note { note: shown, .. } => assert_eq!(content::image_note(shown), on_this_platform(&note), "{src}"),
+        View::Shown { width, height } => panic!("{src} is shown at {width} by {height}"),
     }
 }
 
@@ -159,9 +155,11 @@ fn image_fills_column(w: &mut Browser, alt: String) {
     let page = laid_page(w);
     let laid = page.images.iter().find(|laid| laid.src == src).expect("a laid-out image");
     let reader = theme::reading(w.state().settings.font);
-    let column = ((WIDTH - 2.0 * reader.gutter).min(reader.measure).max(80.0)).floor();
+    let column = reader.column_width(WIDTH).floor();
     assert_eq!(laid.bounds.width, column);
-    let View::Shown((own_width, own_height)) = w.state().images.view(&src) else { panic!("{src} isn't shown") };
+    let View::Shown { width: own_width, height: own_height } = w.state().images.view(&src) else {
+        panic!("{src} isn't shown")
+    };
     let expected = (own_height as f32 * column / own_width as f32).round();
     assert_eq!(laid.bounds.height, expected);
 }
@@ -180,8 +178,7 @@ fn click_note(w: &mut Browser, alt: String) {
     let page = laid_page(w);
     let note = page.fragments.iter().find(|fragment| fragment.action.as_deref() == Some(&src));
     assert!(note.is_some(), "{src}'s note can't be clicked");
-    let location = w.state().images.location(&src).cloned().expect("a location");
-    w.send(Event::LoadImage(location));
+    w.send(Event::LoadImage(src));
 }
 
 #[when("I select everything and copy")]

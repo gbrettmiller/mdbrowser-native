@@ -45,7 +45,7 @@ bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, wi
 | **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) and bundled fonts. Data only, with one exception: `fonts::install()` loads the bundled faces into iced's process-wide font system once at startup. |
 | **Content** | `src/content.rs` | All user-facing strings. |
 | **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `images` reads or fetches an image and decodes it, one decode at a time, within ADR-004's limits. `web` fetches a page or an image through ureq: one fresh request per redirect hop carrying only `Accept`, fixed limits, and no cookies. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net` (only through ureq, in `web`), `std::process` or `std::thread`. |
-| **UI** | `src/ui/` | The iced application: dispatches events to the reducer, runs effects through `services::runner`, and draws state. Holds the document widget (paints a `Page`, turns input into messages) and the page cache. Owns no browsing logic. |
+| **UI** | `src/ui/` | The iced application: dispatches events to the reducer, runs effects through `services::runner`, and draws state. Holds the document widget (paints a `Page`, turns input into messages), the page cache, the viewport (scroll position, held anchor, applied image generation) and the keyboard shortcut table. Owns no browsing logic. |
 
 Every module belongs to exactly one layer. If you're unsure where something goes, and it can be pure, put it in `model`, `layout` or `session`.
 
@@ -55,7 +55,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `services` may use `model`, `session` and `theme` value types (`ReadingFont`), never `ui`.
 - `content` may use `session` and `theme` enums, to key its strings. Only `ui` uses `content`.
 - `layout` may use `model` and `theme`.
-- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` (settings), the `url` crate for addresses, and `iced::widget::image::Handle` as a value type for decoded images.
+- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` (settings), the `url` crate for addresses, and `iced::advanced::image::Handle` (also exported as `iced::widget::image::Handle`) as a value type for decoded images.
 - Pure layers (`model`, `layout`, `session`, `theme`) never perform I/O and never use iced's runtime (`Task`, `Element`). Iced *value* types (`Color`, `Font`, `Rectangle`, image `Handle`) are allowed.
 
 ## How to Add a Feature

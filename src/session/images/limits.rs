@@ -9,6 +9,8 @@ pub const MAX_PIXELS: u64 = 25_000_000;
 /// Wider images are downscaled to this width when decoded.
 pub const MAX_DECODED_WIDTH: u32 = 2_048;
 /// Image loads running at once, across the app.
-pub const MAX_LOADING: usize = 4;
+pub const MAX_CONCURRENT_LOADS: usize = 4;
 /// Decoded pixels kept in memory, in bytes of RGBA.
 pub const CACHE_BYTES: u64 = 256 * 1024 * 1024;
+/// Bytes per decoded pixel: red, green, blue and alpha.
+pub const RGBA_BYTES_PER_PIXEL: u64 = 4;

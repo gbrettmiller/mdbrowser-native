@@ -10,7 +10,7 @@ use image::{ImageFormat, ImageReader, RgbaImage, imageops};
 
 use super::files::{self, ReadError};
 use super::web::{self, Limits};
-use crate::session::images::limits::{MAX_BYTES, MAX_DECODED_WIDTH, MAX_PIXELS, MAX_SIDE};
+use crate::session::images::limits::{MAX_BYTES, MAX_DECODED_WIDTH, MAX_PIXELS, MAX_SIDE, RGBA_BYTES_PER_PIXEL};
 use crate::session::images::{Picture, Problem};
 use crate::session::location::Location;
 use crate::session::web::{Origin, Want};
@@ -70,7 +70,7 @@ pub fn decode(bytes: &[u8]) -> Result<Picture, Problem> {
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_SIDE);
     limits.max_image_height = Some(MAX_SIDE);
-    limits.max_alloc = Some(MAX_PIXELS * 4 + MAX_BYTES);
+    limits.max_alloc = Some(MAX_PIXELS * RGBA_BYTES_PER_PIXEL + MAX_BYTES);
     // Held through decoding, downscaling and conversion, so only one full-size
     // image is ever in memory; just the finished picture leaves the lock.
     let _one_at_a_time = DECODING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
