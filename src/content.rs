@@ -23,7 +23,7 @@ pub fn error(code: ErrorCode) -> &'static str {
 pub fn web_error(code: ErrorCode) -> Option<(&'static str, &'static str)> {
     match code {
         ErrorCode::Empty | ErrorCode::NotAbsolute | ErrorCode::UnsupportedScheme => None,
-        ErrorCode::NotMarkdown => Some(("This page isn't Markdown.", "Open it in your web browser instead.")),
+        ErrorCode::NotMarkdown => Some(("This page isn't Markdown.", "You can open it in your web browser instead.")),
         ErrorCode::NotFound => Some(("There's no page at this address.", "Check it for typos.")),
         ErrorCode::Unreadable => Some(("This page couldn't be read as text.", "It may be too large or not in UTF-8.")),
         ErrorCode::ServerError => Some((error(code), "Try again later.")),
@@ -71,6 +71,7 @@ pub const HISTORY: &str = "History";
 pub const CLEAR_HISTORY: &str = "Clear History";
 pub const HISTORY_EMPTY: &str = "Nothing here yet. Documents you open are listed here.";
 pub const DISMISS: &str = "Dismiss";
+pub const OPEN_IN_BROWSER: &str = "Open in browser";
 pub const ADDRESS_PLACEHOLDER: &str = "Path or web address of a Markdown file, e.g. ~/notes/index.md";
 pub const WELCOME: &str = "Type the path or web address of a Markdown file above, or pass one on the command line.";
 pub const LOADING: &str = "Loading…";

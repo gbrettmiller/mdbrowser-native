@@ -75,14 +75,23 @@ pub enum Event {
     Back,
     Forward,
     Reload,
-    Loaded { request_id: u64, result: Result<Loaded, ErrorCode>, now: u64 },
+    Loaded {
+        request_id: u64,
+        result: Result<Loaded, ErrorCode>,
+        now: u64,
+    },
     OpenerFailed,
+    /// Hand the current page to the system browser (see `State::browser_offer`).
+    OpenInBrowser,
     OpenHistory(String),
     ClearHistory,
     ChooseFont(ReadingFont),
     DismissNotice(u64),
     FragmentHandled,
-    Restore { visits: Vec<Visit>, settings: Settings },
+    Restore {
+        visits: Vec<Visit>,
+        settings: Settings,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -131,6 +140,13 @@ impl State {
 
     pub fn current_location(&self) -> Option<&Location> {
         self.nav.current()?.target.as_ref().map(|target| &target.location)
+    }
+
+    /// The address the system browser may open instead: only a web page that
+    /// turned out not to be Markdown. Local files are never handed over.
+    pub fn browser_offer(&self) -> Option<String> {
+        let not_markdown = self.status == Status::Failed(ErrorCode::NotMarkdown);
+        self.current_location().filter(|location| not_markdown && location.is_web()).map(Location::address)
     }
 }
 
@@ -271,6 +287,38 @@ mod tests {
         let (state, _) = run(opened.into_iter().chain([Event::Follow("http://127.0.0.1/x.md".into())]));
         assert_eq!(state.notices.last().map(|n| n.kind), Some(NoticeKind::LocalNetworkFromWeb));
         assert_eq!(state.address(), "https://x.org/a.md");
+    }
+
+    fn failed_with(code: ErrorCode) -> Event {
+        Event::Loaded { request_id: 1, result: Err(code), now: 1 }
+    }
+
+    #[test]
+    fn a_page_that_is_not_markdown_can_go_to_the_system_browser() {
+        let (state, effects) =
+            run([Event::Enter("https://x.org/page.html".into()), failed_with(ErrorCode::NotMarkdown)]);
+        assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/page.html"));
+        assert!(effects.is_empty());
+        let (_, effects) = step(state, Event::OpenInBrowser);
+        assert_eq!(effects, [Effect::OpenExternal("https://x.org/page.html".into())]);
+    }
+
+    #[test]
+    fn the_system_browser_is_offered_for_nothing_else() {
+        let cases = [
+            vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::NotFound)],
+            vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdown)],
+            vec![Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")],
+            vec![Event::Enter("https://x.org/a.md".into())],
+            vec![Event::Enter("ftp://x.org/a.md".into())],
+            vec![],
+        ];
+        for events in cases {
+            let (state, _) = run(events.clone());
+            assert_eq!(state.browser_offer(), None, "{events:?}");
+            let (_, effects) = step(state, Event::OpenInBrowser);
+            assert!(effects.is_empty(), "{events:?}");
+        }
     }
 
     #[test]

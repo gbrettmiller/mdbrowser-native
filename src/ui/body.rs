@@ -14,13 +14,22 @@ pub fn message<'a>(message: impl text::IntoFragment<'a>) -> Element<'a, Message>
     container(text(message).size(16)).padding(32).into()
 }
 
-/// The failure, a hint for pages on the web, and the address it was for.
-pub fn error<'a>(code: ErrorCode, address: String, web: bool, theme: &theme::Theme) -> Element<'a, Message> {
+/// The failure, a hint for pages on the web, the address it was for, and the
+/// system browser when the session offers it.
+pub fn error<'a>(
+    code: ErrorCode,
+    address: String,
+    web: bool,
+    browser_offered: bool,
+    theme: &theme::Theme,
+) -> Element<'a, Message> {
     let muted = theme.muted;
     let (message, hint) = content::failure(code, web);
+    let open = button(content::OPEN_IN_BROWSER).on_press(Message::Session(Event::OpenInBrowser));
     column![text(message).size(20)]
         .push(hint.map(|hint| text(hint).size(16)))
         .push(text(address).size(14).style(move |_| text::Style { color: Some(muted) }))
+        .push(browser_offered.then_some(open))
         .spacing(8)
         .padding(32)
         .into()

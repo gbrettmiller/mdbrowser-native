@@ -31,6 +31,10 @@ pub fn step(state: State, event: Event) -> Step {
         },
         Event::Loaded { request_id, result, now } => loaded(state, request_id, result, now),
         Event::OpenerFailed => notice(state, NoticeKind::OpenFailed),
+        Event::OpenInBrowser => match state.browser_offer() {
+            Some(url) => (state, vec![Effect::OpenExternal(url)]),
+            None => none(state),
+        },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
         Event::ChooseFont(font) => {
             let settings = Settings { font };

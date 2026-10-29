@@ -103,6 +103,22 @@ fn still_viewing_url(w: &mut Browser, path: String) {
     assert!(shown_title(w).is_some(), "{:?}", w.state().status);
 }
 
+#[when("I choose to open it in the browser")]
+fn open_in_browser(w: &mut Browser) {
+    assert!(w.state().browser_offer().is_some(), "no browser offered: {:?}", w.state().status);
+    w.send(Event::OpenInBrowser);
+}
+
+#[then("I am not offered to open it in the browser")]
+fn no_browser_offer(w: &mut Browser) {
+    assert_eq!(w.state().browser_offer(), None);
+}
+
+#[then(expr = "the system opened the URL of {string}")]
+fn system_opened_url(w: &mut Browser, path: String) {
+    assert_eq!(w.opened, [w.url(&path)]);
+}
+
 #[then(expr = "the system opened {string}")]
 fn system_opened(w: &mut Browser, href: String) {
     assert_eq!(w.opened, [href]);

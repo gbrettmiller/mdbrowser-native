@@ -346,7 +346,7 @@ In ARCHITECTURE.md:
   - `serverError`: "The site had a problem sending this page. Try again later."
   - `unreachable`: "Couldn't reach this site. Check your connection, then reload."
   - `badRedirect`: "This site redirected somewhere that can't be followed safely. Try opening the address in your web browser."
-  - `notMarkdown` (pages): "This page isn't Markdown. Open it in your web browser instead."
+  - `notMarkdown` (pages): "This page isn't Markdown. You can open it in your web browser instead." (reworded in step 9)
   - Pages only:
     - `notFound`: "There's no page at this address. Check it for typos."
     - `unreadable`: "This page couldn't be read as text. It may be too large or not in UTF-8."
@@ -462,12 +462,12 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 **Files**: `src/session/{links,reducer,mod}.rs`, `features/remote.feature`, `tests/acceptance/steps*`
 **Commit**: `feat(session): follow Markdown links between sites`
 
-### Step 9: Open in browser
+### Step 9: Open in browser — done
 
 **Complexity**: standard
 **RED**: Reducer tests. `OpenInBrowser` emits `OpenExternal(url)` only for a web location in `Failed(NotMarkdown)`. These emit nothing: `Failed(NotFound)` on a web location, `NotMarkdown` on a file, `Ready` and `Loading`. Acceptance: "A page that isn't Markdown can go to the system browser" and "A local file that isn't Markdown offers no browser".
 **GREEN**: Add `Event::OpenInBrowser`. The error view gets a button using the toolbar's button style, with its label in `content`. For pages, `notMarkdown` reads "This page isn't Markdown. You can open it in your web browser instead."
-**Files**: `src/session/{mod,reducer}.rs`, `src/content.rs`, `src/ui/body.rs`, `tests/acceptance/steps*`
+**Files**: `src/session/{mod,reducer}.rs`, `src/content.rs`, `src/ui/body.rs`, `tests/acceptance/steps*`. Also, found while checking by hand: `services::files::from_command_line` turned a URL argument into a path; it now passes anything with a scheme through (`session::address::has_scheme`).
 **Commit**: `feat(ui): offer the system browser for pages that aren't Markdown`
 
 ### Step 10: Docs and doctrine

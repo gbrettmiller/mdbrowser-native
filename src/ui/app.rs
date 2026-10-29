@@ -255,7 +255,7 @@ impl App {
             Status::Loading => body::message(content::loading(state.current_location().and_then(Location::host))),
             Status::Failed(code) => {
                 let web = state.current_location().is_some_and(Location::is_web);
-                body::error(*code, state.address(), web, &reader)
+                body::error(*code, state.address(), web, state.browser_offer().is_some(), &reader)
             }
             Status::Ready(shown) => self.document_view(shown.clone()),
         };

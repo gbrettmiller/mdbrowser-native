@@ -36,15 +36,33 @@ Feature: Browse remote Markdown
       | /plain.md   | Plain Served             |
       | /untyped.md | Untyped                  |
 
-  Scenario Outline: Responses that aren't Markdown
+  Scenario Outline: A page that isn't Markdown can go to the system browser
     When I enter the URL of "<path>"
     Then I see the error "notMarkdown"
     And the error shows the URL of "<path>"
+    When I choose to open it in the browser
+    Then the system opened the URL of "<path>"
     Examples:
       | path       |
       | /page.html |
       | /plain.txt |
-      | /fake.md   |
+
+  Scenario: A followed link to a page that isn't Markdown offers the system browser
+    Given I am viewing the URL of "/index.md"
+    When I follow "/fake.md"
+    Then I see the error "notMarkdown"
+    When I choose to open it in the browser
+    Then the system opened the URL of "/fake.md"
+
+  Scenario: A local file that isn't Markdown offers no browser
+    When I enter the absolute path of "data.txt"
+    Then I see the error "notMarkdown"
+    And I am not offered to open it in the browser
+
+  Scenario: Other failures offer no browser
+    When I enter the URL of "/missing.md"
+    Then I see the error "notFound"
+    And I am not offered to open it in the browser
 
   Scenario: Redirects are followed and the final address is shown
     When I enter the URL of "/moved.md"
