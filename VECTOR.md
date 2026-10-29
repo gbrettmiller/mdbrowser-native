@@ -50,7 +50,7 @@ Downloadable apps for Linux, Windows and macOS, so non-technical readers can ins
 
 # Design Principles
 1. **The parse tree is the document.** The CommonMark/GFM tree is the document model, the way the DOM is for the web. Nothing downstream ever sees HTML.
-2. **The reader owns the presentation.** Documents bring content, and the browser brings all of the style. Font, size, spacing and colour belong to the reader. Raw HTML in a document is never interpreted.
+2. **The reader owns the presentation.** Documents bring content, and the browser brings all of the style. Font, size, spacing and colour belong to the reader. Raw HTML in a document is never interpreted: its tags are stripped and the text between them is kept (ADR-002).
 3. **Borrow the hard primitives, own the engine.** Parsing, text shaping and windowing come from libraries. The flow from tree to layout, and selection, are ours.
 4. **Interop before invention.** Where the community has a convention (RSS 2.0 field names, `urlPrev`/`urlNext`, `llms.txt`, GitHub heading slugs), use it as-is. Follow the [rules for standards-makers](https://this.how/standards/). Ignore what we don't understand instead of failing on it.
 5. **Writing and reading only.** Every feature should help someone read what was written or get to the next thing to read. Anything that turns a document into an application doesn't belong here.
@@ -90,7 +90,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 6. **ASM-006.** Discovery works through `llms.txt`, RSS 2.0 and OPML without a new protocol. *Hypothesis, low confidence.*
 
 ## Open Questions
-- **HTML in documents: strip it or show it literally?** markdownWeb strips HTML; we currently show it as literal text. Both keep principle 2. Recommendation: decide by ADR before phase 2. Stripping matches the community and keeps stray tags from becoming reader noise, but it can silently drop content.
+- ~~HTML in documents: strip it or show it literally?~~ Resolved by ADR-002 (2026-10-29): strip tags, comments and declarations, and keep the text between them, matching markdownWeb.
 - **Image semantics.** What exactly do `image`, `inlineImage` and `metaImage` mean, and where should each appear? They are undocumented, so ask in markdownWeb issue #1.
 - **Remote images: load, click-to-load, or block?** Real posts depend on them (examples 2 and 3), which argues for loading by default with a reader setting.
 - **Enclosures.** Link out to the system player, or play audio in the browser?
