@@ -39,6 +39,8 @@ Each phase has its own plan. This is the order, not a commitment to dates.
 4. **Reader controls**: text size, spacing and colours (including a dark palette), beyond the typeface choice.
 5. **Discovery**: `llms.txt` as a site index, RSS 2.0 feeds and OPML.
 
+Downloadable apps for Linux, Windows and macOS, so non-technical readers can install without building from source, come after phase 2. The plan is in `vector/plans/release-distribution.md`.
+
 ## What This Is Not
 - Not an HTML browser. Nothing is ever converted to HTML, and HTML files are not rendered. Non-Markdown links are handed off to the system.
 - Not an app platform. Documents carry no styling beyond Markdown's own emphasis, and no scripts. The web of Markdown is for writing and reading only.

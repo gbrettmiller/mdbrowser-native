@@ -5,21 +5,46 @@ on:
     branches: [main]
   pull_request:
 
-# Gates run fastest to slowest (Minimum CD reference architecture).
+# Gates run fastest to slowest (Minimum CD reference architecture): format once,
+# then lint, tests and a release build on every supported platform.
 jobs:
-  ci:
+  format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+          components: rustfmt
       - name: Format
         run: cargo fmt --check
+
+  platform:
+    needs: format
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-22.04 keeps the glibc floor low (2.35) for future Linux binaries.
+        os: [ubuntu-22.04, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # Clippy runs per platform because unix and non-unix code paths differ.
       - name: Lint
         run: cargo clippy --all-targets -- -D warnings
-      - name: Unit tests
-        run: cargo test
+      - name: Tests
+        run: cargo test --no-fail-fast
       - name: Build
         run: cargo build --release
+
+  # The single check branch protection requires; it passes only if every job above did.
+  ci:
+    if: always()
+    needs: [format, platform]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All gates passed
+        run: test "${{ needs.format.result }}" = success && test "${{ needs.platform.result }}" = success

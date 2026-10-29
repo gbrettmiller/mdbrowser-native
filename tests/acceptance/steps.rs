@@ -86,7 +86,7 @@ fn enter_home_relative(w: &mut Browser, name: String) {
 
 #[when(expr = "I enter the file:\\/\\/ URL of {string}")]
 fn enter_file_url(w: &mut Browser, name: String) {
-    let address = format!("file://{}", w.absolute(&name));
+    let address = w.file_url(&name);
     enter(w, address);
 }
 

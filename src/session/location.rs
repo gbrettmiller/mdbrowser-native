@@ -113,7 +113,17 @@ pub(super) fn parse_file_url(url: &str) -> Option<(String, Option<String>)> {
     let rest = url.get("file://".len()..)?;
     let slash = rest.find('/')?;
     let host = &rest[..slash];
-    (host.is_empty() || host.eq_ignore_ascii_case("localhost")).then(|| split_reference(&rest[slash..]))
+    (host.is_empty() || host.eq_ignore_ascii_case("localhost")).then(|| {
+        let (path, fragment) = split_reference(&rest[slash..]);
+        (file_url_path(path, cfg!(windows)), fragment)
+    })
+}
+
+/// On Windows a file URL's path carries its drive after a slash (`/C:/x`); the path is `C:/x`.
+fn file_url_path(path: String, windows: bool) -> String {
+    let bytes = path.as_bytes();
+    let has_drive = bytes.len() >= 3 && bytes[0] == b'/' && bytes[1].is_ascii_alphabetic() && bytes[2] == b':';
+    if windows && has_drive { path[1..].to_string() } else { path }
 }
 
 /// `//host/…` or `\\\\host\\…` in any mix of slashes: a network share, not a local file.
@@ -173,6 +183,18 @@ pub fn parse_address(input: &str, home: &Path) -> Result<Target, ErrorCode> {
     Ok(Target { location: Location::file(path), fragment })
 }
 
+/// Test paths are written Unix-style; on Windows they live on drive C:.
+#[cfg(test)]
+pub(crate) fn native(unix: &str) -> String {
+    if cfg!(windows) { format!("C:{}", unix.replace('/', "\\")) } else { unix.to_string() }
+}
+
+/// A `file://` URL for a Unix-style test path, on drive C: under Windows.
+#[cfg(test)]
+pub(crate) fn native_url(unix: &str) -> String {
+    if cfg!(windows) { format!("file:///C:{unix}") } else { format!("file://{unix}") }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,11 +202,11 @@ mod tests {
     const HOME: &str = "/home/reader";
 
     fn parse(input: &str) -> Result<(String, Option<String>), ErrorCode> {
-        parse_address(input, Path::new(HOME)).map(|t| (t.location.address(), t.fragment))
+        parse_address(input, Path::new(&native(HOME))).map(|t| (t.location.address(), t.fragment))
     }
 
     fn ok(path: &str, fragment: Option<&str>) -> Result<(String, Option<String>), ErrorCode> {
-        Ok((path.to_string(), fragment.map(str::to_string)))
+        Ok((native(path), fragment.map(str::to_string)))
     }
 
     #[test]
@@ -194,32 +216,54 @@ mod tests {
         assert_eq!(parse("https://example.com/readme.md"), Err(ErrorCode::UnsupportedScheme));
         assert_eq!(parse("ftp://x/a.md"), Err(ErrorCode::UnsupportedScheme));
         assert_eq!(parse("notes/a.md"), Err(ErrorCode::NotAbsolute));
-        assert_eq!(parse("C:\\notes\\a.md"), Err(ErrorCode::NotAbsolute));
-        assert_eq!(parse("/x/data.txt"), Err(ErrorCode::NotMarkdown));
+        assert_eq!(parse(&native("/x/data.txt")), Err(ErrorCode::NotMarkdown));
         assert_eq!(parse("~"), Err(ErrorCode::NotMarkdown));
     }
 
     #[test]
+    #[cfg(not(windows))]
+    fn windows_drive_paths_are_relative_elsewhere() {
+        assert_eq!(parse("C:\\notes\\a.md"), Err(ErrorCode::NotAbsolute));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_paths_need_a_drive() {
+        assert_eq!(parse("C:\\notes\\a.md"), Ok(("C:\\notes\\a.md".into(), None)));
+        assert_eq!(parse("c:/notes/a.md"), Ok(("c:\\notes\\a.md".into(), None)));
+        assert_eq!(parse("\\notes\\a.md"), Err(ErrorCode::NotAbsolute));
+    }
+
+    #[test]
     fn accepts_absolute_home_relative_and_file_url_forms() {
-        assert_eq!(parse("/x/a.md"), ok("/x/a.md", None));
-        assert_eq!(parse("  /x/a.markdown "), ok("/x/a.markdown", None));
-        assert_eq!(parse("/x/A.MD"), ok("/x/A.MD", None));
+        assert_eq!(parse(&native("/x/a.md")), ok("/x/a.md", None));
+        assert_eq!(parse(&format!("  {} ", native("/x/a.markdown"))), ok("/x/a.markdown", None));
+        assert_eq!(parse(&native("/x/A.MD")), ok("/x/A.MD", None));
         assert_eq!(parse("~/notes/a.md"), ok("/home/reader/notes/a.md", None));
-        assert_eq!(parse("file:///x/a.md"), ok("/x/a.md", None));
-        assert_eq!(parse("file://localhost/x/a.md"), ok("/x/a.md", None));
+        assert_eq!(parse(&native_url("/x/a.md")), ok("/x/a.md", None));
+        assert_eq!(parse(&native_url("/x/a.md").replace("file://", "file://localhost")), ok("/x/a.md", None));
     }
 
     #[test]
     fn file_urls_need_a_local_host_and_are_percent_decoded() {
         assert_eq!(parse("file://server/x/a.md"), Err(ErrorCode::NotAbsolute));
-        assert_eq!(parse("file:///x/my%20notes.md"), ok("/x/my notes.md", None));
+        assert_eq!(parse(&native_url("/x/my%20notes.md")), ok("/x/my notes.md", None));
+    }
+
+    #[test]
+    fn drive_letters_in_file_urls_lose_their_leading_slash_only_on_windows() {
+        assert_eq!(file_url_path("/C:/x/a.md".into(), true), "C:/x/a.md");
+        assert_eq!(file_url_path("/c:/x/a.md".into(), true), "c:/x/a.md");
+        assert_eq!(file_url_path("/x/a.md".into(), true), "/x/a.md");
+        assert_eq!(file_url_path("/C:/x/a.md".into(), false), "/C:/x/a.md");
+        assert_eq!(file_url_path("/x/a.md".into(), false), "/x/a.md");
     }
 
     #[test]
     fn fragments_split_off_and_paths_normalise() {
-        assert_eq!(parse("file:///x/a.md#intro"), ok("/x/a.md", Some("intro")));
-        assert_eq!(parse("/x/a.md#caf%C3%A9"), ok("/x/a.md", Some("café")));
-        assert_eq!(parse("/x/../y/./a.md"), ok("/y/a.md", None));
+        assert_eq!(parse(&native_url("/x/a.md#intro")), ok("/x/a.md", Some("intro")));
+        assert_eq!(parse(&format!("{}#caf%C3%A9", native("/x/a.md"))), ok("/x/a.md", Some("café")));
+        assert_eq!(parse(&native("/x/../y/./a.md")), ok("/y/a.md", None));
     }
 
     #[test]

@@ -119,9 +119,10 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session::location::native;
 
     fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
-        events.into_iter().fold((State::new("/home/r"), Vec::new()), |(state, _), event| step(state, event))
+        events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))
     }
 
     fn loaded(request_id: u64, source: &str) -> Event {
@@ -130,30 +131,31 @@ mod tests {
 
     #[test]
     fn entering_an_address_requests_a_load_and_waits() {
-        let (state, effects) = run([Event::Enter("/d/a.md".into())]);
+        let (state, effects) = run([Event::Enter(native("/d/a.md"))]);
         assert_eq!(state.status, Status::Loading);
-        assert_eq!(effects, [Effect::Load { request_id: 1, location: Location::file("/d/a.md") }]);
+        assert_eq!(effects, [Effect::Load { request_id: 1, location: Location::file(native("/d/a.md")) }]);
     }
 
     #[test]
     fn a_load_shows_the_document_and_records_history() {
-        let (state, effects) = run([Event::Enter("/d/a.md#intro".into()), loaded(1, "# A")]);
+        let (state, effects) = run([Event::Enter(format!("{}#intro", native("/d/a.md"))), loaded(1, "# A")]);
         let Status::Ready(shown) = &state.status else { panic!("{:?}", state.status) };
         assert_eq!(shown.title, "A");
         assert_eq!(state.fragment.as_deref(), Some("intro"));
-        assert!(matches!(&effects[..], [Effect::PersistVisits(visits)] if visits[0].address == "/d/a.md"));
+        assert!(matches!(&effects[..], [Effect::PersistVisits(visits)] if visits[0].address == native("/d/a.md")));
     }
 
     #[test]
     fn stale_loads_are_ignored() {
-        let (state, effects) = run([Event::Enter("/d/a.md".into()), Event::Enter("/d/b.md".into()), loaded(1, "# A")]);
+        let (state, effects) =
+            run([Event::Enter(native("/d/a.md")), Event::Enter(native("/d/b.md")), loaded(1, "# A")]);
         assert_eq!(state.status, Status::Loading);
         assert!(effects.is_empty());
     }
 
     #[test]
     fn links_do_nothing_until_a_document_is_showing() {
-        let (state, effects) = run([Event::Enter("/d/a.md".into()), Event::Follow("https://x.org".into())]);
+        let (state, effects) = run([Event::Enter(native("/d/a.md")), Event::Follow("https://x.org".into())]);
         assert!(effects.is_empty() && state.notices.is_empty());
     }
 

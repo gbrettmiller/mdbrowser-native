@@ -70,8 +70,16 @@ impl Browser {
         self.state.as_ref().expect("state")
     }
 
+    /// Feature files name documents with `/`; build the path with the platform's separator.
     pub fn path(&self, name: &str) -> PathBuf {
-        self.home.path().join(name)
+        name.split('/').fold(self.home.path().to_path_buf(), |path, part| path.join(part))
+    }
+
+    /// The document's `file://` URL: `file:///C:/…` on Windows, `file:///home/…` elsewhere.
+    pub fn file_url(&self, name: &str) -> String {
+        let path = self.absolute(name).replace('\\', "/");
+        let slash = if path.starts_with('/') { "" } else { "/" };
+        format!("file://{slash}{path}")
     }
 
     pub fn absolute(&self, name: &str) -> String {
