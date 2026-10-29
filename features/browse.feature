@@ -53,14 +53,24 @@ Feature: Browse local Markdown files
       | plain text                        | t.md    |
       | ---\ntitle: [bad\n---\n# Fallback | Fallback |
 
-  Scenario Outline: Raw HTML is shown as literal text
+  Scenario Outline: Raw HTML is stripped, its text kept
     Given a file "h.md" containing "<content>"
     When I enter the absolute path of "h.md"
-    Then the document text contains "<content>"
+    Then the document text is "<text>"
     Examples:
-      | content                      |
-      | <script>alert(1)</script>    |
-      | <img src=x onerror=alert(1)> |
+      | content                          | text              |
+      | before <b>bold</b> after         | before bold after |
+      | <img src=x onerror=alert(1)>tail | tail              |
+      | <!-- a comment -->kept           | kept              |
+      | <a title='a>b'>x</a>             | x                 |
+      | <script>alert(1)</script>        | alert(1)          |
+      | `<b>code</b>` stays              | <b>code</b> stays |
+      | a < b and <3                     | a < b and <3      |
+
+  Scenario: HTML in a heading is stripped from the title
+    Given a file "t.md" containing "# <b>Title</b>"
+    When I enter the absolute path of "t.md"
+    Then I see the document titled "Title"
 
   Scenario: Opener failure shows a notice
     Given the system opener fails

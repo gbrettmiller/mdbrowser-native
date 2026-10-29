@@ -25,5 +25,5 @@ fn layout(blocks: &[Block], theme: &Theme, width: f32) -> Page {
     with two lines
 
 <div>
-  An HTML block is shown as literal text.
+  An HTML block is stripped to its text.
 </div>

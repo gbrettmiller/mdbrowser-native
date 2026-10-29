@@ -4,7 +4,7 @@ use pulldown_cmark::{Alignment, CodeBlockKind, Event, Tag, TagEnd};
 
 use super::inlines::{inlines, is_inline};
 use super::slug::Slugger;
-use super::{Align, Block, Item, Span, text_of};
+use super::{Align, Block, Item, Span, Style, html, text_of};
 
 /// The parser's event stream with arbitrary lookahead (task markers can sit
 /// one event deep inside a list item), plus the document-wide slug counter.
@@ -64,10 +64,7 @@ fn block(events: &mut Events) -> Option<Block> {
             };
             Some(Block::Code { lang, text: text_until_end(events) })
         }
-        // Raw HTML is shown as literal text, never interpreted.
-        Event::Start(Tag::HtmlBlock) => {
-            Some(Block::Code { lang: None, text: text_until_end(events).trim_end_matches('\n').to_string() })
-        }
+        Event::Start(Tag::HtmlBlock) => html_block(events),
         Event::Start(Tag::List(start)) => Some(Block::List { start, items: items(events) }),
         Event::Start(Tag::Table(aligns)) => return Some(table(events, aligns)),
         // Frontmatter, footnote definitions and anything else we don't show.
@@ -79,6 +76,13 @@ fn block(events: &mut Events) -> Option<Block> {
     };
     events.next(); // the matching End
     block
+}
+
+/// Raw HTML is stripped, never interpreted (ADR-002); what text is left reads as a paragraph.
+fn html_block(events: &mut Events) -> Option<Block> {
+    let text = html::strip(&text_until_end(events)).split_whitespace().collect::<Vec<_>>().join(" ");
+    let span = (!text.is_empty()).then(|| Span { text, style: Style::default(), link: None });
+    paragraph(span.into_iter().collect())
 }
 
 fn skip_to_end(events: &mut Events) {
