@@ -9,6 +9,13 @@
 /// Empty comments, which CommonMark closes early.
 const EMPTY_COMMENTS: [&str; 2] = ["<!-->", "<!--->"];
 
+/// CommonMark attribute names: an ASCII letter or one of these, then letters, digits or these.
+const ATTRIBUTE_NAME_START: &str = "_:";
+const ATTRIBUTE_NAME_REST: &str = "_.:-";
+
+/// Characters that end an unquoted attribute value, besides whitespace.
+const UNQUOTED_VALUE_STOP: &str = "\"'=<>`";
+
 pub fn strip(source: &str) -> String {
     let mut out = String::with_capacity(source.len());
     let mut rest = source;
@@ -56,8 +63,8 @@ fn declaration(text: &str) -> Option<usize> {
 /// `</name >`
 fn closing_tag(text: &str) -> Option<usize> {
     let rest = tag_name(text.strip_prefix("</")?)?.trim_start();
-    let end = rest.strip_prefix('>')?;
-    Some(text.len() - end.len())
+    let after = rest.strip_prefix('>')?;
+    Some(text.len() - after.len())
 }
 
 /// `<name attr="v" attr2=v attr3 />`
@@ -65,8 +72,8 @@ fn open_tag(text: &str) -> Option<usize> {
     let mut rest = tag_name(text.strip_prefix('<')?)?;
     loop {
         let trimmed = rest.trim_start();
-        if let Some(end) = trimmed.strip_prefix("/>").or_else(|| trimmed.strip_prefix('>')) {
-            return Some(text.len() - end.len());
+        if let Some(after) = trimmed.strip_prefix("/>").or_else(|| trimmed.strip_prefix('>')) {
+            return Some(text.len() - after.len());
         }
         if trimmed.len() == rest.len() {
             return None; // attributes must be separated by whitespace
@@ -84,8 +91,9 @@ fn tag_name(text: &str) -> Option<&str> {
 
 /// `name`, `name=value`, `name='value'` or `name="value"`; returns what follows it.
 fn attribute(text: &str) -> Option<&str> {
-    text.starts_with(|c: char| c.is_ascii_alphabetic() || "_:".contains(c)).then_some(())?;
-    let end = text.find(|c: char| !(c.is_ascii_alphanumeric() || "_.:-".contains(c))).unwrap_or(text.len());
+    text.starts_with(|c: char| c.is_ascii_alphabetic() || ATTRIBUTE_NAME_START.contains(c)).then_some(())?;
+    let end =
+        text.find(|c: char| !(c.is_ascii_alphanumeric() || ATTRIBUTE_NAME_REST.contains(c))).unwrap_or(text.len());
     let after_name = &text[end..];
     let Some(value) = after_name.trim_start().strip_prefix('=') else { return Some(after_name) };
     let value = value.trim_start();
@@ -93,7 +101,7 @@ fn attribute(text: &str) -> Option<&str> {
         let inside = &value[quote.len_utf8()..];
         return inside.find(quote).map(|at| &inside[at + quote.len_utf8()..]);
     }
-    let end = value.find(|c: char| c.is_whitespace() || "\"'=<>`".contains(c)).unwrap_or(value.len());
+    let end = value.find(|c: char| c.is_whitespace() || UNQUOTED_VALUE_STOP.contains(c)).unwrap_or(value.len());
     (end > 0).then(|| &value[end..])
 }
 
