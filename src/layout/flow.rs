@@ -4,7 +4,7 @@ use iced::advanced::graphics::text::cosmic_text as ct;
 use iced::{Color, Font, Rectangle};
 
 use super::{Fill, Page};
-use crate::model::{Align, Block, Item, Span};
+use crate::model::{Align, Block, Item, Span, Style, image_description};
 use crate::theme::{Theme, bold};
 
 /// Base look of a text block before per-span styling.
@@ -51,6 +51,12 @@ impl Flow<'_> {
         let theme = self.theme;
         match block {
             Block::Paragraph(spans) => self.text(spans, x, width, ink, Align::Left, ct::Wrap::WordOrGlyph),
+            // Drawn as its description until images are laid out (phase 2b, step 7).
+            Block::Image { alt, link, .. } => {
+                let style = Style { emphasis: true, ..Style::default() };
+                let spans = [Span { text: image_description(alt), style, link: link.clone() }];
+                self.text(&spans, x, width, ink, Align::Left, ct::Wrap::WordOrGlyph)
+            }
             Block::Heading { level, spans, slug } => {
                 let size = theme.body_size * theme.heading_scales[usize::from(*level).clamp(1, 6) - 1];
                 if self.y > theme.gutter {

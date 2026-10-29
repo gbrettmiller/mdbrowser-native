@@ -388,9 +388,9 @@ Feature: Images
   - SVG needs its own ADR: it is a document format, with scripts and external references.
   - **Limits as code:** the limits live as named constants in `session::images::limits`. The ADR, the criteria and the tests all quote those constants, so they can't drift.
 - **Model.**
-  - `model::inlines` yields `Vec<Inline>`, where `Inline` is `Span(Span)` or `Image { src, alt, link }`. Style and the link stack carry across images.
+  - `model::inlines::parts` yields `Vec<Inline>`, where `Inline` is `Span(Span)` or `Image { src, alt, link, style }`. Style and the link stack carry across images.
   - `flatten` turns images back into `[image: alt]` spans, for headings and table cells.
-  - `split` turns a paragraph into `Paragraph` and `Block::Image { src, alt, link }` blocks.
+  - `blocks::paragraphs` splits a paragraph into `Paragraph` and `Block::Image { src, alt, link }` blocks, trimming whitespace only at the cuts.
   - `plain_text` writes an image as `[image: alt]` or `[image]` on its own line.
 - **Session, pure.** `session/images/` holds four modules:
   - `resolve.rs`: `resolve(src, current) -> Result<Location, Refusal>`. It uses the 2a link rules through a shared `session/href.rs`, which takes `as_browsers_read`, `is_disk_shaped` and the boundary check out of `links/page.rs`. Any extension is allowed.
@@ -443,7 +443,7 @@ In ARCHITECTURE.md:
 **Files**: `vector/decisions/ADR-004-images.md`, `ARCHITECTURE.md`
 **Commit**: `docs(vector): decide how images are decoded and drawn (ADR-004)`
 
-### Step 2: Images become blocks
+### Step 2: Images become blocks — done
 
 **Complexity**: standard
 **RED**:

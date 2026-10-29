@@ -1,6 +1,7 @@
 //! Step definitions. Steps assert on session state, recorded effects and the
 //! requests the test server saw, never on pixels.
 
+mod images;
 mod local;
 mod remote;
 

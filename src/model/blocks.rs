@@ -2,7 +2,7 @@
 
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, Tag, TagEnd};
 
-use super::inlines::{inlines, is_inline};
+use super::inlines::{Inline, inlines, is_inline, parts};
 use super::slug::Slugger;
 use super::{Align, Block, Item, Span, Style, html, text_of};
 
@@ -37,8 +37,15 @@ pub fn blocks(events: &mut Events) -> Vec<Block> {
         if matches!(event, Event::End(_)) {
             break;
         }
-        let block = if is_inline(event) { paragraph(inlines(events)) } else { block(events) };
-        out.extend(block);
+        if is_inline(event) {
+            out.extend(paragraphs(parts(events)));
+        } else if matches!(event, Event::Start(Tag::Paragraph)) {
+            events.next();
+            out.extend(paragraphs(parts(events)));
+            events.next(); // End(Paragraph)
+        } else {
+            out.extend(block(events));
+        }
     }
     out
 }
@@ -47,10 +54,48 @@ fn paragraph(spans: Vec<Span>) -> Option<Block> {
     (!spans.is_empty()).then_some(Block::Paragraph(spans))
 }
 
+/// A paragraph split at each image: the text before it, the image, the text after.
+/// Whitespace is trimmed only at the cuts; a paragraph without images is untouched.
+fn paragraphs(parts: Vec<Inline>) -> Vec<Block> {
+    let mut out = Vec::new();
+    let mut text = Vec::new();
+    let mut after_image = false;
+    for part in parts {
+        match part {
+            Inline::Span(span) => text.push(span),
+            Inline::Image { src, alt, link, .. } => {
+                out.extend(paragraph(trimmed(std::mem::take(&mut text), after_image, true)));
+                out.push(Block::Image { src, alt, link });
+                after_image = true;
+            }
+        }
+    }
+    out.extend(paragraph(trimmed(text, after_image, false)));
+    out
+}
+
+/// Trims whitespace at a cut (start, end or both), dropping spans left empty.
+fn trimmed(mut spans: Vec<Span>, start: bool, end: bool) -> Vec<Span> {
+    while let Some(first) = spans.first_mut().filter(|_| start) {
+        first.text = first.text.trim_start().to_string();
+        if !first.text.is_empty() {
+            break;
+        }
+        spans.remove(0);
+    }
+    while let Some(last) = spans.last_mut().filter(|_| end) {
+        last.text = last.text.trim_end().to_string();
+        if !last.text.is_empty() {
+            break;
+        }
+        spans.pop();
+    }
+    spans
+}
+
 fn block(events: &mut Events) -> Option<Block> {
     let block = match events.next()? {
         Event::Rule => return Some(Block::Rule),
-        Event::Start(Tag::Paragraph) => paragraph(inlines(events)),
         Event::Start(Tag::Heading { level, .. }) => {
             let spans = inlines(events);
             let slug = events.slugger.slug(&text_of(&spans));
