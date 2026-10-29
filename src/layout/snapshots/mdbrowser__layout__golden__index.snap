@@ -2,7 +2,7 @@
 source: src/layout/golden.rs
 expression: "geometry(&page_at(include_str!(\"../../corpus/index.md\"),\nReadingFont::Literata, WIDTH))"
 ---
-height 589.0, 27 fragments, anchors [("a-markdown-browser", 32.0)]
+height 655.0, 32 fragments, anchors [("a-markdown-browser", 32.0)]
    32.0   32.0  378.5 "A Markdown Browser"
   109.0   32.0  146.7 "This window has "
   109.0  178.7  316.0 "no HTML, no DOM and no webview"
@@ -26,7 +26,12 @@ height 589.0, 27 fragments, anchors [("a-markdown-browser", 32.0)]
   418.0   60.0  202.4 "The CommonMark spec"
   418.0  262.4  215.7 " as a real-world stress test"
   451.0   32.0   10.8 "•"
-  451.0   60.0  138.7 "An external link"
-  451.0  198.7   39.5 " and "
-  451.0  238.3  124.4 "a missing page"
-  496.0   51.6  620.1 "Drag to select across blocks, then press Ctrl+C. Ctrl+A selects everything."
+  451.0   60.0  241.1 "Web of Markdown examples"
+  451.0  301.1  245.0 ": real posts with front matter"
+  484.0   32.0   10.8 "•"
+  484.0   60.0  200.8 "Front matter edge cases"
+  517.0   32.0   10.8 "•"
+  517.0   60.0  138.7 "An external link"
+  517.0  198.7   39.5 " and "
+  517.0  238.3  124.4 "a missing page"
+  562.0   51.6  620.1 "Drag to select across blocks, then press Ctrl+C. Ctrl+A selects everything."

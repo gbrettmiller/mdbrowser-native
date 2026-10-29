@@ -6,7 +6,7 @@
   "assumption": "Writers and tools will converge on a shared front matter vocabulary drawn from RSS 2.0 (title, author, pubDate, description, source, enclosure) plus urlPrev, urlNext, image, inlineImage and metaImage, so acting on those names reaches most Markdown-web content.",
   "category": "market",
   "confidence": "low",
-  "evidence": "INT-001 asks for it explicitly and cites overlap with Jekyll, Hugo, Eleventy, Astro and Obsidian. Only one corpus (scripting.com) uses it today, and the vocabulary is undocumented.",
+  "evidence": "INT-001 asks for it explicitly and cites overlap with Jekyll, Hugo, Eleventy, Astro and Obsidian. Only one corpus (scripting.com) uses it today, and the vocabulary is undocumented. Survey of the 16,869-file scripting.com archive (2026-10-28, corpus/markdownweb/README.md): author, pubDate, source and generator on every post with front matter; urlPrev/urlNext on all but one; title 2,899; image 2,628; description 713; urlvideo 536; metaImage 450; enclosure 193; inlineImage 159. urlvideo and urltoot are in use but not in the readme's vocabulary.",
   "test_method": "Survey front matter keys in the markdownWeb archive, Andrew Shell's site and a sample of Jekyll/Hugo/Obsidian repos; track whether other Markdown-web browsers adopt the names.",
   "result": ""
 }
