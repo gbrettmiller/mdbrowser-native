@@ -9,6 +9,8 @@ Try the pages below. Links to other `.md` files open here; anything else goes to
 - [Tables and code](tables-and-code.md)
 - [A long document](long.md) for scroll performance
 - [The CommonMark spec](spec.md) as a real-world stress test
+- [Web of Markdown examples](markdownweb/README.md): real posts with front matter
+- [Front matter edge cases](front-matter/README.md)
 - [An external link](https://commonmark.org) and [a missing page](nowhere.md)
 
 > Drag to select across blocks, then press Ctrl+C. Ctrl+A selects everything.
