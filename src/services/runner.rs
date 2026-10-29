@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use iced::Task;
 
-use super::store::Store;
+use super::store::{Store, Ticket};
 use super::{files, opener};
 use crate::session::{Effect, Event};
 
@@ -14,17 +14,22 @@ fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_secs())
 }
 
+/// Takes the store's ticket now, while effects are still in dispatch order,
+/// then saves in the background.
 fn in_background(
     store: Option<Arc<Store>>,
-    save: impl FnOnce(&Store) -> std::io::Result<()> + Send + 'static,
+    save: impl FnOnce(&Store, Ticket) -> std::io::Result<()> + Send + 'static,
 ) -> Task<Option<Event>> {
     match store {
-        Some(store) => Task::perform(async move { save(&store) }, |result| {
-            if let Err(error) = result {
-                eprintln!("mdbrowser: couldn't save: {error}");
-            }
-            None
-        }),
+        Some(store) => {
+            let ticket = store.ticket();
+            Task::perform(async move { save(&store, ticket) }, |result| {
+                if let Err(error) = result {
+                    eprintln!("mdbrowser: couldn't save: {error}");
+                }
+                None
+            })
+        }
         None => Task::none(),
     }
 }
@@ -42,7 +47,9 @@ pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
                 Event::OpenerFailed
             })
         }),
-        Effect::PersistVisits(visits) => in_background(store, move |store| store.save_visits(&visits)),
-        Effect::PersistSettings(settings) => in_background(store, move |store| store.save_settings(settings)),
+        Effect::PersistVisits(visits) => in_background(store, move |store, ticket| store.save_visits(ticket, &visits)),
+        Effect::PersistSettings(settings) => {
+            in_background(store, move |store, ticket| store.save_settings(ticket, settings))
+        }
     }
 }

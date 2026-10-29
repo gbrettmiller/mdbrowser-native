@@ -101,8 +101,12 @@ impl Browser {
                     self.opened.push(url);
                 }
             }
-            Effect::PersistVisits(visits) => self.store.save_visits(&visits).expect("save history"),
-            Effect::PersistSettings(settings) => self.store.save_settings(settings).expect("save settings"),
+            Effect::PersistVisits(visits) => {
+                self.store.save_visits(self.store.ticket(), &visits).expect("save history")
+            }
+            Effect::PersistSettings(settings) => {
+                self.store.save_settings(self.store.ticket(), settings).expect("save settings")
+            }
         }
     }
 
@@ -130,7 +134,7 @@ impl Browser {
     }
 
     pub fn seed_history(&mut self, visits: Vec<Visit>) {
-        self.store.save_visits(&visits).expect("seed history");
+        self.store.save_visits(self.store.ticket(), &visits).expect("seed history");
         self.restart();
     }
 
