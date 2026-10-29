@@ -145,8 +145,8 @@ mod tests {
     use std::net::SocketAddr;
     use std::time::Duration;
 
-    use super::super::test_server::{Reply, Server};
     use super::*;
+    use crate::services::test_server::{Reply, Server};
 
     /// Resolves every name to the test server, as rebinding DNS would.
     #[derive(Debug)]

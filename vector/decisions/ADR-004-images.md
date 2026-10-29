@@ -76,7 +76,7 @@ Option A is the only one that keeps decoding off the render thread and bounded b
 - At most 16 MiB per file or response, counted after decompression (ADR-003).
 - At most 16,384 pixels on a side and 25 megapixels. Both are checked from the header before decoding, and are also enforced by `image::Limits`.
 - Images wider than 2,048 pixels are downscaled to 2,048 when decoded.
-- Decodes run one at a time, behind a mutex in `services::images`. Peak decode memory is about one 25 MP image as RGBA, 100 MB, plus a 16 MiB input.
+- Decodes run one at a time, behind a mutex in `services::images` that also covers downscaling and conversion. Downscaling box-samples straight into the output (`imageops::thumbnail`), with no intermediate buffer. Peak decode memory is about one 25 MP image as RGBA, 100 MB, plus a 16 MiB input. A progressive JPEG can need about twice that, in its decoder's internal buffers, which `image::Limits` doesn't count. That is bounded, and accepted.
 - At most 4 image loads at once, across the app.
 - A 256 MiB least-recently-used cache of decoded pixels, keyed by requested location. The current page's images are pinned, so a very image-heavy page can hold more than the budget while it is shown.
 

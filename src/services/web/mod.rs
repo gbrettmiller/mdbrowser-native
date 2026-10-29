@@ -46,10 +46,6 @@ pub fn fetch(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Erro
 }
 
 #[cfg(test)]
-#[path = "../../../tests/support/http.rs"]
-mod test_server;
-
-#[cfg(test)]
 mod tests {
     use std::io::Write;
     use std::net::TcpListener;
@@ -58,8 +54,8 @@ mod tests {
     use flate2::Compression;
     use flate2::write::GzEncoder;
 
-    use super::test_server::{Reply, Server};
     use super::*;
+    use crate::services::test_server::{Reply, Server};
     use crate::session::web::{ACCEPT, MAX_REDIRECTS};
 
     const LIMIT: u64 = 1024;

@@ -9,28 +9,47 @@ use crate::session::error::ErrorCode;
 /// Larger than any plausible document; guards against runaway reads.
 pub const MAX_BYTES: u64 = 16 * 1024 * 1024;
 
-fn code(error: std::io::Error) -> ErrorCode {
-    match error.kind() {
-        ErrorKind::NotFound => ErrorCode::NotFound,
-        _ => ErrorCode::Unreadable,
+/// Why a capped read stopped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadError {
+    NotFound,
+    /// Over `MAX_BYTES`.
+    TooLarge,
+    /// Permissions, a directory, a device or a pipe.
+    Unreadable,
+}
+
+/// A regular file's bytes, up to `MAX_BYTES`. Pipes and devices are refused
+/// without blocking. Symlinks to regular files are followed.
+pub fn read_capped(path: &Path) -> Result<Vec<u8>, ReadError> {
+    let failed = |error: std::io::Error| match error.kind() {
+        ErrorKind::NotFound => ReadError::NotFound,
+        _ => ReadError::Unreadable,
+    };
+    let file = open_without_blocking(path).map_err(failed)?;
+    let metadata = file.metadata().map_err(failed)?;
+    if !metadata.is_file() {
+        return Err(ReadError::Unreadable);
     }
+    if metadata.len() > MAX_BYTES {
+        return Err(ReadError::TooLarge);
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(failed)?;
+    if bytes.len() as u64 > MAX_BYTES {
+        return Err(ReadError::TooLarge); // grew after the size check
+    }
+    Ok(bytes)
 }
 
 /// Strict UTF-8: a missing file is `NotFound`; anything else that stops us
 /// reading it as text is `Unreadable`. That includes permissions, bad encoding,
-/// directories, devices and pipes, and anything over `MAX_BYTES`. Symlinks to
-/// regular files are followed.
+/// directories, devices and pipes, and anything over `MAX_BYTES`.
 pub fn read_markdown(path: &Path) -> Result<String, ErrorCode> {
-    let file = open_without_blocking(path).map_err(code)?;
-    let metadata = file.metadata().map_err(code)?;
-    if !metadata.is_file() || metadata.len() > MAX_BYTES {
-        return Err(ErrorCode::Unreadable);
-    }
-    let mut bytes = Vec::new();
-    file.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(code)?;
-    if bytes.len() as u64 > MAX_BYTES {
-        return Err(ErrorCode::Unreadable); // grew after the size check
-    }
+    let bytes = read_capped(path).map_err(|error| match error {
+        ReadError::NotFound => ErrorCode::NotFound,
+        ReadError::TooLarge | ReadError::Unreadable => ErrorCode::Unreadable,
+    })?;
     String::from_utf8(bytes).map_err(|_| ErrorCode::Unreadable)
 }
 
@@ -40,7 +59,8 @@ pub fn read_markdown(path: &Path) -> Result<String, ErrorCode> {
 #[cfg(unix)]
 fn open_without_blocking(path: &Path) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new().read(true).custom_flags(libc::O_NONBLOCK).open(path)
+    // O_NOCTTY: a symlink to a terminal must never become our controlling terminal.
+    std::fs::OpenOptions::new().read(true).custom_flags(libc::O_NONBLOCK | libc::O_NOCTTY).open(path)
 }
 
 #[cfg(not(unix))]
@@ -59,6 +79,30 @@ pub fn from_command_line(argument: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capped_reads_say_why_they_stop() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = |name: &str| dir.path().join(name);
+        std::fs::write(path("a.png"), [1, 2, 3]).unwrap();
+        assert_eq!(read_capped(&path("a.png")), Ok(vec![1, 2, 3]));
+        assert_eq!(read_capped(&path("missing.png")), Err(ReadError::NotFound));
+        std::fs::create_dir(path("dir.png")).unwrap();
+        assert_eq!(read_capped(&path("dir.png")), Err(ReadError::Unreadable));
+        let big = std::fs::File::create(path("big.png")).unwrap();
+        big.set_len(MAX_BYTES + 1).unwrap();
+        assert_eq!(read_capped(&path("big.png")), Err(ReadError::TooLarge));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn a_pipe_is_refused_without_blocking() {
+        let dir = tempfile::tempdir().unwrap();
+        let fifo = dir.path().join("pipe.png");
+        let made = std::process::Command::new("mkfifo").arg(&fifo).status().unwrap();
+        assert!(made.success());
+        assert_eq!(read_capped(&fifo), Err(ReadError::Unreadable));
+    }
 
     #[test]
     fn addresses_with_a_scheme_pass_through_the_command_line() {

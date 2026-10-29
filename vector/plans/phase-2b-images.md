@@ -499,7 +499,7 @@ In ARCHITECTURE.md:
 **Files**: `src/session/mod.rs`, `src/services/store.rs`, `src/content.rs`, `src/ui/toolbar.rs`, `features/images.feature`, `tests/acceptance/steps/images.rs`
 **Commit**: `feat(session): let the reader choose how web images load`
 
-### Step 5: Read, fetch and decode images
+### Step 5: Read, fetch and decode images — done (committed as 5a, the shared fetch loop and connect-time check, and 5b, reading and decoding)
 
 **Complexity**: complex (I/O, untrusted input)
 **RED**: `services::images` and `services::web` tests. Fixtures are generated in the test with the `image` crate. WebP is encoded losslessly by the same crate; if that encoder isn't available, a hand-written byte constant is used.
