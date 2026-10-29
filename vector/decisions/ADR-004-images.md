@@ -109,7 +109,7 @@ Option A is the only one that keeps decoding off the render thread and bounded b
 - SVG, AVIF, TIFF and the other formats show their description instead. Adding one is a deliberate change to the feature list.
 - Animated GIFs and WebPs show their first frame.
 - Downscaling to 2,048 pixels softens very large images on HiDPI screens. That is acceptable at column widths around 700 pixels.
-- **Binary size:** the four codecs add to the release binary. The baseline before 2b is 32.6 MB, and the measured cost is added here at the end of phase 2b.
+- **Binary size:** the four codecs add to the release binary: 32.6 MB before 2b, 34.7 MB after (Linux x64, 2026-10-29), about 2.1 MB.
 
 **Neutral:**
 - `iced::widget::image::Handle` is held in session state as a value type: reference-counted, compared by id and cheap to clone. ARCHITECTURE.md's import rules name it.

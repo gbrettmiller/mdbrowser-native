@@ -610,7 +610,7 @@ Also:
 **Files**: `features/images.feature`, `tests/acceptance/**`
 **Commit**: `test(acceptance): image settings, clicks, links and caching`
 
-### Step 10: Docs, doctrine and manual check
+### Step 10: Docs, doctrine and manual check — done
 
 **Complexity**: trivial
 **GREEN**:
@@ -632,6 +632,14 @@ Also:
   - a `#anchor` link into an image-heavy post lands on its heading
 **Files**: `README.md`, `VECTOR.md`, `features/README.md`, `vector/decisions/ADR-004-images.md`
 **Commit**: `docs: describe images`
+
+**Manual check, 2026-10-29** (release build, Linux):
+- markdownWeb example 2 (the ice-cream truck, a GIF) draws its first frame above the text; example 3 draws both images.
+- A scripting.com archive post with a leading image (2022/05/21) draws it from imgs.scripting.com, above its paragraph.
+- andrewshell.org shows its portrait.
+- A broken local image shows its description and "Couldn't load this image. Click to try again." as a link; a wide image scales to the column.
+- Not yet checked by hand: each Web images mode, Ctrl+Shift+I in "off", a `#anchor` into an image-heavy post, and the reading position as images arrive. These are covered by acceptance and unit tests.
+- Seen: a very tall image fills the window above the first line (recorded in VECTOR.md's open questions).
 
 ## Complexity Classification
 

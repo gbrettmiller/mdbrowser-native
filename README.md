@@ -4,7 +4,7 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 2a, local files and remote Markdown over `http(s)`. Images (phase 2b), front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 2b, local files and remote Markdown over `http(s)`, with images. A Settings panel and a home page (phase 2c), front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## What it does today
 
@@ -19,6 +19,10 @@ Writers own the words. Readers own the presentation. The document chooses nothin
 - Select text with the mouse and copy it with Ctrl+C.
 - Other `http` and `https` links, and `mailto` links, open in your system's handler. Other schemes are blocked.
 - Raw HTML in a document is stripped, never interpreted: the tags go and the text between them stays.
+- Draws Markdown images (`![description](src)`) from files and the web: PNG, JPEG, GIF (its first frame) and WebP. An image is never shown larger than it is, and is scaled down to fit the text. An image that can't be shown leaves its description and a note saying why; one that failed to load can be clicked to try again.
+- The **Web images** menu chooses whether images from the web load automatically, on click, or not at all. Images in local files always load. Ctrl+Shift+I (Cmd+Shift+I on macOS) loads the current page's images whatever the setting.
+- Loading web images tells the sites that host them that you are reading the post, as in any browser, though mdbrowser sends no cookies or referrer. Choose "on click" or "off" if you'd rather not.
+- A web page can't show images from your disk, and a public page can't show images from your local network.
 
 ## Build from source
 
@@ -50,6 +54,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Focus the address bar | Ctrl+L | Cmd+L |
 | Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
 | Open a page that isn't Markdown in your browser | Ctrl+Shift+O | Cmd+Shift+O |
+| Load this page's images | Ctrl+Shift+I | Cmd+Shift+I |
 | Select all / copy | Ctrl+A / Ctrl+C | Cmd+A / Cmd+C |
 
 ### Where your data lives
