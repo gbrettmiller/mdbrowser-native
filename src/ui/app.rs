@@ -2,7 +2,7 @@
 //! and turns session state into a window. No browsing logic lives here.
 
 use std::cell::{Cell, RefCell};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use iced::keyboard::{self, Key, key::Named};
@@ -14,6 +14,7 @@ use super::document::Document;
 use super::pages::{Pages, SETTLE};
 use super::{body, toolbar};
 use crate::content;
+use crate::model::Document as Doc;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
 use crate::session::{self, Event, Shown, State, Status};
@@ -48,8 +49,8 @@ pub enum Message {
     Resized,
     Relayout,
     ToggleHistory,
-    /// Try to scroll to the pending anchor; the count bounds the retries.
-    ResolveAnchor(u32),
+    /// Try to scroll to this pending anchor; the count bounds the retries.
+    ResolveAnchor(String, u32),
 }
 
 pub struct App {
@@ -63,8 +64,9 @@ pub struct App {
     /// Last laid-out width, for scrolling to anchors outside `view`.
     width: Cell<f32>,
     settling: Cell<bool>,
-    /// The document the view has laid out at its settled width (by address), if any.
-    laid_out: Cell<usize>,
+    /// The document the view has laid out at its settled width. Weak, so the
+    /// allocation (and its address) can't be reused by a later document.
+    laid_out: RefCell<Weak<Doc>>,
     /// When the laid-out width last changed.
     width_since: Cell<Instant>,
     relayout_scheduled: bool,
@@ -85,7 +87,7 @@ impl App {
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
             width: Cell::new(WINDOW_SIZE.0 - SCROLLBAR),
             settling: Cell::new(false),
-            laid_out: Cell::new(0),
+            laid_out: RefCell::new(Weak::new()),
             width_since: Cell::new(Instant::now()),
             relayout_scheduled: false,
         };
@@ -111,6 +113,7 @@ impl App {
     /// Steps the reducer, runs its effects, and keeps the view in step with it.
     fn dispatch(&mut self, event: Event) -> Task<Message> {
         let before = self.shown();
+        let fragment_before = self.session().fragment.clone();
         let previous_address = self.session().address();
         let (state, effects) = session::step(self.session.take().expect("session"), event);
         self.session = Some(state);
@@ -120,31 +123,34 @@ impl App {
         let store = self.store.clone();
         let effects: Vec<_> =
             effects.into_iter().map(|effect| runner::run(effect, store.clone()).map(Message::Effect)).collect();
-        let scroll = self.scroll_after(before);
+        let scroll = self.scroll_after(before, fragment_before);
         Task::batch(effects.into_iter().chain([scroll]))
     }
 
     /// New documents start at the top; a pending anchor is resolved once the
     /// view has laid the page out at its real width.
-    fn scroll_after(&mut self, before: Option<Arc<Shown>>) -> Task<Message> {
+    fn scroll_after(&mut self, before: Option<Arc<Shown>>, fragment_before: Option<String>) -> Task<Message> {
         let Some(shown) = self.shown() else { return Task::none() };
         let is_new = !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
         let to_top = if is_new { operation::snap_to(SCROLL_ID, RelativeOffset::START) } else { Task::none() };
-        if self.session().fragment.is_some() {
-            Task::batch([to_top, Task::done(Message::ResolveAnchor(0))])
-        } else {
-            to_top
+        // Start one resolution per new anchor; other dispatches leave a running one alone.
+        match self.session().fragment.clone() {
+            Some(fragment) if is_new || Some(&fragment) != fragment_before.as_ref() => {
+                Task::batch([to_top, Task::done(Message::ResolveAnchor(fragment, 0))])
+            }
+            _ => to_top,
         }
     }
 
-    fn resolve_anchor(&mut self, attempt: u32) -> Task<Message> {
-        let (Some(shown), Some(fragment)) = (self.shown(), self.session().fragment.clone()) else {
-            return Task::none();
-        };
-        let laid_out = self.laid_out.get() == Arc::as_ptr(&shown.document) as usize;
+    fn resolve_anchor(&mut self, fragment: String, attempt: u32) -> Task<Message> {
+        let Some(shown) = self.shown() else { return Task::none() };
+        if self.session().fragment.as_ref() != Some(&fragment) {
+            return Task::none(); // superseded or already handled
+        }
+        let laid_out = self.laid_out.borrow().upgrade().is_some_and(|doc| Arc::ptr_eq(&doc, &shown.document));
         if !laid_out || self.width_since.get().elapsed() < ANCHOR_STABLE {
             return if attempt < ANCHOR_ATTEMPTS {
-                Task::perform(background::after(ANCHOR_RETRY), move |_| Message::ResolveAnchor(attempt + 1))
+                Task::perform(background::after(ANCHOR_RETRY), move |_| Message::ResolveAnchor(fragment, attempt + 1))
             } else {
                 self.dispatch(Event::FragmentHandled)
             };
@@ -181,7 +187,7 @@ impl App {
                 self.history_open = !self.history_open;
                 Task::none()
             }
-            Message::ResolveAnchor(attempt) => self.resolve_anchor(attempt),
+            Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
         }
     }
 
@@ -231,7 +237,7 @@ impl App {
             let (page, settling) = self.pages.borrow_mut().get(&shown.document, font, width, Instant::now());
             self.settling.set(settling);
             if !settling {
-                self.laid_out.set(Arc::as_ptr(&shown.document) as usize);
+                *self.laid_out.borrow_mut() = Arc::downgrade(&shown.document);
             }
             let document =
                 Document::new(page, theme::reading(font), |href| Message::Session(Event::Follow(href)), Message::Hover);
