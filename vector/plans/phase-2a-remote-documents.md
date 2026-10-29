@@ -330,7 +330,7 @@ In ARCHITECTURE.md:
 **Files**: `vector/decisions/ADR-003-http-client.md`, `ARCHITECTURE.md`
 **Commit**: `docs(vector): choose ureq and url for remote documents (ADR-003)`
 
-### Step 3: Split `location.rs`, then add error codes
+### Step 3: Split `location.rs`, then add error codes — done
 
 **Complexity**: standard
 **RED**: A content test: every `ErrorCode` has a non-empty, distinct string, and so does every `NoticeKind`. It is iterated over an `ALL` list that a match keeps exhaustive. A unit test for `is_markdown_name`: `a.md` and `A.MARKDOWN` are accepted, case-insensitively. `a.md?x` and `a.txt` are rejected, because callers pass bare path names with any query already removed.
@@ -340,7 +340,8 @@ In ARCHITECTURE.md:
 - Add the strings, with what to try next:
   - `serverError`: "The site had a problem sending this page. Try again later."
   - `unreachable`: "Couldn't reach this site. Check your connection, then reload."
-  - `badRedirect`: "This site redirected somewhere that can't be followed safely."
+  - `badRedirect`: "This site redirected somewhere that can't be followed safely. Try opening the address in your web browser."
+  - `notMarkdown` (pages): "This page isn't Markdown. Open it in your web browser instead."
   - Pages only:
     - `notFound`: "There's no page at this address. Check it for typos."
     - `unreadable`: "This page couldn't be read as text. It may be too large or not in UTF-8."

@@ -1,6 +1,8 @@
 //! The browsing session as a pure reducer: `step(state, event) → (state, effects)`.
 //! Effects are data; `services::runner` executes them and feeds results back as events.
 
+mod address;
+pub mod error;
 pub mod links;
 pub mod location;
 pub mod navigation;
@@ -42,6 +44,12 @@ pub enum Status {
 pub enum NoticeKind {
     OpenFailed,
     UnsupportedLink,
+    LocalFromWeb,
+}
+
+impl NoticeKind {
+    /// Every kind, for exhaustive content tests.
+    pub const ALL: [Self; 3] = [Self::OpenFailed, Self::UnsupportedLink, Self::LocalFromWeb];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
