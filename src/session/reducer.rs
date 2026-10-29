@@ -2,11 +2,12 @@
 
 use std::sync::Arc;
 
+use super::address::parse_address;
+use super::error::ErrorCode;
 use super::links::{self, Link};
-use super::location::{ErrorCode, parse_address};
 use super::navigation::{Entry, Navigation};
 use super::visits;
-use super::{Effect, Event, Notice, NoticeKind, Settings, Shown, State, Status};
+use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status};
 use crate::model;
 
 type Step = (State, Vec<Effect>);
@@ -30,6 +31,10 @@ pub fn step(state: State, event: Event) -> Step {
         },
         Event::Loaded { request_id, result, now } => loaded(state, request_id, result, now),
         Event::OpenerFailed => notice(state, NoticeKind::OpenFailed),
+        Event::OpenInBrowser => match state.browser_offer() {
+            Some(url) => (state, vec![Effect::OpenExternal(url)]),
+            None => none(state),
+        },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
         Event::ChooseFont(font) => {
             let settings = Settings { font };
@@ -85,17 +90,20 @@ fn failed(state: State, code: ErrorCode) -> State {
     State { pending: None, status: Status::Failed(code), fragment: None, ..state }
 }
 
-fn loaded(state: State, request_id: u64, result: Result<String, ErrorCode>, now: u64) -> Step {
+/// A finished load for the current entry. A redirect settles the entry on the
+/// final location, so the address bar, History and relative links all use it.
+fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now: u64) -> Step {
     let target = state.nav.current().and_then(|entry| entry.target.clone());
     let (Some(target), true) = (target, state.pending == Some(request_id)) else { return none(state) };
     match result {
-        Ok(source) => {
+        Ok(Loaded { source, location }) => {
             let document = model::parse(&source);
-            let title = document.title(&target.location.label());
-            let visits = visits::record(&state.visits, &target.location.address(), &title, now);
+            let title = document.title(&location.label());
+            let visits = visits::record(&state.visits, &location.address(), &title, now);
             let shown = Arc::new(Shown { document: Arc::new(document), title });
-            let state = State { pending: None, status: Status::Ready(shown), fragment: target.fragment, ..state };
-            persist_visits(State { visits, ..state })
+            let nav = if location == target.location { state.nav } else { state.nav.settle(location) };
+            let status = Status::Ready(shown);
+            persist_visits(State { nav, visits, pending: None, status, fragment: target.fragment, ..state })
         }
         Err(code) => none(failed(state, code)),
     }
@@ -109,6 +117,8 @@ fn follow(state: State, href: &str) -> Step {
         Link::Navigate(target) => navigate_to(state, Entry { input: target.location.address(), target: Some(target) }),
         Link::Scroll(fragment) => none(State { fragment: Some(fragment), ..state }),
         Link::External(url) => (state, vec![Effect::OpenExternal(url)]),
+        Link::LocalFromWeb => notice(state, NoticeKind::LocalFromWeb),
+        Link::LocalNetworkFromWeb => notice(state, NoticeKind::LocalNetworkFromWeb),
         Link::Unsupported => notice(state, NoticeKind::UnsupportedLink),
     }
 }

@@ -7,8 +7,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use iced::Task;
 
 use super::store::{Store, Ticket};
-use super::{background, files, opener};
-use crate::session::{Effect, Event};
+use super::{background, files, opener, web};
+use crate::session::error::ErrorCode;
+use crate::session::location::Location;
+use crate::session::{Effect, Event, Loaded};
 
 fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_secs())
@@ -34,10 +36,21 @@ fn in_background(
     }
 }
 
+/// Reads a file or fetches a page. Matched exhaustively, so a web location can never reach `files`.
+pub fn load(location: Location, limits: &web::Limits) -> Result<Loaded, ErrorCode> {
+    match location {
+        Location::File(path) => {
+            files::read_markdown(&path).map(|source| Loaded { source, location: Location::File(path) })
+        }
+        Location::Web(url) => web::fetch(&url, limits)
+            .map(|fetched| Loaded { source: fetched.source, location: Location::web(fetched.url) }),
+    }
+}
+
 pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
     match effect {
         Effect::Load { request_id, location } => {
-            Task::perform(background::run_blocking(move || files::read_markdown(location.path())), move |result| {
+            Task::perform(background::run_blocking(move || load(location, &web::Limits::default())), move |result| {
                 Some(Event::Loaded { request_id, result, now: now() })
             })
         }

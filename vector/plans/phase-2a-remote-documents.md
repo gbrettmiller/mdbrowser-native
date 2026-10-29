@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-29
 **Branches**: `feat/strip-html` (PR A, step 1), then `feat/phase-2a` (PR B, steps 2–10), both from `main`
-**Status**: approved (2026-10-29, revision 3)
+**Status**: built (2026-10-29); PR A merged, PR B in review. Approved as revision 3.
 
 ## Goal
 
@@ -25,27 +25,32 @@ Decisions already made by the product owner (2026-10-29):
 
 ## Acceptance Criteria
 
-1. [ ] **Typed addresses.** An `http://` or `https://` address (scheme in any case) is fetched with an `Accept` header that ranks `text/markdown` highest. A Markdown response is shown with its title. The address bar always shows the full final URL, including its scheme.
-2. [ ] **What counts as Markdown.**
+1. [x] **Typed addresses.** An `http://` or `https://` address (scheme in any case) is fetched with an `Accept` header that ranks `text/markdown` highest. A Markdown response is shown with its title. The address bar always shows the full final URL, including its scheme.
+2. [x] **What counts as Markdown.**
    - Markdown: Content-Type `text/markdown` or `text/x-markdown` (case-insensitive, parameters allowed). Also `text/plain` or no Content-Type, when the final URL's *path* ends in `.md` or `.markdown`. Query and fragment are ignored, and case doesn't matter.
    - `notMarkdown`: anything else.
    - An empty 2xx body is a valid, empty document.
-3. [ ] **Open in browser.** On `notMarkdown` for any web location (typed or followed), the error offers **Open in browser**, which hands the URL to the system browser. Local files never offer it.
-4. [ ] **Redirects.** Statuses 301, 302, 303, 307 and 308 are followed up to 5 hops. The address bar, History and relative links use the final URL.
-   - These give `badRedirect`: a 6th hop, https→http, a non-http(s) target, or a missing `Location` header.
+3. [x] **Open in browser.** On `notMarkdown` for any web location (typed or followed), the error offers **Open in browser**, which hands the URL to the system browser. Local files never offer it.
+4. [x] **Redirects.** Statuses 301, 302, 303, 307 and 308 are followed up to 5 hops. The address bar, History and relative links use the final URL.
+   - These give `badRedirect`:
+     - a 6th hop
+     - https→http
+     - a non-http(s) target
+     - a missing or empty `Location` header
+     - a public host redirecting to a loopback, private or link-local address, or to `localhost` (ADR-003)
    - Any other 3xx gives `serverError`. Any 2xx is a success.
    - User names and passwords in a redirect target are dropped, never sent.
-5. [ ] **Failures.**
+5. [x] **Failures.**
    - 404 and 410 → `notFound`.
    - Other 4xx and 5xx → `serverError`.
    - Refused connection, DNS, TLS and timeout failures → `unreachable`.
    - A body over 16 MiB, invalid UTF-8, or a declared charset other than UTF-8 or US-ASCII → `unreadable`.
    - Every web error shows the address it was for, plus a hint: a non-empty sentence saying what to try next. The content test asserts this for every web error code.
-6. [ ] **Links in a remote page.** Relative, root-relative and scheme-relative links resolve against the page's final URL. `.md`/`.markdown` links open in the app; other `http(s)` and `mailto:` links go to the system browser; `#fragment` links scroll.
-7. [ ] **Remote pages can't reach the disk.** `file:` links, drive-letter paths (`C:\x.md`) and UNC paths (`\\host\x.md`) are refused with the notice "Web pages can't open files on your computer." The page stays put, and nothing is read from disk. Bare absolute paths resolve as URLs on the same site.
-8. [ ] **Links in a local file.** An `http(s)` link to `.md`/`.markdown` opens in the app. Other web links still go to the system browser.
-9. [ ] **History and navigation.** Back, forward and reload work across files and pages, and between pages. Reload re-fetches. Remote visits go into History under their final URL and can be reopened from there.
-10. [ ] **Stale loads.** A fetch still running when the reader navigates away is ignored when it finishes.
+6. [x] **Links in a remote page.** Relative, root-relative and scheme-relative links resolve against the page's final URL. `.md`/`.markdown` links open in the app; other `http(s)` and `mailto:` links go to the system browser; `#fragment` links scroll.
+7. [x] **Remote pages can't reach the disk.** `file:` links, drive-letter paths (`C:\x.md`) and UNC paths (`\\host\x.md`) are refused with the notice "Web pages can't open files on your computer." The page stays put, and nothing is read from disk. Bare absolute paths resolve as URLs on the same site. A public page's Markdown link into the local network (loopback, private, link-local, `localhost`, however spelled) is refused with "Web pages can't open addresses on your local network." (added in step 8).
+8. [x] **Links in a local file.** An `http(s)` link to `.md`/`.markdown` opens in the app. Other web links still go to the system browser.
+9. [x] **History and navigation.** Back, forward and reload work across files and pages, and between pages. Reload re-fetches. Remote visits go into History under their final URL and can be reopened from there.
+10. [x] **Stale loads.** A fetch still running when the reader navigates away is ignored when it finishes.
 11. [x] **HTML stripping.** Raw HTML is stripped in files and pages, in paragraphs, headings (including the title), list items, table cells and link text. Tags, comments and declarations go, quoted attributes containing `>` included. The text between them stays. Code spans, fenced code and indented code are untouched.
 12. [ ] **CI.** `format`, `platform (ubuntu-22.04)`, `platform (ubuntu-24.04-arm)`, `platform (macos-latest)`, `platform (windows-latest)` and `ci` are all green (`.github/workflows/ci.yml`). The acceptance suite runs against a real HTTP server on 127.0.0.1 on all four platforms.
 
@@ -295,7 +300,7 @@ Feature: Browse remote Markdown
 - **New `ErrorCode`s** are `ServerError`, `Unreachable` and `BadRedirect`. Their keys and strings arrive in the same step as the codes, with an exhaustive content test.
 - **New `NoticeKind`**: `LocalFromWeb`, with the string "Web pages can't open files on your computer."
 - **Loading** already shows `content::LOADING` in the body. For pages it becomes "Loading example.com…". The address bar keeps the typed text on failure (as it does today), and Reload retries from an error.
-- **Shared test server**: `tests/support/http.rs`, std-only and about 80 lines. The acceptance world includes it with `mod`, and `services::web`'s unit tests include it with `#[cfg(test)] #[path = "../../tests/support/http.rs"]`. This avoids a test-only public API in the library and adds no dev-dependency.
+- **Shared test server**: `tests/support/http.rs`, std-only, about 120 lines. The acceptance world includes it with `mod`, and `services::web`'s unit tests include it with `#[cfg(test)] #[path = "../../tests/support/http.rs"]`. This avoids a test-only public API in the library and the server itself adds no dev-dependency (the gzip test in step 6 uses flate2).
 
 ## Steps
 
@@ -317,10 +322,10 @@ Replace `html_is_shown_as_literal_text_not_interpreted`. **Before GREEN**, list 
 **Files**: `src/model/html.rs` (new), `src/model/{mod,inlines,blocks}.rs`, `features/browse.feature`, `tests/acceptance/steps.rs`, the listed snapshots
 **Commit**: `feat(model): strip raw HTML and keep the text between tags`
 
-### Step 2: ADR-003, the HTTP client and URL handling, plus doctrine
+### Step 2: ADR-003, the HTTP client and URL handling, plus doctrine — done
 
 **Complexity**: trivial
-**GREEN**: Use `invest-adr` to record ureq 3 (blocking, which fits `background::run_blocking`; rustls with webpki roots, so no OpenSSL anywhere) and `url`. The alternatives are reqwest with tokio (a second runtime alongside iced's) and hand-rolled HTTP (no TLS). Costs to record: about 2 MB of binary, and corporate MITM proxies fail as `unreachable`. Also record the accepted **private-network risk**: a page can link to `http://192.168.x.x/…`, which is fetched only on a click, with no cookies. It is tracked as a follow-up.
+**GREEN**: Use `invest-adr` to record ureq 3 (blocking, which fits `background::run_blocking`; rustls with webpki roots, so no OpenSSL anywhere) and `url`. The alternatives are reqwest with tokio (a second runtime alongside iced's) and hand-rolled HTTP (no TLS). Costs to record: about 2 MB of binary, and corporate MITM proxies fail as `unreachable`. Also record the accepted **private-network risk**: a page can link to `http://192.168.x.x/…`, which is fetched only on a click, with no cookies. It is tracked as a follow-up. (Narrowed in step 8: public pages are now refused; see the ADR-003 amendment.)
 
 In ARCHITECTURE.md:
 - add `ureq` and `url` to the stack table
@@ -330,7 +335,7 @@ In ARCHITECTURE.md:
 **Files**: `vector/decisions/ADR-003-http-client.md`, `ARCHITECTURE.md`
 **Commit**: `docs(vector): choose ureq and url for remote documents (ADR-003)`
 
-### Step 3: Split `location.rs`, then add error codes
+### Step 3: Split `location.rs`, then add error codes — done
 
 **Complexity**: standard
 **RED**: A content test: every `ErrorCode` has a non-empty, distinct string, and so does every `NoticeKind`. It is iterated over an `ALL` list that a match keeps exhaustive. A unit test for `is_markdown_name`: `a.md` and `A.MARKDOWN` are accepted, case-insensitively. `a.md?x` and `a.txt` are rejected, because callers pass bare path names with any query already removed.
@@ -340,7 +345,8 @@ In ARCHITECTURE.md:
 - Add the strings, with what to try next:
   - `serverError`: "The site had a problem sending this page. Try again later."
   - `unreachable`: "Couldn't reach this site. Check your connection, then reload."
-  - `badRedirect`: "This site redirected somewhere that can't be followed safely."
+  - `badRedirect`: "This site redirected somewhere that can't be followed safely. Try opening the address in your web browser."
+  - `notMarkdown` (pages): "This page isn't Markdown. You can open it in your web browser instead." (reworded in step 9)
   - Pages only:
     - `notFound`: "There's no page at this address. Check it for typos."
     - `unreadable`: "This page couldn't be read as text. It may be too large or not in UTF-8."
@@ -349,7 +355,7 @@ In ARCHITECTURE.md:
 **Files**: `src/session/{error,address,location,mod}.rs`, `src/content.rs`
 **Commit**: `refactor(session): split addresses from locations and add web error codes`
 
-### Step 4: `Location` can be a web URL
+### Step 4: `Location` can be a web URL — done
 
 **Complexity**: standard
 **RED**: Unit tests:
@@ -363,7 +369,7 @@ The existing file tests still pass.
 **Files**: `Cargo.toml`, `src/session/location.rs`, `src/session/links.rs`, `src/services/runner.rs`, `src/ui/*` call sites
 **Commit**: `refactor(session): let a location be a file or a web URL`
 
-### Step 5: Web response policy, pure
+### Step 5: Web response policy, pure — done
 
 **Complexity**: complex (security-sensitive)
 **RED**: Unit tests in `session::web`:
@@ -376,7 +382,7 @@ The existing file tests still pass.
 **Files**: `src/session/web.rs` (new), `src/session/mod.rs`
 **Commit**: `feat(session): decide which web responses are Markdown`
 
-### Step 6: Fetch service
+### Step 6: Fetch service — done
 
 **Complexity**: complex (I/O, network, security)
 **RED**: Add `tests/support/http.rs`. Tests in `services::web` against it:
@@ -390,12 +396,18 @@ The existing file tests still pass.
 - a silent server times out as `unreachable`, using a short test timeout
 - a refused connection is `unreachable`: bind port 0, drop it, connect at once
 - **cookies:** the first response sets `Set-Cookie` and redirects, and the second request carries no `Cookie`
+- **from the step 5 security review:**
+  - a gzip body that inflates past the test limit is `unreadable`, because the cap applies after decompression
+  - a typed `https://user:pw@host/` sends no `Authorization` to a redirect target on another host; every hop is a fresh request carrying only `Accept`
+  - a `Location` header that isn't valid UTF-8 is `badRedirect`
 **GREEN**: Implement `fetch` with ureq. It does I/O only and calls `session::web` for every decision.
+- The hop number comes from the loop itself (`1..=MAX_REDIRECTS + 1`), so it can't be skipped.
+- Bytes are decoded with `String::from_utf8`, never unchecked; a UTF-8 BOM is dropped.
 **REFACTOR**: Share `MAX_BYTES` with `files`.
-**Files**: `Cargo.toml`, `src/services/{web,mod}.rs`, `tests/support/http.rs`
+**Files**: `Cargo.toml` (ureq; flate2 as a dev-dependency for the gzip test, already in the tree through ureq), `src/services/{web,mod,runner}.rs`, `src/session/web.rs` (`decode`), `tests/support/http.rs`
 **Commit**: `feat(services): fetch Markdown over http(s)`
 
-### Step 7: Typed web addresses load
+### Step 7: Typed web addresses load — done
 
 **Complexity**: complex (parse → reducer → runner → acceptance)
 **RED**:
@@ -426,7 +438,7 @@ The existing file tests still pass.
 **Files**: `src/session/{address,reducer,navigation,mod}.rs`, `src/services/runner.rs`, `src/content.rs`, `src/ui/app.rs`, `tests/acceptance/*`, `features/remote.feature`
 **Commit**: `feat(session): open Markdown by http(s) address`
 
-### Step 8: Links across sites
+### Step 8: Links across sites — done
 
 **Complexity**: complex (security-sensitive)
 **RED**: `links::classify` unit tests.
@@ -450,15 +462,15 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 **Files**: `src/session/{links,reducer,mod}.rs`, `features/remote.feature`, `tests/acceptance/steps*`
 **Commit**: `feat(session): follow Markdown links between sites`
 
-### Step 9: Open in browser
+### Step 9: Open in browser — done
 
 **Complexity**: standard
 **RED**: Reducer tests. `OpenInBrowser` emits `OpenExternal(url)` only for a web location in `Failed(NotMarkdown)`. These emit nothing: `Failed(NotFound)` on a web location, `NotMarkdown` on a file, `Ready` and `Loading`. Acceptance: "A page that isn't Markdown can go to the system browser" and "A local file that isn't Markdown offers no browser".
 **GREEN**: Add `Event::OpenInBrowser`. The error view gets a button using the toolbar's button style, with its label in `content`. For pages, `notMarkdown` reads "This page isn't Markdown. You can open it in your web browser instead."
-**Files**: `src/session/{mod,reducer}.rs`, `src/content.rs`, `src/ui/body.rs`, `tests/acceptance/steps*`
+**Files**: `src/session/{mod,reducer}.rs`, `src/content.rs`, `src/ui/body.rs`, `tests/acceptance/steps*`. Also, found while checking by hand: `services::files::from_command_line` turned a URL argument into a path; it now passes anything with a scheme through (`session::address::has_scheme`).
 **Commit**: `feat(ui): offer the system browser for pages that aren't Markdown`
 
-### Step 10: Docs and doctrine
+### Step 10: Docs and doctrine — done
 
 **Complexity**: trivial
 **GREEN**:
@@ -474,13 +486,13 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 
 ## Pre-PR Quality Gate (each PR)
 
-- [ ] `cargo test` passes (unit and acceptance)
-- [ ] `cargo build --release` passes
-- [ ] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass
-- [ ] `/code-review` passes, including `arch-review` (session may use `url`, and `services::web` matches ARCHITECTURE.md) and `a11y-review` on the new button
+- [x] `cargo test` passes (unit and acceptance)
+- [x] `cargo build --release` passes
+- [x] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass
+- [x] `/code-review` passes, including `arch-review` (session may use `url`, and `services::web` matches ARCHITECTURE.md) and `a11y-review` on the new button
 - [ ] Manual check (PR B): open `https://raw.githubusercontent.com/scripting/markdownWeb/main/readme.md` and `https://andrewshell.org/`, and follow a link from one page to another
 - [ ] All six CI checks are green
-- [ ] Documentation is updated
+- [x] Documentation is updated
 
 ## Risks & Open Questions
 
@@ -491,14 +503,17 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
   - scripting.com served HTML at `/` and reset the connection on a guessed `.md` path
 
   `application/octet-stream` is not accepted. If the manual check finds real pages served that way, widening the rule is a deliberate, test-first change.
-- **Private-network fetches.** These are accepted for 2a and recorded in ADR-003 as a follow-up (see step 2).
+- **Private-network fetches.** Narrowed in step 8 at the product owner's call: a public page can't open local-network addresses in the app, by link or redirect. Local files still may, and DNS rebinding is not caught (ADR-003, a follow-up).
 - **Plain `http`.** The full URL with its scheme is always in the address bar, but there is no "not secure" label yet. That label is a candidate follow-up, tracked in VECTOR open questions in step 10.
 - **No cache.** Back and forward re-fetch, so the reader sees "Loading…" briefly, and scroll position resets to the fragment or the top. That is fine for blog-sized posts.
 - **No stop button.** Navigating away makes a fetch stale, and the overall timeout is 30 s.
-- **Keyboard access.** iced buttons, including the existing toolbar ones, aren't Tab-focusable today. The new button matches the existing pattern, and `a11y-review` will flag the app-wide gap. Fixing it is separate work, not 2a.
+- **Keyboard access.** iced buttons, including the existing toolbar ones, aren't Tab-focusable today. The new button matches the existing pattern, and `a11y-review` flagged the app-wide gap. Fixing it is separate work, not 2a. Open in browser also has a shortcut, Ctrl/Cmd+Shift+O, so it never needs a pointer.
+- **Screen readers.** iced 0.14 has no live regions, so a switch to Loading or to an error isn't announced. A platform limit, tracked with the keyboard gap.
 - **The link's destination isn't shown before clicking** (in the app or in the browser). That is phase 4 or later.
 - **Addresses without a scheme** (`example.com/x.md`) stay `notAbsolute`. Auto-prefixing `https://` is a possible small follow-up.
 - **Script and style text** stays visible after stripping (ADR-002, accepted).
+- **Certificate failures look like outages** (step 6 security review). Every failure before a response, a bad certificate included, is `unreachable`. A separate `insecure` error would make a MITM visible; it is a follow-up, beside ADR-003's corporate-proxy note.
+- **Slow DNS leaves a thread behind.** ureq resolves on its own thread when a global timeout is set, so a stuck lookup outlives the fetch until the system resolver gives up. Bounded, and irrelevant at one fetch per click.
 - **Windows CI and loopback servers.** A refused connection is asserted with a bind-and-drop port. Timeouts are unit-tested only, with short test limits.
 
 ## Plan Review Summary

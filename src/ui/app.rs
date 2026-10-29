@@ -17,6 +17,7 @@ use crate::content;
 use crate::model::Document as Doc;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
+use crate::session::location::Location;
 use crate::session::{self, Event, Shown, State, Status};
 use crate::theme::{self, fonts};
 
@@ -211,6 +212,10 @@ impl App {
                 Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
             }
             Key::Character("h") if modifiers.command() => self.update(Message::ToggleHistory),
+            // The only keyboard route to the button; the session ignores it unless offered.
+            Key::Character("o" | "O") if modifiers.command() && modifiers.shift() => {
+                self.dispatch(Event::OpenInBrowser)
+            }
             _ => Task::none(),
         }
     }
@@ -251,8 +256,8 @@ impl App {
         let reader = theme::reading(state.settings.font);
         let main: Element<'_, Message> = match &state.status {
             Status::Idle => body::message(content::WELCOME),
-            Status::Loading => body::message(content::LOADING),
-            Status::Failed(code) => body::error(*code, state.address(), &reader),
+            Status::Loading => body::message(content::loading(state.current_location().and_then(Location::host))),
+            Status::Failed(code) => body::error(*code, state, &reader),
             Status::Ready(shown) => self.document_view(shown.clone()),
         };
         let background = reader.background;

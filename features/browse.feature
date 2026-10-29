@@ -27,7 +27,8 @@ Feature: Browse local Markdown files
       | input                         | code              |
       |                               | empty             |
       | notes/a.md                    | notAbsolute       |
-      | https://example.com/readme.md | unsupportedScheme |
+      | ftp://example.com/readme.md   | unsupportedScheme |
+      | http://                       | notAbsolute       |
 
   Scenario: Not a Markdown file is rejected before reading
     When I enter the absolute path of "data.txt"

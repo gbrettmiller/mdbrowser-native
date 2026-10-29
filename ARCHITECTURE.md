@@ -6,7 +6,7 @@ This file is the technical specification: layers, stack, conventions, structure 
 
 ## Stack
 
-Rust (edition 2024). Rationale: ADR-001.
+Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003.
 
 | Concern | Crate |
 |---|---|
@@ -16,6 +16,8 @@ Rust (edition 2024). Rationale: ADR-001.
 | Frontmatter | yaml-rust2 |
 | History and settings files | serde, serde_json |
 | Per-user data directory | dirs |
+| HTTP(S) fetching | ureq 3, with rustls and webpki roots; no cookies, redirects off |
+| URLs and relative-reference resolution | url |
 | Unit tests | `cargo test` (built-in), insta for golden layout snapshots |
 | Acceptance | Gherkin in `features/`, run by the `cucumber` crate (`tests/acceptance/`), with tempfile and futures |
 | Lint | rustfmt (`rustfmt.toml`) and clippy with `-D warnings` |
@@ -24,7 +26,7 @@ Fonts are bundled: `assets/fonts/` holds static Literata, Source Serif 4, iA Wri
 
 ## Rendering pipeline
 
-`fetch → parse → lay out → paint`. Each arrow is a pure function except fetch.
+`fetch → parse → lay out → paint`. Each arrow is a pure function except fetch, which reads a local file (`services::files`) or fetches a page over HTTP (`services::web`); `session::web` decides what to send and what each response means.
 
 ```
 bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, width)──▶ Page ──ui paint──▶ pixels
@@ -38,10 +40,10 @@ bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, wi
 |-------|----------|------|
 | **Model** | `src/model/` | Markdown source → owned document tree. Pure. Depends only on pulldown-cmark and yaml-rust2 (frontmatter). |
 | **Layout** | `src/layout/` | Tree + theme + width → `Page`; hit-testing, carets, selection and copy text. Pure apart from reading the shared font database. |
-| **Session** | `src/session/` | Address parsing, link classification, back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
+| **Session** | `src/session/` | Address parsing (files and `http(s)` URLs), link classification, web fetch policy (`Accept`, status, redirects, which responses are readable Markdown, and refusing a public page's way into the local network), back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
 | **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) and bundled fonts. Data only, with one exception: `fonts::install()` loads the bundled faces into iced's process-wide font system once at startup. |
 | **Content** | `src/content.rs` | All user-facing strings. |
-| **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net`, `std::process` or `std::thread`. |
+| **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `web` fetches a page through ureq: one fresh request per redirect hop carrying only `Accept`, fixed limits, and no cookies. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net` (only through ureq, in `web`), `std::process` or `std::thread`. |
 | **UI** | `src/ui/` | The iced application: dispatches events to the reducer, runs effects through `services::runner`, and draws state. Holds the document widget (paints a `Page`, turns input into messages) and the page cache. Owns no browsing logic. |
 
 Every module belongs to exactly one layer. If you're unsure where something goes, and it can be pure, put it in `model`, `layout` or `session`.
@@ -52,7 +54,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `services` may use `model`, `session` and `theme` value types (`ReadingFont`), never `ui`.
 - `content` may use `session` and `theme` enums, to key its strings. Only `ui` uses `content`.
 - `layout` may use `model` and `theme`.
-- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` (settings).
+- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` (settings), and the `url` crate for addresses.
 - Pure layers (`model`, `layout`, `session`, `theme`) never perform I/O and never use iced's runtime (`Task`, `Element`). Iced *value* types (`Color`, `Font`, `Rectangle`) are allowed.
 
 ## How to Add a Feature
@@ -88,5 +90,5 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `features/` — Gherkin acceptance scenarios
 - `corpus/` — sample Markdown documents for golden tests and manual checks
 - `scripts/shoot.sh` — screenshots documents in each font (Hyprland + grim). It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
-- `vector/` — Investiture doctrine tree: `decisions/`, `research/`, `schemas/`
+- `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`
 - `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check

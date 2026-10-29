@@ -1,4 +1,4 @@
-> **Status: deferred (2026-10-28).** Pick this up once web browsing (phase 2: `http(s)`, remote images) is implemented. Stage 1 (cross-platform CI and the platform fixes in the README) went ahead separately on `ci/cross-platform`; skip whatever of it is already done.
+> **Status: deferred (2026-10-28).** Pick this up once web browsing (phase 2) is implemented: 2a, remote documents, was built 2026-10-29; 2b, images, is next. Whether 2a alone is enough to start is the product owner's call. Stage 1 (cross-platform CI and the platform fixes in the README) went ahead separately on `ci/cross-platform`; skip whatever of it is already done.
 
 # mdbrowser-native — Downloadable releases for Linux, Windows and macOS
 

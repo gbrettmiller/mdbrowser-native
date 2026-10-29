@@ -3,7 +3,8 @@
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 
-use crate::session::location::ErrorCode;
+use crate::session::address::has_scheme;
+use crate::session::error::ErrorCode;
 
 /// Larger than any plausible document; guards against runaway reads.
 pub const MAX_BYTES: u64 = 16 * 1024 * 1024;
@@ -47,14 +48,29 @@ fn open_without_blocking(path: &Path) -> std::io::Result<std::fs::File> {
     std::fs::File::open(path)
 }
 
-/// A path given on the command line, made absolute against the working directory.
+/// An address given on the command line: a URL as is, a path made absolute against the working directory.
 pub fn from_command_line(argument: &str) -> String {
+    if has_scheme(argument) {
+        return argument.to_string(); // a URL, not a path
+    }
     std::path::absolute(argument).map_or_else(|_| argument.to_string(), |path| path.display().to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn addresses_with_a_scheme_pass_through_the_command_line() {
+        for argument in ["https://x.org/a.md", "HTTP://x.org/", "file:///x/a.md", "ftp://x.org/a.md"] {
+            assert_eq!(from_command_line(argument), argument);
+        }
+    }
+
+    #[test]
+    fn paths_on_the_command_line_become_absolute() {
+        assert!(std::path::Path::new(&from_command_line("notes/a.md")).is_absolute());
+    }
 
     #[test]
     fn maps_read_failures_to_error_codes() {

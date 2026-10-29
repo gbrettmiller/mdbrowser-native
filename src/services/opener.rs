@@ -1,6 +1,6 @@
 //! Hands http(s) and mailto links to the system, never through a shell.
 
-use crate::session::location::decode;
+use crate::session::address::decode;
 
 /// Defence in depth on top of `session::links`: only web and mail URLs, with no
 /// characters a shell or launcher could reinterpret, and no mail attachments.

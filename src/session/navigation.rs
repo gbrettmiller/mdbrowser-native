@@ -1,7 +1,8 @@
 //! The back/forward stack. Entries keep what was typed, so an address that
-//! failed to parse can still be revisited (and fail again) like any other.
+//! failed to parse can still be revisited (and fail again) like any other,
+//! until a redirect settles an entry on its final address.
 
-use super::location::Target;
+use super::location::{Location, Target};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
@@ -37,6 +38,17 @@ impl Navigation {
         let kept = if self.entries.is_empty() { 0 } else { self.index + 1 };
         let entries: Vec<Entry> = self.entries.into_iter().take(kept).chain([entry]).collect();
         Navigation { index: entries.len() - 1, entries }
+    }
+
+    /// The current entry now lives at `location` (a redirect's end), keeping its fragment.
+    pub fn settle(mut self, location: Location) -> Self {
+        if let Some(entry) = self.entries.get_mut(self.index)
+            && let Some(target) = entry.target.take()
+        {
+            let target = Target { location, ..target };
+            *entry = Entry { input: target.location.address(), target: Some(target) };
+        }
+        self
     }
 
     pub fn back(self) -> Self {
@@ -85,6 +97,36 @@ mod tests {
         let nav = Navigation::default().push(entry("a")).push(entry("b")).back().push(entry("c"));
         assert_eq!(inputs(&nav), ["a", "c"]);
         assert!(!nav.can_go_forward());
+    }
+
+    fn web(url: &str) -> Location {
+        Location::web(url::Url::parse(url).unwrap())
+    }
+
+    fn targeted(url: &str, fragment: Option<&str>) -> Entry {
+        let target = Target { location: web(url), fragment: fragment.map(str::to_string) };
+        Entry { input: target.location.address(), target: Some(target) }
+    }
+
+    #[test]
+    fn settling_moves_the_current_entry_to_its_final_location() {
+        let nav = Navigation::default().push(entry("a")).push(targeted("https://x.org/old.md", Some("intro")));
+        let nav = nav.settle(web("https://x.org/new.md"));
+        assert_eq!(nav.current(), Some(&targeted("https://x.org/new.md", Some("intro"))));
+        assert_eq!(nav.back().current(), Some(&entry("a")));
+    }
+
+    #[test]
+    fn settling_an_entry_without_a_target_changes_nothing() {
+        let nav = Navigation::default().push(entry("typo"));
+        assert_eq!(nav.clone().settle(web("https://x.org/a.md")), nav);
+        assert_eq!(Navigation::default().settle(web("https://x.org/a.md")), Navigation::default());
+    }
+
+    #[test]
+    fn settling_where_it_already_is_changes_nothing() {
+        let nav = Navigation::default().push(targeted("https://x.org/a.md", None));
+        assert_eq!(nav.clone().settle(web("https://x.org/a.md")), nav);
     }
 
     #[test]

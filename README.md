@@ -4,17 +4,21 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 1, local files only. Remote (`http(s)`) browsing, front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 2a, local files and remote Markdown over `http(s)`. Images (phase 2b), front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## What it does today
 
 - Opens local Markdown by path, `~/` path or `file://` URL, and follows links between `.md` files.
+- Opens Markdown on the web by `http://` or `https://` address. It asks the site for Markdown first, so some sites serve it even at addresses without `.md`: try `https://andrewshell.org/`. Redirects are followed, and the address bar shows where the page ended up.
+- Follows links between `.md` pages across sites, and from local files to the web. A web page can never open files on your computer, or addresses on your local network.
+- A web page that turns out not to be Markdown can be handed to your web browser with **Open in browser**.
 - Renders CommonMark plus GitHub tables, task lists and strikethrough. In-page `#anchors` use GitHub heading slugs.
 - Takes the window title from front matter `title`, then the first heading, then the file name.
 - Back, forward, reload, and a History panel that persists across restarts.
 - Four bundled reading faces: Literata (default), Source Serif 4, iA Writer Quattro and Inter. Code is set in JetBrains Mono.
 - Select text with the mouse and copy it with Ctrl+C.
-- `http`, `https` and `mailto` links open in your system's handler. Other schemes are blocked.
+- Other `http` and `https` links, and `mailto` links, open in your system's handler. Other schemes are blocked.
+- Raw HTML in a document is stripped, never interpreted: the tags go and the text between them stays.
 
 ## Build from source
 
@@ -35,7 +39,7 @@ cd mdbrowser-native
 cargo run --release -- corpus/index.md
 ```
 
-The first build takes a few minutes. The app ends up at `target/release/mdbrowser` (`mdbrowser.exe` on Windows); pass it a path to a `.md` file, or start it with none and type a path in the address bar.
+The first build takes a few minutes. The app ends up at `target/release/mdbrowser` (`mdbrowser.exe` on Windows). Pass it a path to a `.md` file or a web address (`target/release/mdbrowser https://andrewshell.org/`), or start it with none and type one in the address bar.
 
 ### Keyboard
 
@@ -45,6 +49,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Reload | Ctrl+R or F5 | Cmd+R or F5 |
 | Focus the address bar | Ctrl+L | Cmd+L |
 | Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
+| Open a page that isn't Markdown in your browser | Ctrl+Shift+O | Cmd+Shift+O |
 | Select all / copy | Ctrl+A / Ctrl+C | Cmd+A / Cmd+C |
 
 ### Where your data lives
