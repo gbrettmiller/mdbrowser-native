@@ -40,6 +40,8 @@ struct State {
     head: Option<Caret>,
     dragging: bool,
     hovered: Option<String>,
+    /// Highlight rectangles for the current selection, rebuilt only when it changes.
+    highlight: Vec<Rectangle>,
 }
 
 fn page_id(page: &Arc<Page>) -> usize {
@@ -58,6 +60,11 @@ pub fn visible<'p, T>(
 impl<Message> Document<'_, Message> {
     fn selection(&self, state: &State) -> Option<(Caret, Caret)> {
         state.anchor.zip(state.head).filter(|(a, b)| a != b)
+    }
+
+    fn select(&self, state: &mut State, anchor: Option<Caret>, head: Option<Caret>) {
+        (state.anchor, state.head) = (anchor, head);
+        state.highlight = self.selection(state).map(|(a, b)| self.page.highlight(a, b)).unwrap_or_default();
     }
 
     fn local(point: Point, bounds: Rectangle) -> Point {
@@ -100,9 +107,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
         for fill in visible(&self.page.fills, |fill| fill.bounds, in_page) {
             renderer.fill_quad(Quad { bounds: fill.bounds + offset, ..Quad::default() }, fill.color);
         }
-        if let Some((a, b)) = self.selection(state).filter(|_| state.page == page_id(&self.page)) {
-            for rect in self.page.highlight(a, b).into_iter().filter(|rect| rect.intersects(&in_page)) {
-                renderer.fill_quad(Quad { bounds: rect + offset, ..Quad::default() }, self.theme.selection);
+        if state.page == page_id(&self.page) {
+            for rect in visible(&state.highlight, |rect| *rect, in_page) {
+                renderer.fill_quad(Quad { bounds: *rect + offset, ..Quad::default() }, self.theme.selection);
             }
         }
         for text in visible(&self.page.texts, |text| text.bounds, in_page) {
@@ -137,8 +144,8 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
                 if let Some(href) = self.page.link_at(point) {
                     shell.publish((self.on_follow)(href.to_string()));
                 } else {
-                    state.anchor = self.page.caret_at(point);
-                    state.head = state.anchor;
+                    let caret = self.page.caret_at(point);
+                    self.select(state, caret, caret);
                     state.dragging = true;
                     shell.request_redraw();
                 }
@@ -147,14 +154,15 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => state.dragging = false,
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 if state.dragging {
-                    state.head = self.page.caret_at(Self::local(*position, bounds));
+                    let head = self.page.caret_at(Self::local(*position, bounds));
+                    self.select(state, state.anchor, head);
                     shell.request_redraw();
                     return;
                 }
-                let hovered = cursor.position_in(bounds).and_then(|p| self.page.link_at(p)).map(str::to_string);
-                if hovered != state.hovered {
-                    state.hovered = hovered.clone();
-                    shell.publish((self.on_hover)(hovered));
+                let hovered = cursor.position_in(bounds).and_then(|p| self.page.link_at(p));
+                if hovered != state.hovered.as_deref() {
+                    state.hovered = hovered.map(str::to_string);
+                    shell.publish((self.on_hover)(state.hovered.clone()));
                 }
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key: Key::Character(c), modifiers, .. })
@@ -169,7 +177,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
                     }
                     "a" => {
                         if let Some((a, b)) = self.page.everything() {
-                            (state.anchor, state.head) = (Some(a), Some(b));
+                            self.select(state, Some(a), Some(b));
                             shell.request_redraw();
                             shell.capture_event();
                         }

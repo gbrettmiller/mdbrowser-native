@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use iced::Task;
 
 use super::store::{Store, Ticket};
-use super::{files, opener};
+use super::{background, files, opener};
 use crate::session::{Effect, Event};
 
 fn now() -> u64 {
@@ -23,7 +23,7 @@ fn in_background(
     match store {
         Some(store) => {
             let ticket = store.ticket();
-            Task::perform(async move { save(&store, ticket) }, |result| {
+            Task::perform(background::run_blocking(move || save(&store, ticket)), |result| {
                 if let Err(error) = result {
                     eprintln!("mdbrowser: couldn't save: {error}");
                 }
@@ -37,11 +37,11 @@ fn in_background(
 pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
     match effect {
         Effect::Load { request_id, location } => {
-            Task::perform(async move { files::read_markdown(location.path()) }, move |result| {
+            Task::perform(background::run_blocking(move || files::read_markdown(location.path())), move |result| {
                 Some(Event::Loaded { request_id, result, now: now() })
             })
         }
-        Effect::OpenExternal(url) => Task::perform(async move { opener::open(&url) }, |result| {
+        Effect::OpenExternal(url) => Task::perform(background::run_blocking(move || opener::open(&url)), |result| {
             result.err().map(|error| {
                 eprintln!("mdbrowser: {error}");
                 Event::OpenerFailed
