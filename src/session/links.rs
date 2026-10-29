@@ -57,13 +57,14 @@ pub fn classify(href: &str, current: &Location) -> Link {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session::location::{native, native_url};
 
     fn here() -> Location {
-        Location::file("/docs/a/index.md")
+        Location::file(native("/docs/a/index.md"))
     }
 
     fn navigate(path: &str, fragment: Option<&str>) -> Link {
-        Link::Navigate(Target { location: Location::file(path), fragment: fragment.map(str::to_string) })
+        Link::Navigate(Target { location: Location::file(native(path)), fragment: fragment.map(str::to_string) })
     }
 
     #[test]
@@ -71,8 +72,17 @@ mod tests {
         assert_eq!(classify("../b/page.md#intro", &here()), navigate("/docs/b/page.md", Some("intro")));
         assert_eq!(classify("notes.md", &here()), navigate("/docs/a/notes.md", None));
         assert_eq!(classify("/abs/c.markdown", &here()), navigate("/abs/c.markdown", None));
-        assert_eq!(classify("file:///x/b.md", &here()), navigate("/x/b.md", None));
+        assert_eq!(classify(&native_url("/x/b.md"), &here()), navigate("/x/b.md", None));
         assert_eq!(classify("my%20notes.md", &here()), navigate("/docs/a/my notes.md", None));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_links_resolve_to_drive_paths() {
+        let expected = |path: &str| Link::Navigate(Target { location: Location::file(path), fragment: None });
+        assert_eq!(classify("file:///C:/x/b.md", &here()), expected("C:\\x\\b.md"));
+        assert_eq!(classify("..\\b\\page.md", &here()), expected("C:\\docs\\b\\page.md"));
+        assert_eq!(classify("/abs/c.md", &here()), expected("C:\\abs\\c.md"));
     }
 
     #[test]
