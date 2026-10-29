@@ -2,9 +2,8 @@
 
 use std::path::Path;
 
-use super::location::{
-    Location, Target, decode, is_markdown, is_network_path, normalise, parse_file_url, scheme_of, split_reference,
-};
+use super::address::{decode, is_network_path, normalise, parse_file_url, scheme_of, split_reference};
+use super::location::{Location, Target, is_markdown};
 
 const EXTERNAL_SCHEMES: [&str; 3] = ["http", "https", "mailto"];
 
@@ -33,7 +32,7 @@ fn local_target(reference: &str, current: &Location) -> Option<(String, Option<S
     if path.is_empty() || is_network_path(&path) {
         return None;
     }
-    let directory = current.path().parent().unwrap_or(Path::new("/"));
+    let directory = current.as_file()?.parent().unwrap_or(Path::new("/")); // web bases arrive in step 8
     Some((directory.join(path).display().to_string(), fragment))
 }
 
@@ -57,7 +56,7 @@ pub fn classify(href: &str, current: &Location) -> Link {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::location::{native, native_url};
+    use crate::session::address::{native, native_url};
 
     fn here() -> Location {
         Location::file(native("/docs/a/index.md"))

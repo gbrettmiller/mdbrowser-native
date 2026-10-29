@@ -2,8 +2,9 @@
 
 use std::sync::Arc;
 
+use super::address::parse_address;
+use super::error::ErrorCode;
 use super::links::{self, Link};
-use super::location::{ErrorCode, parse_address};
 use super::navigation::{Entry, Navigation};
 use super::visits;
 use super::{Effect, Event, Notice, NoticeKind, Settings, Shown, State, Status};

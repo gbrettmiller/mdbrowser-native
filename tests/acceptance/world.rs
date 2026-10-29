@@ -95,7 +95,7 @@ impl Browser {
     fn run(&mut self, effect: Effect) {
         match effect {
             Effect::Load { request_id, location } => {
-                let path = location.path().to_path_buf();
+                let path = location.as_file().expect("a file location").to_path_buf();
                 if self.held.contains(&path) {
                     self.parked.push((request_id, path));
                 } else {

@@ -8,6 +8,8 @@ use iced::Task;
 
 use super::store::{Store, Ticket};
 use super::{background, files, opener};
+use crate::session::error::ErrorCode;
+use crate::session::location::Location;
 use crate::session::{Effect, Event};
 
 fn now() -> u64 {
@@ -37,7 +39,11 @@ fn in_background(
 pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
     match effect {
         Effect::Load { request_id, location } => {
-            Task::perform(background::run_blocking(move || files::read_markdown(location.path())), move |result| {
+            let load = move || match location {
+                Location::File(path) => files::read_markdown(&path),
+                Location::Web(_) => Err(ErrorCode::Unreachable), // fetching arrives with services::web
+            };
+            Task::perform(background::run_blocking(load), move |result| {
                 Some(Event::Loaded { request_id, result, now: now() })
             })
         }

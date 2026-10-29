@@ -3,7 +3,7 @@
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 
-use crate::session::location::ErrorCode;
+use crate::session::error::ErrorCode;
 
 /// Larger than any plausible document; guards against runaway reads.
 pub const MAX_BYTES: u64 = 16 * 1024 * 1024;

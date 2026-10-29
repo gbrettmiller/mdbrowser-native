@@ -1,7 +1,7 @@
 //! Every user-facing string.
 
 use crate::session::NoticeKind;
-use crate::session::location::ErrorCode;
+use crate::session::error::ErrorCode;
 use crate::theme::ReadingFont;
 
 pub fn error(code: ErrorCode) -> &'static str {

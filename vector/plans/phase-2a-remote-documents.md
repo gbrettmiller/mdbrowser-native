@@ -350,7 +350,7 @@ In ARCHITECTURE.md:
 **Files**: `src/session/{error,address,location,mod}.rs`, `src/content.rs`
 **Commit**: `refactor(session): split addresses from locations and add web error codes`
 
-### Step 4: `Location` can be a web URL
+### Step 4: `Location` can be a web URL — done
 
 **Complexity**: standard
 **RED**: Unit tests:

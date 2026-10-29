@@ -1,7 +1,7 @@
 //! The browsing session as a pure reducer: `step(state, event) → (state, effects)`.
 //! Effects are data; `services::runner` executes them and feeds results back as events.
 
-mod address;
+pub mod address;
 pub mod error;
 pub mod links;
 pub mod location;
@@ -16,7 +16,8 @@ use std::sync::Arc;
 
 use crate::model::Document;
 use crate::theme::ReadingFont;
-use location::{ErrorCode, Location};
+use error::ErrorCode;
+use location::Location;
 use navigation::Navigation;
 use visits::Visit;
 
@@ -127,7 +128,7 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::location::native;
+    use crate::session::address::native;
 
     fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
         events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))

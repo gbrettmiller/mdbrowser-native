@@ -6,7 +6,7 @@ use iced::{Element, Fill};
 
 use super::app::Message;
 use crate::content;
-use crate::session::location::ErrorCode;
+use crate::session::error::ErrorCode;
 use crate::session::{Event, Notice};
 use crate::theme;
 

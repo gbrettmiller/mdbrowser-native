@@ -2,19 +2,18 @@
 
 use std::path::{Path, PathBuf};
 
-pub(crate) use super::address::decode;
-pub use super::address::parse_address;
-pub(super) use super::address::{is_network_path, normalise, parse_file_url, scheme_of, split_reference};
-#[cfg(test)]
-pub(crate) use super::address::{native, native_url};
-pub use super::error::ErrorCode;
+use url::Url;
+
+use super::address::decode;
 
 const MARKDOWN_EXTENSIONS: [&str; 2] = ["md", "markdown"];
 
-/// A Markdown document's home. Phase 1 knows only local files.
+/// A Markdown document's home: a local file or a web page. Build web locations
+/// with `Location::web`, which keeps the fragment out (it lives on `Target`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Location {
-    path: PathBuf,
+pub enum Location {
+    File(PathBuf),
+    Web(Url),
 }
 
 /// A location plus the in-page anchor to scroll to, if any.
@@ -26,21 +25,40 @@ pub struct Target {
 
 impl Location {
     pub fn file(path: impl Into<PathBuf>) -> Self {
-        Location { path: path.into() }
+        Location::File(path.into())
     }
 
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn web(mut url: Url) -> Self {
+        url.set_fragment(None);
+        Location::Web(url)
     }
 
-    /// What the address bar shows.
+    pub fn as_file(&self) -> Option<&Path> {
+        match self {
+            Location::File(path) => Some(path),
+            Location::Web(_) => None,
+        }
+    }
+
+    /// What the address bar shows: the path, or the full URL.
     pub fn address(&self) -> String {
-        self.path.display().to_string()
+        match self {
+            Location::File(path) => path.display().to_string(),
+            Location::Web(url) => url.to_string(),
+        }
     }
 
-    /// Title of last resort: the file name.
+    /// Title of last resort: the file name, the URL's last path segment, or its host.
     pub fn label(&self) -> String {
-        self.path.file_name().map_or_else(|| self.address(), |name| name.to_string_lossy().into_owned())
+        let name = match self {
+            Location::File(path) => path.file_name().map(|name| name.to_string_lossy().into_owned()),
+            Location::Web(url) => url
+                .path_segments()
+                .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+                .map(decode)
+                .or_else(|| url.host_str().map(str::to_string)),
+        };
+        name.unwrap_or_else(|| self.address())
     }
 }
 
@@ -73,5 +91,36 @@ mod tests {
     #[test]
     fn label_is_the_file_name() {
         assert_eq!(Location::file("/x/notes/a.md").label(), "a.md");
+    }
+
+    fn web(url: &str) -> Location {
+        Location::web(Url::parse(url).unwrap())
+    }
+
+    #[test]
+    fn web_locations_have_no_fragment() {
+        assert_eq!(web("https://example.com/a.md#intro").address(), "https://example.com/a.md");
+        assert_eq!(web("https://example.com/a.md#intro"), web("https://example.com/a.md"));
+        assert_ne!(web("https://example.com/a.md"), web("https://example.com/b.md"));
+    }
+
+    #[test]
+    fn web_addresses_are_the_full_url() {
+        assert_eq!(web("HTTP://Example.COM/a.md?v=1").address(), "http://example.com/a.md?v=1");
+        assert_eq!(web("https://example.com").address(), "https://example.com/");
+    }
+
+    #[test]
+    fn web_labels_are_the_last_segment_or_the_host() {
+        assert_eq!(web("https://example.com/docs/guide.md").label(), "guide.md");
+        assert_eq!(web("https://example.com/docs/my%20notes.md").label(), "my notes.md");
+        assert_eq!(web("https://example.com/docs/").label(), "docs");
+        assert_eq!(web("https://example.com/").label(), "example.com");
+    }
+
+    #[test]
+    fn only_file_locations_have_a_path() {
+        assert_eq!(Location::file("/x/a.md").as_file(), Some(Path::new("/x/a.md")));
+        assert_eq!(web("https://example.com/a.md").as_file(), None);
     }
 }
