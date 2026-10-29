@@ -7,6 +7,7 @@ use super::error::ErrorCode;
 use super::links::{self, Link};
 use super::navigation::{Entry, Navigation};
 use super::visits;
+use super::web::Origin;
 use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status};
 use crate::model;
 
@@ -53,8 +54,8 @@ pub fn step(state: State, event: Event) -> Step {
 /// otherwise the raw input, so the error can be shown and revisited.
 fn entry_for(input: &str, state: &State) -> Entry {
     match parse_address(input, &state.home) {
-        Ok(target) => Entry { input: target.location.address(), target: Some(target) },
-        Err(_) => Entry { input: input.to_string(), target: None },
+        Ok(target) => Entry { input: target.location.address(), target: Some(target), origin: Origin::Trusted },
+        Err(_) => Entry { input: input.to_string(), target: None, origin: Origin::Trusted },
     }
 }
 
@@ -77,7 +78,7 @@ fn enter(state: State, entry: Entry) -> Step {
     match entry.target {
         Some(target) => {
             let state = State { request_id, pending: Some(request_id), status: Status::Loading, ..state };
-            (state, vec![Effect::Load { request_id, location: target.location }])
+            (state, vec![Effect::Load { request_id, location: target.location, origin: entry.origin }])
         }
         None => {
             let code = parse_address(&entry.input, &state.home).err().unwrap_or(ErrorCode::NotAbsolute);
@@ -114,7 +115,10 @@ fn follow(state: State, href: &str) -> Step {
         return none(state);
     };
     match links::classify(href, location) {
-        Link::Navigate(target) => navigate_to(state, Entry { input: target.location.address(), target: Some(target) }),
+        Link::Navigate(target) => {
+            let origin = Origin::of(location);
+            navigate_to(state, Entry { input: target.location.address(), target: Some(target), origin })
+        }
         Link::Scroll(fragment) => none(State { fragment: Some(fragment), ..state }),
         Link::External(url) => (state, vec![Effect::OpenExternal(url)]),
         Link::LocalFromWeb => notice(state, NoticeKind::LocalFromWeb),

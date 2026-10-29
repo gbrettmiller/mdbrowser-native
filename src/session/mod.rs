@@ -101,7 +101,7 @@ pub enum Event {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
-    Load { request_id: u64, location: Location },
+    Load { request_id: u64, location: Location, origin: web::Origin },
     OpenExternal(String),
     PersistVisits(Vec<Visit>),
     PersistSettings(Settings),

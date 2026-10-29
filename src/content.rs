@@ -16,6 +16,7 @@ pub fn error(code: ErrorCode) -> &'static str {
         ErrorCode::ServerError => "The site had a problem sending this page.",
         ErrorCode::Unreachable => "Couldn't reach this site.",
         ErrorCode::BadRedirect => "This site redirected somewhere that can't be followed safely.",
+        ErrorCode::LocalAddress => "This address leads into your local network.",
     }
 }
 
@@ -30,6 +31,9 @@ pub fn web_error(code: ErrorCode) -> Option<(&'static str, &'static str)> {
         ErrorCode::ServerError => Some((error(code), "Try again later.")),
         ErrorCode::Unreachable => Some((error(code), "Check your connection, then reload.")),
         ErrorCode::BadRedirect => Some((error(code), "Try opening the address in your web browser.")),
+        ErrorCode::LocalAddress => {
+            Some((error(code), "Links from web pages can't open it. Type the address yourself if you trust it."))
+        }
     }
 }
 
@@ -109,13 +113,14 @@ mod tests {
     use super::*;
 
     /// Every error a fetch can end in; the rest are about the typed address.
-    const WEB_ERRORS: [ErrorCode; 6] = [
+    const WEB_ERRORS: [ErrorCode; 7] = [
         ErrorCode::NotMarkdown,
         ErrorCode::NotFound,
         ErrorCode::Unreadable,
         ErrorCode::ServerError,
         ErrorCode::Unreachable,
         ErrorCode::BadRedirect,
+        ErrorCode::LocalAddress,
     ];
 
     fn distinct_and_non_empty(strings: &[&str]) {

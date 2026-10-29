@@ -12,11 +12,12 @@ pub enum ErrorCode {
     ServerError,
     Unreachable,
     BadRedirect,
+    LocalAddress,
 }
 
 impl ErrorCode {
     /// Every code, for exhaustive content tests; `key` fails to compile until a new code is handled.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Empty,
         Self::NotAbsolute,
         Self::UnsupportedScheme,
@@ -26,6 +27,7 @@ impl ErrorCode {
         Self::ServerError,
         Self::Unreachable,
         Self::BadRedirect,
+        Self::LocalAddress,
     ];
 
     pub const fn key(self) -> &'static str {
@@ -39,6 +41,7 @@ impl ErrorCode {
             Self::ServerError => "serverError",
             Self::Unreachable => "unreachable",
             Self::BadRedirect => "badRedirect",
+            Self::LocalAddress => "localAddress",
         }
     }
 }

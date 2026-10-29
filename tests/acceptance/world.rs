@@ -11,6 +11,7 @@ use mdbrowser::services::store::Store;
 use mdbrowser::services::web::Limits;
 use mdbrowser::session::location::Location;
 use mdbrowser::session::visits::Visit;
+use mdbrowser::session::web::Origin;
 use mdbrowser::session::{Effect, Event, State, step};
 use tempfile::TempDir;
 use url::Url;
@@ -84,7 +85,7 @@ pub struct Browser {
     pub opener_fails: bool,
     /// Loads of these locations wait until released.
     held: HashSet<Location>,
-    parked: Vec<(u64, Location)>,
+    parked: Vec<(u64, Location, Origin)>,
     pub server: Server,
     /// What the server answers, by path; anything else is a 404.
     pub routes: Arc<Mutex<HashMap<String, Reply>>>,
@@ -165,11 +166,11 @@ impl Browser {
 
     fn run(&mut self, effect: Effect) {
         match effect {
-            Effect::Load { request_id, location } => {
+            Effect::Load { request_id, location, origin } => {
                 if self.held.contains(&location) {
-                    self.parked.push((request_id, location));
+                    self.parked.push((request_id, location, origin));
                 } else {
-                    self.finish_load(request_id, location);
+                    self.finish_load(request_id, location, origin);
                 }
             }
             Effect::OpenExternal(url) => {
@@ -189,7 +190,7 @@ impl Browser {
     }
 
     /// Loads through the app's own `runner::load`, with a lowered size limit.
-    fn finish_load(&mut self, request_id: u64, location: Location) {
+    fn finish_load(&mut self, request_id: u64, location: Location, origin: Origin) {
         match &location {
             Location::File(path) => self.reads.push(path.clone()),
             Location::Web(url) => {
@@ -197,7 +198,7 @@ impl Browser {
             }
         }
         self.clock += 1;
-        let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() });
+        let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() }, origin);
         self.send(Event::Loaded { request_id, result, now: self.clock });
     }
 
@@ -210,10 +211,10 @@ impl Browser {
     pub fn release(&mut self, name: &str) {
         let location = self.location_named(name);
         self.held.remove(&location);
-        let (ready, still): (Vec<_>, Vec<_>) = self.parked.drain(..).partition(|(_, held)| *held == location);
+        let (ready, still): (Vec<_>, Vec<_>) = self.parked.drain(..).partition(|(_, held, _)| *held == location);
         assert_eq!(ready.len(), 1, "exactly one load of {name} was waiting");
         self.parked = still;
-        ready.into_iter().for_each(|(id, p)| self.finish_load(id, p));
+        ready.into_iter().for_each(|(id, held, origin)| self.finish_load(id, held, origin));
     }
 
     pub fn restart(&mut self) {

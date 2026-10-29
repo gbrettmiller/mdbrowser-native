@@ -3,6 +3,7 @@
 use super::*;
 use crate::session::address::native;
 use crate::session::images::ImageLoading;
+use crate::session::web::Origin;
 
 fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
     events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))
@@ -35,7 +36,10 @@ fn history(effects: &[Effect]) -> Vec<String> {
 fn entering_an_address_requests_a_load_and_waits() {
     let (state, effects) = run([Event::Enter(native("/d/a.md"))]);
     assert_eq!(state.status, Status::Loading);
-    assert_eq!(effects, [Effect::Load { request_id: 1, location: Location::file(native("/d/a.md")) }]);
+    assert_eq!(
+        effects,
+        [Effect::Load { request_id: 1, location: Location::file(native("/d/a.md")), origin: Origin::Trusted }]
+    );
 }
 
 #[test]
@@ -59,7 +63,7 @@ fn stale_loads_are_ignored() {
 fn entering_a_web_address_requests_a_load_and_waits() {
     let (state, effects) = run([Event::Enter("https://x.org/a.md".into())]);
     assert_eq!(state.status, Status::Loading);
-    assert_eq!(effects, [Effect::Load { request_id: 1, location: web("https://x.org/a.md") }]);
+    assert_eq!(effects, [Effect::Load { request_id: 1, location: web("https://x.org/a.md"), origin: Origin::Trusted }]);
 }
 
 #[test]
@@ -109,14 +113,20 @@ fn a_failed_web_load_keeps_the_typed_address_and_records_nothing() {
 fn going_back_to_or_reloading_a_settled_entry_loads_its_final_address() {
     let (_, effects) =
         run([Event::Enter("https://x.org/old.md".into()), fetched(1, "https://x.org/new.md", "# New"), Event::Reload]);
-    assert_eq!(effects, [Effect::Load { request_id: 2, location: web("https://x.org/new.md") }]);
+    assert_eq!(
+        effects,
+        [Effect::Load { request_id: 2, location: web("https://x.org/new.md"), origin: Origin::Trusted }]
+    );
     let (_, effects) = run([
         Event::Enter("https://x.org/old.md".into()),
         fetched(1, "https://x.org/new.md", "# New"),
         Event::Enter("https://x.org/c.md".into()),
         Event::Back,
     ]);
-    assert_eq!(effects, [Effect::Load { request_id: 3, location: web("https://x.org/new.md") }]);
+    assert_eq!(
+        effects,
+        [Effect::Load { request_id: 3, location: web("https://x.org/new.md"), origin: Origin::Trusted }]
+    );
 }
 
 #[test]
@@ -187,4 +197,49 @@ fn choosing_how_web_images_load_persists_it_and_keeps_the_font() {
         run([Event::ChooseFont(ReadingFont::Inter), Event::ChooseImageLoading(ImageLoading::OnClick)]);
     let settings = Settings { font: ReadingFont::Inter, images: ImageLoading::OnClick };
     assert_eq!((state.settings, effects), (settings, vec![Effect::PersistSettings(settings)]));
+}
+
+fn load_origins(effects: &[Effect]) -> Vec<Origin> {
+    effects
+        .iter()
+        .filter_map(|effect| match effect {
+            Effect::Load { origin, .. } => Some(*origin),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn typed_and_reopened_addresses_are_trusted() {
+    let (_, effects) = run([Event::Enter("https://x.org/a.md".into())]);
+    assert_eq!(load_origins(&effects), [Origin::Trusted]);
+    let (_, effects) = run([Event::OpenHistory("https://x.org/a.md".into())]);
+    assert_eq!(load_origins(&effects), [Origin::Trusted]);
+}
+
+#[test]
+fn links_from_a_public_page_are_public_and_keep_it_on_reload_and_back() {
+    let opened = [Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")];
+    let (state, effects) = run(opened.clone().into_iter().chain([Event::Follow("b.md".into())]));
+    assert_eq!(load_origins(&effects), [Origin::Public]);
+    let (state, effects) = step(state, Event::Reload);
+    assert_eq!(load_origins(&effects), [Origin::Public]);
+    let (state, _) = step(state, loaded_at(3, web("https://x.org/b.md"), "# B"));
+    let (state, effects) = step(state, Event::Back);
+    assert_eq!(load_origins(&effects), [Origin::Trusted], "a.md was typed");
+    let (_, effects) = step(state, Event::Forward);
+    assert_eq!(load_origins(&effects), [Origin::Public]);
+}
+
+#[test]
+fn links_from_local_files_and_local_pages_are_trusted() {
+    let (_, effects) =
+        run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A"), Event::Follow("https://x.org/b.md".into())]);
+    assert_eq!(load_origins(&effects), [Origin::Trusted]);
+    let (_, effects) = run([
+        Event::Enter("http://127.0.0.1:8000/a.md".into()),
+        fetched(1, "http://127.0.0.1:8000/a.md", "# A"),
+        Event::Follow("https://x.org/b.md".into()),
+    ]);
+    assert_eq!(load_origins(&effects), [Origin::Trusted]);
 }

@@ -1,7 +1,7 @@
 //! Whether a URL points into the reader's own machine or network. Links and
 //! redirects from a public page may not lead there (ADR-003).
 
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use url::{Host, Url};
 
@@ -23,6 +23,14 @@ pub fn is_local_network(url: &Url) -> bool {
 /// A single label (`router`, which the search domain resolves) or a home suffix.
 fn is_local_name(name: &str) -> bool {
     !name.contains('.') || LOCAL_SUFFIXES.iter().any(|suffix| name == *suffix || name.ends_with(&format!(".{suffix}")))
+}
+
+/// An address a name resolved to, by the same rules as one written in a URL.
+pub fn is_local_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => is_local_ipv4(ip),
+        IpAddr::V6(ip) => is_local_ipv6(ip),
+    }
 }
 
 pub fn is_local_ipv4(ip: Ipv4Addr) -> bool {

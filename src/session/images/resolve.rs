@@ -9,6 +9,7 @@ use crate::session::address::{expand_home, is_network_path, normalise, scheme_of
 use crate::session::href::{OnPage, as_browsers_read, join_on_page, local_target};
 use crate::session::location::{FILE_SCHEME, Location, WEB_SCHEMES, without_credentials};
 use crate::session::network::is_local_network;
+use crate::session::web::BAD_PORTS;
 
 /// Why an image source won't be loaded. The reader sees one note for all of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,14 +24,6 @@ pub enum Refusal {
     /// A web image on a port browsers block, where mail, chat and other servers listen.
     Port,
 }
-
-/// The Fetch standard's blocked ports, plus Redis (6379), which it doesn't list.
-const BAD_PORTS: [u16; 82] = [
-    1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110,
-    111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
-    540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061,
-    6000, 6379, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697,
-];
 
 /// A web image location, unless its port is one browsers refuse.
 fn web_image(url: Url) -> Result<Location, Refusal> {

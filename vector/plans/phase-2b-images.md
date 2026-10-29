@@ -410,7 +410,8 @@ Feature: Images
   - `ImageLoading` is `Automatic`, `OnClick` or `Off`, held in `Settings` with a serde default of `Automatic`.
 - **Services.**
   - `services::web` splits into `fetch_bytes(url, want, limits) -> Result<(Url, Vec<u8>), FetchError>`, the shared redirect, deadline, cap, encoding and no-cookie loop, and `fetch`, which pages use and which adds `to_text`.
-    - `FetchError` is neutral: `NotFound`, `Server`, `Unreachable`, `BadRedirect`, `TooLarge`, `WrongType` or `Undecodable`.
+    - `FetchError` is neutral: `NotFound`, `Server`, `Unreachable`, `BadRedirect`, `TooLarge`, `WrongType`, `Undecodable` or `LocalAddress` (the connect-time check; pages show the new `ErrorCode::LocalAddress`).
+    - `session::web::Origin` (`Trusted` or `Public`) says who asked for a fetch; `checks_resolved_address(origin, hop, url, asked)` decides when resolved addresses are checked (public origins always; the reader's own requests only after a redirect to another host). Checked hops go direct, skipping any environment proxy. Navigation entries keep their origin, so reload and Back fetch under the same rules, and an entry that settles on another public host becomes `Public`.
     - Two pure, unit-tested functions map it: pages get an `ErrorCode` exactly as 2a does today, and images get a `Problem`, where `BadRedirect` becomes `Refused`. `Want::{Page, Image}` chooses the `Accept` header and the type policy. ureq sends no `Referer`; a test pins that.
   - `services::files` gains `read_capped(path)`, which `read_markdown` and image loading share.
   - `services::images::load(location) -> Result<Picture, Problem>`.
