@@ -6,6 +6,7 @@ rust-version = "1.88"
 description = "A browser for the web of Markdown — no HTML, no DOM, no webview"
 
 [dependencies]
+dirs = "7.0.0"
 iced = { version = "0.14", features = ["canvas", "advanced"] }
 pulldown-cmark = "0.13"
 serde = { version = "1.0.229", features = ["derive"] }
