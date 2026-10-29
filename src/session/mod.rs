@@ -3,6 +3,8 @@
 
 pub mod address;
 pub mod error;
+mod href;
+pub mod images;
 pub mod links;
 pub mod location;
 pub mod navigation;

@@ -8,8 +8,9 @@ use url::Url;
 
 mod page;
 
-use super::address::{decode, is_network_path, normalise, parse_file_url, scheme_of, split_reference, web_target};
-use super::location::{FILE_SCHEME, Location, Target, WEB_SCHEMES, is_markdown, is_markdown_name, without_credentials};
+use super::address::{decode, normalise, scheme_of, web_target};
+use super::href::{as_browsers_read, local_target};
+use super::location::{Location, Target, WEB_SCHEMES, is_markdown, is_markdown_name, without_credentials};
 
 const MAIL_SCHEME: &str = "mailto";
 
@@ -42,13 +43,6 @@ pub fn classify(href: &str, current: &Location) -> Link {
     }
 }
 
-/// The href as a browser's URL parser reads it: whitespace and control characters
-/// trimmed from the ends, tabs and newlines removed throughout. Checking this form
-/// keeps the checks below from seeing a different string than `Url::join` does.
-fn as_browsers_read(href: &str) -> String {
-    href.trim().trim_matches(|c: char| c <= ' ').chars().filter(|c| !matches!(c, '\t' | '\n' | '\r')).collect()
-}
-
 /// For the system browser: the href as written, unless it carries credentials.
 fn external(reference: &str, url: Url) -> Link {
     let spoofable = !url.username().is_empty() || url.password().is_some();
@@ -70,23 +64,6 @@ fn from_file(reference: &str, current: &Location) -> Link {
             _ => Link::Unsupported,
         },
     }
-}
-
-/// A local reference (relative, absolute or `file://`) resolved against the current file.
-fn local_target(reference: &str, current: &Location) -> Option<(String, Option<String>)> {
-    if is_network_path(reference) {
-        return None; // protocol-relative or a network share: not a local file
-    }
-    let (path, fragment) = match scheme_of(reference).as_deref() {
-        Some(FILE_SCHEME) => parse_file_url(reference)?,
-        Some(_) => return None,
-        None => split_reference(reference),
-    };
-    if path.is_empty() || is_network_path(&path) {
-        return None;
-    }
-    let directory = current.as_file()?.parent().unwrap_or(Path::new("/"));
-    Some((directory.join(path).display().to_string(), fragment))
 }
 
 #[cfg(test)]

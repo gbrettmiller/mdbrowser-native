@@ -46,6 +46,9 @@ Revisions 2 and 3 answer the plan reviews; see the Plan Review Summary.
      - loopback, private and link-local addresses from a public page, including disguised spellings
      - `data:`, `javascript:` and other non-`http(s)` schemes
      - an empty source
+   - Web images on a port browsers block are refused: the Fetch standard's list, plus 6379.
+   - "Local network" includes home names (single-label, `.local`, `.home.arpa`, `.internal`, `.lan`) and special ranges (100.64/10, 198.18/15, 192.0.0/24, 0/8, multicast, broadcast, site-local IPv6, and IPv4 embedded in IPv6). A public name that resolves to a local address is refused when connecting (step 5).
+   - Local files may load local-network images with no click, an accepted risk recorded in ADR-004.
    - A redirect from a public image URL into the local network, to another scheme, or round in a loop is refused. It shows the "refused" note, because retrying can't help.
 4. [ ] **What can be shown.**
    - **Web images:** any `image/*` type, `application/octet-stream` or no type is accepted. The type is matched case-insensitively and its parameters are ignored, and the bytes then decide. Any other type, such as `text/html`, is refused without decoding.
@@ -393,7 +396,7 @@ Feature: Images
   - `blocks::paragraphs` splits a paragraph into `Paragraph` and `Block::Image { src, alt, link }` blocks, trimming whitespace only at the cuts.
   - `plain_text` writes an image as `[image: alt]` or `[image]` on its own line.
 - **Session, pure.** `session/images/` holds four modules:
-  - `resolve.rs`: `resolve(src, current) -> Result<Location, Refusal>`. It uses the 2a link rules through a shared `session/href.rs`, which takes `as_browsers_read`, `is_disk_shaped` and the boundary check out of `links/page.rs`. Any extension is allowed.
+  - `resolve.rs`: `resolve(src, current, home) -> Result<Location, Refusal>`, where `home` expands `~/` in local files. It uses the 2a link rules through a shared `session/href.rs`, which takes `as_browsers_read`, `is_disk_shaped` and the boundary check out of `links/page.rs`. Any extension is allowed.
   - `planner.rs`: **one app-wide table** maps `Location` to `Waiting`, `Off`, `Queued`, `Loading`, `Shown(Picture)` or `Failed(Problem)`. It is the single source of truth.
     - When a page becomes ready, it resolves each `src` once and stores only `src → Location`, or `Refused`. The page holds no image state of its own. Layout's `ImageView` is derived from the page map plus the table, and mode changes act on the table entries that the current page references.
     - It keeps at most 4 locations `Loading`, across the app, and emits `Effect::LoadImage(Location)`.
@@ -468,7 +471,7 @@ In ARCHITECTURE.md:
 **Files**: `src/model/{mod,blocks,inlines}.rs`, `src/layout/flow.rs`, `features/images.feature`, `tests/acceptance/steps/images.rs` (new), the snapshots
 **Commit**: `feat(model): make images blocks of their own`
 
-### Step 3: Where an image comes from
+### Step 3: Where an image comes from — done
 
 **Complexity**: complex (security-sensitive)
 **RED**: `resolve` unit tests.
@@ -513,7 +516,9 @@ In ARCHITECTURE.md:
   - a truncated body is `Unavailable`
   - a deadline is `Unavailable`
   - `Accept` is the image header, and no cookie or `Referer` is sent
-- **Local files:** `.txt` and `.svg` are `Unsupported` without reading.
+- **Local files:** `.txt` and `.svg` are `Unsupported` without reading. A FIFO, a device or a directory is refused without blocking, as `files::read_markdown` already does.
+- **Connect-time check:** a public name that resolves to a local address (served by a test resolver that returns `127.0.0.1` for `public.test`) is refused before connecting, and nothing is requested. The same holds for pages. A public name that resolves to a public address connects to that checked address. The fetcher never resolves twice.
+- **Ports on redirects:** a redirect to a bad port is refused.
 - **Error mapping:** both pure `FetchError` mappings, one test per variant.
 - **2a regression:** every page `fetch` test stays green.
 
@@ -521,6 +526,7 @@ In ARCHITECTURE.md:
 - `Want`, `IMAGE_ACCEPT` and `image_policy` in `session::web`
 - `fetch_bytes`
 - `services/web/{mod,fetch}.rs`
+- the connect-time check: a ureq resolver that refuses local addresses for public names, and the bad-port check on redirect hops
 - `files::read_capped`
 - `services::images::load`, with the decode mutex
 **Files**: `Cargo.toml`, `src/session/web/{mod,body}.rs`, `src/services/{files,images,mod,runner}.rs`, `src/services/web/*`
@@ -650,6 +656,7 @@ Also:
 - **Images in headings, table cells and link text inside headings** stay as descriptions. Rare in the archive.
 - **Animated GIFs and WebPs** show their first frame.
 - **Captions.** Alt text often reads as a caption ("Night on the El Train, 1918."). Like browsers, 2b shows it only in place of a missing image. A caption could be a phase 4 reader control.
+- **Mixed content.** An `https` page can show `http` images. Upgrading or refusing them is a follow-up (ADR-004).
 - **Privacy.** Loading web images by default tells their hosts that a post was read. No cookies, `Referer` or credentials are sent, but the IP address and User-Agent are. "on click", "off" and the README note answer this.
 - **HiDPI.** Images are drawn at logical pixels, so 1× images look soft on 2× screens, as in browsers.
 - **Badges.** A row of README badges stacks vertically.

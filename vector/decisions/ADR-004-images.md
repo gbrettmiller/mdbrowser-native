@@ -82,6 +82,20 @@ Option A is the only one that keeps decoding off the render thread and bounded b
 
 **Fetching** reuses the page fetch loop (ADR-003): the same redirect rules, deadline and cap, no cookies, no `Referer` and no credentials. A public page can't reach the disk or the local network.
 
+**Images fetch without a click.** That raises the stakes of ADR-003's private-network rules, so the product owner decided the following during step 3's security review (2026-10-29):
+- **Local-network detection is wider.** It now covers names that only mean something at home (single-label names such as `router`, and `.local`, `.home.arpa`, `.internal` and `.lan`). It also covers more address ranges:
+  - 100.64.0.0/10, which carrier NAT and Tailscale use
+  - 198.18.0.0/15, 192.0.0.0/24 and 0.0.0.0/8
+  - multicast and broadcast
+  - IPv6 site-local addresses
+  - IPv4 carried inside IPv6: mapped, compatible, NAT64 and 6to4
+
+  Links and redirects share this check.
+- **The connect-time check ships in 2b (step 5).** The fetcher resolves each name, refuses if any resolved address is local, and connects only to the address it checked. That closes ADR-003's DNS-rebinding follow-up, for pages and images alike.
+- **Bad ports are refused for web images:** the Fetch standard's blocked-port list, plus Redis on 6379.
+- **Accepted risk: local files load local-network images with no click.** A local file is the reader's own, so its images load like any other, including from `127.0.0.1` or the LAN, the moment it opens. A downloaded README can therefore make the app send GET requests on the local network, and tell a remote image host the reader's IP. This matches how a local HTML file behaves in a browser.
+- **Follow-up: mixed content.** An `https` page can still show `http` images, which a network attacker could swap. Browsers upgrade or block these.
+
 ## Consequences
 
 **Positive:**
