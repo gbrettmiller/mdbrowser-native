@@ -55,6 +55,11 @@ CI runs the same gates on every pull request. Acceptance scenarios live in [`fea
 | [DESIGN.md](DESIGN.md) | The reader stylesheet: typefaces and tokens |
 | [vector/decisions/](vector/decisions/) | Architecture decision records |
 
+## Acknowledgements
+
+- [agentic-dev-team](https://github.com/bdfinst/agentic-dev-team) by Bryan Finster: the agentic workhorse of this project, from planning through test-driven builds, review and pull requests.
+- [Investiture](https://github.com/erikaflowers/investiture) and [Zero Vector](https://zerovector.design/investiture) by Allison Flowers: my assistant in building out the project doctrine, `VECTOR.md`, `ARCHITECTURE.md` and the `vector/` research and decision records.
+
 ## Licence
 
 Licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option. See [LICENSE](LICENSE).
