@@ -86,6 +86,11 @@ impl Page {
     pub fn anchor_y(&self, slug: &str) -> Option<f32> {
         self.anchors.iter().find(|(s, _)| s == slug).map(|(_, y)| *y)
     }
+
+    /// Where to scroll so the heading sits `margin` below the top of the view.
+    pub fn scroll_offset_for(&self, slug: &str, margin: f32) -> Option<f32> {
+        self.anchor_y(slug).map(|y| (y - margin).max(0.0))
+    }
 }
 
 #[cfg(test)]
@@ -183,6 +188,15 @@ pub(crate) mod tests {
         assert_eq!(p.anchor_y("intro"), Some(intro.bounds.y));
         assert_eq!(p.anchor_y("top"), Some(p.fragments[0].bounds.y));
         assert_eq!(p.anchor_y("missing"), None);
+    }
+
+    #[test]
+    fn scrolling_to_an_anchor_leaves_a_margin_but_never_goes_negative() {
+        let p = page("# Top\n\nbody\n\n## Intro");
+        let intro = p.anchor_y("intro").unwrap();
+        assert_eq!(p.scroll_offset_for("intro", 20.0), Some(intro - 20.0));
+        assert_eq!(p.scroll_offset_for("top", 1000.0), Some(0.0));
+        assert_eq!(p.scroll_offset_for("missing", 20.0), None);
     }
 
     #[test]

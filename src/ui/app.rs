@@ -14,8 +14,8 @@ use super::document::Document;
 use super::pages::{Pages, SETTLE};
 use super::{body, toolbar};
 use crate::content;
-use crate::services::runner;
 use crate::services::store::Store;
+use crate::services::{background, files, runner};
 use crate::session::{self, Event, Shown, State, Status};
 use crate::theme::{self, fonts};
 
@@ -24,6 +24,16 @@ const SCROLL_ID: &str = "document";
 const SCROLLBAR: f32 = 12.0;
 /// Layouts slower than this wait for a resize to settle.
 const EXPENSIVE_LAYOUT: Duration = Duration::from_millis(32);
+/// Slack after `SETTLE` before re-checking a resize.
+const RELAYOUT_SLACK: Duration = Duration::from_millis(20);
+/// An anchor waits for the page to be laid out at its real width: this often, at most this many times.
+const ANCHOR_RETRY: Duration = Duration::from_millis(16);
+const ANCHOR_ATTEMPTS: u32 = 60;
+/// ...and the width must have held this long, so a compositor resizing a new
+/// window (e.g. tiling it) doesn't move the heading after we've scrolled to it.
+const ANCHOR_STABLE: Duration = Duration::from_millis(150);
+/// Window size at launch, and the layout width assumed before the first frame.
+const WINDOW_SIZE: (f32, f32) = (1000.0, 1000.0);
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -38,6 +48,8 @@ pub enum Message {
     Resized,
     Relayout,
     ToggleHistory,
+    /// Try to scroll to the pending anchor; the count bounds the retries.
+    ResolveAnchor(u32),
 }
 
 pub struct App {
@@ -51,6 +63,10 @@ pub struct App {
     /// Last laid-out width, for scrolling to anchors outside `view`.
     width: Cell<f32>,
     settling: Cell<bool>,
+    /// The document the view has laid out at its settled width (by address), if any.
+    laid_out: Cell<usize>,
+    /// When the laid-out width last changed.
+    width_since: Cell<Instant>,
     relayout_scheduled: bool,
 }
 
@@ -67,13 +83,15 @@ impl App {
             hover: None,
             history_open: false,
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
-            width: Cell::new(940.0),
+            width: Cell::new(WINDOW_SIZE.0 - SCROLLBAR),
             settling: Cell::new(false),
+            laid_out: Cell::new(0),
+            width_since: Cell::new(Instant::now()),
             relayout_scheduled: false,
         };
         let restore = app.dispatch(Event::Restore { visits, settings });
         let open = match std::env::args().nth(1) {
-            Some(argument) => app.dispatch(Event::Enter(crate::services::files::from_command_line(&argument))),
+            Some(argument) => app.dispatch(Event::Enter(files::from_command_line(&argument))),
             None => operation::focus(ADDRESS_ID),
         };
         (app, Task::batch([restore, open]))
@@ -106,24 +124,38 @@ impl App {
         Task::batch(effects.into_iter().chain([scroll]))
     }
 
-    /// New documents start at the top; pending anchors scroll into view.
+    /// New documents start at the top; a pending anchor is resolved once the
+    /// view has laid the page out at its real width.
     fn scroll_after(&mut self, before: Option<Arc<Shown>>) -> Task<Message> {
         let Some(shown) = self.shown() else { return Task::none() };
         let is_new = !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
-        let Some(fragment) = self.session().fragment.clone() else {
-            return if is_new { operation::snap_to(SCROLL_ID, RelativeOffset::START) } else { Task::none() };
+        let to_top = if is_new { operation::snap_to(SCROLL_ID, RelativeOffset::START) } else { Task::none() };
+        if self.session().fragment.is_some() {
+            Task::batch([to_top, Task::done(Message::ResolveAnchor(0))])
+        } else {
+            to_top
+        }
+    }
+
+    fn resolve_anchor(&mut self, attempt: u32) -> Task<Message> {
+        let (Some(shown), Some(fragment)) = (self.shown(), self.session().fragment.clone()) else {
+            return Task::none();
         };
+        let laid_out = self.laid_out.get() == Arc::as_ptr(&shown.document) as usize;
+        if !laid_out || self.width_since.get().elapsed() < ANCHOR_STABLE {
+            return if attempt < ANCHOR_ATTEMPTS {
+                Task::perform(background::after(ANCHOR_RETRY), move |_| Message::ResolveAnchor(attempt + 1))
+            } else {
+                self.dispatch(Event::FragmentHandled)
+            };
+        }
         let font = self.session().settings.font;
         let (page, _) = self.pages.borrow_mut().get(&shown.document, font, self.width.get(), Instant::now());
-        self.session = Some(session::step(self.session.take().expect("session"), Event::FragmentHandled).0);
-        match page.anchor_y(&fragment) {
-            Some(y) => {
-                let y = (y - theme::reading(font).gutter).max(0.0);
-                operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) })
-            }
-            None if is_new => operation::snap_to(SCROLL_ID, RelativeOffset::START),
+        let scroll = match page.scroll_offset_for(&fragment, theme::reading(font).gutter) {
+            Some(y) => operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
             None => Task::none(),
-        }
+        };
+        Task::batch([self.dispatch(Event::FragmentHandled), scroll])
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -149,6 +181,7 @@ impl App {
                 self.history_open = !self.history_open;
                 Task::none()
             }
+            Message::ResolveAnchor(attempt) => self.resolve_anchor(attempt),
         }
     }
 
@@ -158,8 +191,7 @@ impl App {
             return Task::none();
         }
         self.relayout_scheduled = true;
-        let wait = SETTLE + Duration::from_millis(20);
-        Task::perform(async move { std::thread::sleep(wait) }, |_| Message::Relayout)
+        Task::perform(background::after(SETTLE + RELAYOUT_SLACK), |_| Message::Relayout)
     }
 
     fn shortcut(&mut self, event: keyboard::Event) -> Task<Message> {
@@ -192,9 +224,15 @@ impl App {
         let font = self.session().settings.font;
         responsive(move |size| {
             let width = size.width - SCROLLBAR;
+            if (self.width.get() - width).abs() >= 0.5 {
+                self.width_since.set(Instant::now());
+            }
             self.width.set(width);
             let (page, settling) = self.pages.borrow_mut().get(&shown.document, font, width, Instant::now());
             self.settling.set(settling);
+            if !settling {
+                self.laid_out.set(Arc::as_ptr(&shown.document) as usize);
+            }
             let document =
                 Document::new(page, theme::reading(font), |href| Message::Session(Event::Follow(href)), Message::Hover);
             scrollable(document).id(SCROLL_ID).into()
@@ -236,6 +274,6 @@ pub fn run() -> iced::Result {
         .subscription(App::subscription)
         .default_font(Font::with_name(theme::ReadingFont::Inter.family()))
         .theme(|_: &App| iced::Theme::Light)
-        .window_size((1000.0, 1000.0))
+        .window_size(WINDOW_SIZE)
         .run()
 }
