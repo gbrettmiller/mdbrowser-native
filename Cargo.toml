@@ -28,3 +28,6 @@ opt-level = 2
 name = "acceptance"
 path = "tests/acceptance/main.rs"
 harness = false
+
+[target."cfg(unix)".dependencies]
+libc = "0.2.191"

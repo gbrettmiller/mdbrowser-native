@@ -1,20 +1,27 @@
 //! Hands http(s) and mailto links to the system, never through a shell.
 
+use crate::session::location::decode;
+
 /// Defence in depth on top of `session::links`: only web and mail URLs, with no
 /// characters a shell or launcher could reinterpret, and no mail attachments.
 pub fn is_safe_to_open(url: &str) -> bool {
     let scheme = url.split_once(':').map(|(scheme, _)| scheme.to_ascii_lowercase());
     let allowed_scheme = matches!(scheme.as_deref(), Some("http" | "https" | "mailto"));
     let clean = !url.chars().any(|c| c.is_whitespace() || c.is_control() || "\"\\<>`^|".contains(c));
-    allowed_scheme && clean && !(scheme.as_deref() == Some("mailto") && has_attachment(url))
+    allowed_scheme && clean && !(scheme.as_deref() == Some("mailto") && has_unsafe_mail_fields(url))
 }
 
-/// Some mail clients attach local files named in `attach`/`attachment` parameters.
-fn has_attachment(url: &str) -> bool {
+/// Mail headers a link may pre-fill. Anything else (`attach`, client-specific
+/// extras), after percent-decoding the name, makes the link unsafe: some clients
+/// attach local files named in such parameters.
+const MAIL_FIELDS: [&str; 6] = ["to", "cc", "bcc", "subject", "body", "in-reply-to"];
+
+fn has_unsafe_mail_fields(url: &str) -> bool {
     url.split_once('?').is_some_and(|(_, query)| {
-        query
-            .split('&')
-            .any(|pair| pair.split('=').next().unwrap_or_default().to_ascii_lowercase().starts_with("attach"))
+        query.split('&').filter(|pair| !pair.is_empty()).any(|pair| {
+            let name = decode(pair.split('=').next().unwrap_or_default()).trim().to_ascii_lowercase();
+            !MAIL_FIELDS.contains(&name.as_str())
+        })
     })
 }
 
@@ -33,7 +40,11 @@ mod tests {
 
     #[test]
     fn ordinary_web_and_mail_links_are_allowed() {
-        for url in ["https://example.com/a?x=1&y=2#top", "http://x.org/%20a", "mailto:a@b.co?subject=Hi&body=x"] {
+        for url in [
+            "https://example.com/a?x=1&y=2#top",
+            "http://x.org/%20a",
+            "mailto:a@b.co?subject=Hi&body=x&cc=c@d.co&%62ody=y",
+        ] {
             assert!(is_safe_to_open(url), "{url}");
         }
     }
@@ -59,6 +70,8 @@ mod tests {
             "javascript:alert(1)",
             "mailto:a@b.co?attach=/etc/passwd",
             "mailto:a@b.co?Attachment=x",
+            "mailto:a@b.co?%61ttach=/home/u/.ssh/id_rsa",
+            "mailto:a@b.co?subject=x&X-Unknown=y",
         ] {
             assert!(!is_safe_to_open(url), "{url}");
         }

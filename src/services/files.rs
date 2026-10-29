@@ -17,19 +17,34 @@ fn code(error: std::io::Error) -> ErrorCode {
 
 /// Strict UTF-8: a missing file is `NotFound`; anything else that stops us
 /// reading it as text is `Unreadable`. That includes permissions, bad encoding,
-/// directories, devices and pipes (checked before opening, since opening a pipe
-/// blocks), and anything over `MAX_BYTES`. Symlinks to regular files are followed.
+/// directories, devices and pipes, and anything over `MAX_BYTES`. Symlinks to
+/// regular files are followed.
 pub fn read_markdown(path: &Path) -> Result<String, ErrorCode> {
-    let metadata = std::fs::metadata(path).map_err(code)?;
+    let file = open_without_blocking(path).map_err(code)?;
+    let metadata = file.metadata().map_err(code)?;
     if !metadata.is_file() || metadata.len() > MAX_BYTES {
         return Err(ErrorCode::Unreadable);
     }
     let mut bytes = Vec::new();
-    std::fs::File::open(path).map_err(code)?.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(code)?;
+    file.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(code)?;
     if bytes.len() as u64 > MAX_BYTES {
         return Err(ErrorCode::Unreadable); // grew after the size check
     }
     String::from_utf8(bytes).map_err(|_| ErrorCode::Unreadable)
+}
+
+/// Opening a pipe for reading blocks until a writer appears, so on Unix open
+/// non-blocking and check the type on the handle. That leaves no window to
+/// swap a pipe in after the check. Regular-file reads are unaffected.
+#[cfg(unix)]
+fn open_without_blocking(path: &Path) -> std::io::Result<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new().read(true).custom_flags(libc::O_NONBLOCK).open(path)
+}
+
+#[cfg(not(unix))]
+fn open_without_blocking(path: &Path) -> std::io::Result<std::fs::File> {
+    std::fs::File::open(path)
 }
 
 /// A path given on the command line, made absolute against the working directory.

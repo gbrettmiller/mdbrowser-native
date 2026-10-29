@@ -2185,6 +2185,7 @@ dependencies = [
  "futures",
  "iced",
  "insta",
+ "libc",
  "open",
  "pulldown-cmark",
  "serde",

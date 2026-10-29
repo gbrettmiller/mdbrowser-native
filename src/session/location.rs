@@ -78,7 +78,7 @@ pub(super) fn scheme_of(reference: &str) -> Option<String> {
 }
 
 /// Percent-decodes; malformed or non-UTF-8 input is returned unchanged.
-pub(super) fn decode(text: &str) -> String {
+pub(crate) fn decode(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;

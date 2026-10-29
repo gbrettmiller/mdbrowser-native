@@ -87,8 +87,11 @@ fn write_atomically(path: &Path, ticket: Ticket, contents: &str) -> std::io::Res
         std::fs::create_dir_all(dir)?;
     }
     let temporary = path.with_extension(format!("json.{}.{}.tmp", std::process::id(), ticket.0));
-    std::fs::write(&temporary, contents)?;
-    std::fs::rename(&temporary, path)
+    let written = std::fs::write(&temporary, contents).and_then(|()| std::fs::rename(&temporary, path));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    written
 }
 
 #[cfg(test)]
@@ -165,6 +168,16 @@ mod tests {
             .collect();
         threads.into_iter().for_each(|thread| thread.join().unwrap().unwrap());
         assert_eq!(store.load_visits(), vec![visit("/15.md")]);
+        let names: Vec<_> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(names, ["history.json"]);
+    }
+
+    #[test]
+    fn a_failed_save_leaves_no_temporary_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::at(dir.path());
+        std::fs::create_dir(dir.path().join("history.json")).unwrap(); // rename onto a directory fails
+        assert!(store.save_visits(store.ticket(), &[visit("/a.md")]).is_err());
         let names: Vec<_> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name()).collect();
         assert_eq!(names, ["history.json"]);
     }
