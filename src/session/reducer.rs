@@ -93,7 +93,7 @@ fn loaded(state: State, request_id: u64, result: Result<String, ErrorCode>, now:
             let document = model::parse(&source);
             let title = document.title(&target.location.label());
             let visits = visits::record(&state.visits, &target.location.address(), &title, now);
-            let shown = Arc::new(Shown { document, title });
+            let shown = Arc::new(Shown { document: Arc::new(document), title });
             let state = State { pending: None, status: Status::Ready(shown), fragment: target.fragment, ..state };
             persist_visits(State { visits, ..state })
         }

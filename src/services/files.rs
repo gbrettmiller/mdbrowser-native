@@ -14,6 +14,11 @@ pub fn read_markdown(path: &Path) -> Result<String, ErrorCode> {
     })
 }
 
+/// A path given on the command line, made absolute against the working directory.
+pub fn from_command_line(argument: &str) -> String {
+    std::path::absolute(argument).map_or_else(|_| argument.to_string(), |path| path.display().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

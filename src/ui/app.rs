@@ -1,91 +1,241 @@
-//! Walking skeleton: open the file named on the command line and render it.
+//! The application: hands events to the session reducer, runs its effects,
+//! and turns session state into a window. No browsing logic lives here.
 
-use std::cell::RefCell;
-use std::path::PathBuf;
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use iced::widget::{column, container, responsive, scrollable, text};
-use iced::{Element, Fill, Task};
+use iced::keyboard::{self, Key, key::Named};
+use iced::widget::operation::{self, AbsoluteOffset, RelativeOffset};
+use iced::widget::{column, container, responsive, row, scrollable, text};
+use iced::{Element, Fill, Font, Subscription, Task, window};
 
 use super::document::Document;
+use super::pages::{Pages, SETTLE};
+use super::{body, toolbar};
 use crate::content;
-use crate::layout::{self, Page};
-use crate::model::{self, Document as Doc};
-use crate::services::files;
-use crate::theme::{self, ReadingFont, fonts};
+use crate::services::runner;
+use crate::services::store::Store;
+use crate::session::{self, Event, Shown, State, Status};
+use crate::theme::{self, fonts};
 
+pub const ADDRESS_ID: &str = "address";
+const SCROLL_ID: &str = "document";
 const SCROLLBAR: f32 = 12.0;
+/// Layouts slower than this wait for a resize to settle.
+const EXPENSIVE_LAYOUT: Duration = Duration::from_millis(32);
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Follow(String),
+    /// Straight to the reducer.
+    Session(Event),
+    /// An effect finished; some report back.
+    Effect(Option<Event>),
+    AddressChanged(String),
+    Submit,
     Hover(Option<String>),
+    Key(keyboard::Event),
+    Resized,
+    Relayout,
+    ToggleHistory,
 }
 
-struct App {
-    path: PathBuf,
-    document: Result<Doc, String>,
-    theme: theme::Theme,
-    /// Layout is a function of (document, theme, width); keep the last one.
-    page: RefCell<Option<(f32, Arc<Page>)>>,
-    status: String,
+pub struct App {
+    session: Option<State>,
+    /// What the address bar shows; follows the session until the reader types.
+    draft: String,
+    store: Option<Arc<Store>>,
+    hover: Option<String>,
+    history_open: bool,
+    pages: RefCell<Pages>,
+    /// Last laid-out width, for scrolling to anchors outside `view`.
+    width: Cell<f32>,
+    settling: Cell<bool>,
+    relayout_scheduled: bool,
 }
 
 impl App {
     fn boot() -> (Self, Task<Message>) {
-        let path = PathBuf::from(std::env::args().nth(1).unwrap_or_else(|| "corpus/index.md".into()));
-        let font = std::env::var("MDBROWSER_FONT").ok().and_then(|key| ReadingFont::from_key(&key)).unwrap_or_default();
-        let document =
-            files::read_markdown(&path).map(|source| model::parse(&source)).map_err(|code| content::error(code).into());
-        let app = App { path, document, theme: theme::reading(font), page: RefCell::new(None), status: String::new() };
-        (app, Task::none())
+        let store = Store::default_location().map(Arc::new);
+        let visits = store.as_ref().map(|store| store.load_visits()).unwrap_or_default();
+        let settings = store.as_ref().map(|store| store.load_settings()).unwrap_or_default();
+        let home = dirs::home_dir().unwrap_or_else(|| "/".into());
+        let mut app = App {
+            session: Some(State::new(home)),
+            draft: String::new(),
+            store,
+            hover: None,
+            history_open: false,
+            pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
+            width: Cell::new(940.0),
+            settling: Cell::new(false),
+            relayout_scheduled: false,
+        };
+        let restore = app.dispatch(Event::Restore { visits, settings });
+        let open = match std::env::args().nth(1) {
+            Some(argument) => app.dispatch(Event::Enter(crate::services::files::from_command_line(&argument))),
+            None => operation::focus(ADDRESS_ID),
+        };
+        (app, Task::batch([restore, open]))
     }
 
-    fn title(&self) -> String {
-        let name = self.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        self.document.as_ref().map_or(name.clone(), |doc| doc.title(&name))
+    pub(super) fn session(&self) -> &State {
+        self.session.as_ref().expect("session")
+    }
+
+    fn shown(&self) -> Option<Arc<Shown>> {
+        match &self.session().status {
+            Status::Ready(shown) => Some(shown.clone()),
+            _ => None,
+        }
+    }
+
+    /// Steps the reducer, runs its effects, and keeps the view in step with it.
+    fn dispatch(&mut self, event: Event) -> Task<Message> {
+        let before = self.shown();
+        let previous_address = self.session().address();
+        let (state, effects) = session::step(self.session.take().expect("session"), event);
+        self.session = Some(state);
+        if self.session().address() != previous_address {
+            self.draft = self.session().address();
+        }
+        let store = self.store.clone();
+        let effects: Vec<_> =
+            effects.into_iter().map(|effect| runner::run(effect, store.clone()).map(Message::Effect)).collect();
+        let scroll = self.scroll_after(before);
+        Task::batch(effects.into_iter().chain([scroll]))
+    }
+
+    /// New documents start at the top; pending anchors scroll into view.
+    fn scroll_after(&mut self, before: Option<Arc<Shown>>) -> Task<Message> {
+        let Some(shown) = self.shown() else { return Task::none() };
+        let is_new = !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
+        let Some(fragment) = self.session().fragment.clone() else {
+            return if is_new { operation::snap_to(SCROLL_ID, RelativeOffset::START) } else { Task::none() };
+        };
+        let font = self.session().settings.font;
+        let (page, _) = self.pages.borrow_mut().get(&shown.document, font, self.width.get(), Instant::now());
+        self.session = Some(session::step(self.session.take().expect("session"), Event::FragmentHandled).0);
+        match page.anchor_y(&fragment) {
+            Some(y) => {
+                let y = (y - theme::reading(font).gutter).max(0.0);
+                operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) })
+            }
+            None if is_new => operation::snap_to(SCROLL_ID, RelativeOffset::START),
+            None => Task::none(),
+        }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Follow(href) => self.status = format!("Following links arrives with the session: {href}"),
-            Message::Hover(href) => self.status = href.unwrap_or_default(),
+            Message::Session(event) | Message::Effect(Some(event)) => self.dispatch(event),
+            Message::Effect(None) => Task::none(),
+            Message::AddressChanged(draft) => {
+                self.draft = draft;
+                Task::none()
+            }
+            Message::Submit => self.dispatch(Event::Enter(self.draft.clone())),
+            Message::Hover(target) => {
+                self.hover = target;
+                Task::none()
+            }
+            Message::Key(event) => self.shortcut(event),
+            Message::Resized => self.schedule_relayout(),
+            Message::Relayout => {
+                self.relayout_scheduled = false;
+                if self.settling.get() { self.schedule_relayout() } else { Task::none() }
+            }
+            Message::ToggleHistory => {
+                self.history_open = !self.history_open;
+                Task::none()
+            }
         }
-        Task::none()
     }
 
-    fn page_for(&self, doc: &Doc, width: f32) -> Arc<Page> {
-        let mut cached = self.page.borrow_mut();
-        if let Some((_, page)) = cached.as_ref().filter(|(w, _)| (w - width).abs() < 0.5) {
-            return page.clone();
+    /// Wakes the view once the width has had time to settle.
+    fn schedule_relayout(&mut self) -> Task<Message> {
+        if self.relayout_scheduled {
+            return Task::none();
         }
-        let started = Instant::now();
-        let page = Arc::new(layout::layout(&doc.blocks, &self.theme, width));
-        eprintln!("layout @{width}px: {} fragments in {:?}", page.fragments.len(), started.elapsed());
-        *cached = Some((width, page.clone()));
-        page
+        self.relayout_scheduled = true;
+        let wait = SETTLE + Duration::from_millis(20);
+        Task::perform(async move { std::thread::sleep(wait) }, |_| Message::Relayout)
+    }
+
+    fn shortcut(&mut self, event: keyboard::Event) -> Task<Message> {
+        let keyboard::Event::KeyPressed { key, modifiers, .. } = event else { return Task::none() };
+        match key.as_ref() {
+            Key::Named(Named::ArrowLeft) if modifiers.alt() => self.dispatch(Event::Back),
+            Key::Named(Named::ArrowRight) if modifiers.alt() => self.dispatch(Event::Forward),
+            Key::Named(Named::F5) => self.dispatch(Event::Reload),
+            Key::Character("r") if modifiers.command() => self.dispatch(Event::Reload),
+            Key::Character("l") if modifiers.command() => {
+                Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
+            }
+            Key::Character("h") if modifiers.command() => self.update(Message::ToggleHistory),
+            _ => Task::none(),
+        }
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        Subscription::batch([keyboard::listen().map(Message::Key), window::resize_events().map(|_| Message::Resized)])
+    }
+
+    fn title(&self) -> String {
+        match &self.session().status {
+            Status::Ready(shown) => format!("{} — {}", shown.title, content::APP_NAME),
+            _ => content::APP_NAME.into(),
+        }
+    }
+
+    fn document_view(&self, shown: Arc<Shown>) -> Element<'_, Message> {
+        let font = self.session().settings.font;
+        responsive(move |size| {
+            let width = size.width - SCROLLBAR;
+            self.width.set(width);
+            let (page, settling) = self.pages.borrow_mut().get(&shown.document, font, width, Instant::now());
+            self.settling.set(settling);
+            let document =
+                Document::new(page, theme::reading(font), |href| Message::Session(Event::Follow(href)), Message::Hover);
+            scrollable(document).id(SCROLL_ID).into()
+        })
+        .into()
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body: Element<'_, Message> = match &self.document {
-            Err(error) => container(text(error.clone())).padding(32).into(),
-            Ok(doc) => responsive(move |size| {
-                let page = self.page_for(doc, size.width - SCROLLBAR);
-                scrollable(Document::new(page, self.theme, Message::Follow, Message::Hover)).into()
-            })
-            .into(),
+        let state = self.session();
+        let reader = theme::reading(state.settings.font);
+        let main: Element<'_, Message> = match &state.status {
+            Status::Idle => body::message(content::WELCOME),
+            Status::Loading => body::message(content::LOADING),
+            Status::Failed(code) => body::error(*code, state.address(), &reader),
+            Status::Ready(shown) => self.document_view(shown.clone()),
         };
-        let background = self.theme.background;
-        let page = container(body)
+        let background = reader.background;
+        let page = container(main)
             .width(Fill)
             .height(Fill)
             .style(move |_| container::Style { background: Some(background.into()), ..container::Style::default() });
-        column![page, container(text(self.status.clone()).size(12)).padding([2, 8])].into()
+        let content: Element<'_, Message> =
+            if self.history_open { row![page, super::history::panel(state)].into() } else { page.into() };
+        let status = self.hover.clone().unwrap_or_default();
+        column![
+            toolbar::toolbar(state, &self.draft),
+            body::notices(&state.notices),
+            content,
+            container(text(status).size(12)).padding([2, 8]),
+        ]
+        .into()
     }
 }
 
 pub fn run() -> iced::Result {
     fonts::install();
-    iced::application(App::boot, App::update, App::view).title(App::title).window_size((960.0, 1000.0)).run()
+    iced::application(App::boot, App::update, App::view)
+        .title(App::title)
+        .subscription(App::subscription)
+        .default_font(Font::with_name(theme::ReadingFont::Inter.family()))
+        .theme(|_: &App| iced::Theme::Light)
+        .window_size((1000.0, 1000.0))
+        .run()
 }

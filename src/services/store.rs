@@ -16,9 +16,13 @@ impl Store {
         Store { dir: dir.into() }
     }
 
-    /// `$XDG_DATA_HOME/mdbrowser` (or the platform equivalent).
+    /// `$MDBROWSER_DATA_DIR` if set (tests, screenshots), else
+    /// `$XDG_DATA_HOME/mdbrowser` or the platform equivalent.
     pub fn default_location() -> Option<Self> {
-        dirs::data_dir().map(|dir| Store::at(dir.join("mdbrowser")))
+        match std::env::var_os("MDBROWSER_DATA_DIR") {
+            Some(dir) => Some(Store::at(dir)),
+            None => dirs::data_dir().map(|dir| Store::at(dir.join("mdbrowser"))),
+        }
     }
 
     fn file(&self, name: &str) -> PathBuf {

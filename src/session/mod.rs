@@ -26,7 +26,7 @@ pub struct Settings {
 /// A document ready to show.
 #[derive(Debug, PartialEq)]
 pub struct Shown {
-    pub document: Document,
+    pub document: Arc<Document>,
     pub title: String,
 }
 
