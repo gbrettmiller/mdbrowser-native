@@ -49,6 +49,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Reload | Ctrl+R or F5 | Cmd+R or F5 |
 | Focus the address bar | Ctrl+L | Cmd+L |
 | Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
+| Open a page that isn't Markdown in your browser | Ctrl+Shift+O | Cmd+Shift+O |
 | Select all / copy | Ctrl+A / Ctrl+C | Cmd+A / Cmd+C |
 
 ### Where your data lives

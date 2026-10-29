@@ -212,6 +212,10 @@ impl App {
                 Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
             }
             Key::Character("h") if modifiers.command() => self.update(Message::ToggleHistory),
+            // The only keyboard route to the button; the session ignores it unless offered.
+            Key::Character("o" | "O") if modifiers.command() && modifiers.shift() => {
+                self.dispatch(Event::OpenInBrowser)
+            }
             _ => Task::none(),
         }
     }

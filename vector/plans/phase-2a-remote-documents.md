@@ -489,7 +489,7 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 - [x] `cargo test` passes (unit and acceptance)
 - [x] `cargo build --release` passes
 - [x] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass
-- [ ] `/code-review` passes, including `arch-review` (session may use `url`, and `services::web` matches ARCHITECTURE.md) and `a11y-review` on the new button
+- [x] `/code-review` passes, including `arch-review` (session may use `url`, and `services::web` matches ARCHITECTURE.md) and `a11y-review` on the new button
 - [ ] Manual check (PR B): open `https://raw.githubusercontent.com/scripting/markdownWeb/main/readme.md` and `https://andrewshell.org/`, and follow a link from one page to another
 - [ ] All six CI checks are green
 - [x] Documentation is updated
@@ -507,7 +507,8 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 - **Plain `http`.** The full URL with its scheme is always in the address bar, but there is no "not secure" label yet. That label is a candidate follow-up, tracked in VECTOR open questions in step 10.
 - **No cache.** Back and forward re-fetch, so the reader sees "Loading…" briefly, and scroll position resets to the fragment or the top. That is fine for blog-sized posts.
 - **No stop button.** Navigating away makes a fetch stale, and the overall timeout is 30 s.
-- **Keyboard access.** iced buttons, including the existing toolbar ones, aren't Tab-focusable today. The new button matches the existing pattern, and `a11y-review` will flag the app-wide gap. Fixing it is separate work, not 2a.
+- **Keyboard access.** iced buttons, including the existing toolbar ones, aren't Tab-focusable today. The new button matches the existing pattern, and `a11y-review` flagged the app-wide gap. Fixing it is separate work, not 2a. Open in browser also has a shortcut, Ctrl/Cmd+Shift+O, so it never needs a pointer.
+- **Screen readers.** iced 0.14 has no live regions, so a switch to Loading or to an error isn't announced. A platform limit, tracked with the keyboard gap.
 - **The link's destination isn't shown before clicking** (in the app or in the browser). That is phase 4 or later.
 - **Addresses without a scheme** (`example.com/x.md`) stay `notAbsolute`. Auto-prefixing `https://` is a possible small follow-up.
 - **Script and style text** stays visible after stripping (ADR-002, accepted).
