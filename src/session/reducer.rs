@@ -1,0 +1,125 @@
+//! `step`: every way the session can change, as one pure function.
+
+use std::sync::Arc;
+
+use super::links::{self, Link};
+use super::location::{ErrorCode, parse_address};
+use super::navigation::{Entry, Navigation};
+use super::visits;
+use super::{Effect, Event, Notice, NoticeKind, Settings, Shown, State, Status};
+use crate::model;
+
+type Step = (State, Vec<Effect>);
+
+fn none(state: State) -> Step {
+    (state, Vec::new())
+}
+
+pub fn step(state: State, event: Event) -> Step {
+    match event {
+        Event::Enter(input) | Event::OpenHistory(input) => {
+            let entry = entry_for(&input, &state);
+            navigate_to(state, entry)
+        }
+        Event::Follow(href) => follow(state, &href),
+        Event::Back => move_by(state, Navigation::back),
+        Event::Forward => move_by(state, Navigation::forward),
+        Event::Reload => match state.nav.current().cloned() {
+            Some(entry) => enter(state, entry),
+            None => none(state),
+        },
+        Event::Loaded { request_id, result, now } => loaded(state, request_id, result, now),
+        Event::OpenerFailed => notice(state, NoticeKind::OpenFailed),
+        Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
+        Event::ChooseFont(font) => {
+            let settings = Settings { font };
+            (State { settings, ..state }, vec![Effect::PersistSettings(settings)])
+        }
+        Event::DismissNotice(id) => {
+            let notices = state.notices.iter().copied().filter(|n| n.id != id).collect();
+            none(State { notices, ..state })
+        }
+        Event::FragmentHandled => none(State { fragment: None, ..state }),
+        Event::Restore { visits, settings } => none(State { visits, settings, ..state }),
+    }
+}
+
+/// What gets pushed for typed input: the canonical address if it parses,
+/// otherwise the raw input, so the error can be shown and revisited.
+fn entry_for(input: &str, state: &State) -> Entry {
+    match parse_address(input, &state.home) {
+        Ok(target) => Entry { input: target.location.address(), target: Some(target) },
+        Err(_) => Entry { input: input.to_string(), target: None },
+    }
+}
+
+fn navigate_to(state: State, entry: Entry) -> Step {
+    let nav = state.nav.clone().push(entry.clone());
+    enter(State { nav, ..state }, entry)
+}
+
+fn move_by(state: State, mover: fn(Navigation) -> Navigation) -> Step {
+    let nav = mover(state.nav.clone());
+    match nav.current().cloned() {
+        Some(entry) if nav != state.nav => enter(State { nav, ..state }, entry),
+        _ => none(state),
+    }
+}
+
+/// Shows an entry. Every call bumps the request id, so any load in flight goes stale.
+fn enter(state: State, entry: Entry) -> Step {
+    let request_id = state.request_id + 1;
+    match entry.target {
+        Some(target) => {
+            let state = State { request_id, pending: Some(request_id), status: Status::Loading, ..state };
+            (state, vec![Effect::Load { request_id, location: target.location }])
+        }
+        None => {
+            let code = parse_address(&entry.input, &state.home).err().unwrap_or(ErrorCode::NotAbsolute);
+            none(failed(State { request_id, ..state }, code))
+        }
+    }
+}
+
+fn failed(state: State, code: ErrorCode) -> State {
+    State { pending: None, status: Status::Failed(code), fragment: None, ..state }
+}
+
+fn loaded(state: State, request_id: u64, result: Result<String, ErrorCode>, now: u64) -> Step {
+    let target = state.nav.current().and_then(|entry| entry.target.clone());
+    let (Some(target), true) = (target, state.pending == Some(request_id)) else { return none(state) };
+    match result {
+        Ok(source) => {
+            let document = model::parse(&source);
+            let title = document.title(&target.location.label());
+            let visits = visits::record(&state.visits, &target.location.address(), &title, now);
+            let shown = Arc::new(Shown { document: Arc::new(document), title });
+            let state = State { pending: None, status: Status::Ready(shown), fragment: target.fragment, ..state };
+            persist_visits(State { visits, ..state })
+        }
+        Err(code) => none(failed(state, code)),
+    }
+}
+
+fn follow(state: State, href: &str) -> Step {
+    let Some(location) = state.current_location().filter(|_| matches!(state.status, Status::Ready(_))) else {
+        return none(state);
+    };
+    match links::classify(href, location) {
+        Link::Navigate(target) => navigate_to(state, Entry { input: target.location.address(), target: Some(target) }),
+        Link::Scroll(fragment) => none(State { fragment: Some(fragment), ..state }),
+        Link::External(url) => (state, vec![Effect::OpenExternal(url)]),
+        Link::Unsupported => notice(state, NoticeKind::UnsupportedLink),
+    }
+}
+
+fn notice(state: State, kind: NoticeKind) -> Step {
+    let id = state.notice_seq + 1;
+    let notices = state.notices.iter().copied().chain([Notice { id, kind }]).collect();
+    none(State { notice_seq: id, notices, ..state })
+}
+
+fn persist_visits(state: State) -> Step {
+    let effects = vec![Effect::PersistVisits(state.visits.clone())];
+    (state, effects)
+}

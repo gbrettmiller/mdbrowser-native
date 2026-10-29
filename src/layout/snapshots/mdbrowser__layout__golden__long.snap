@@ -1,0 +1,5 @@
+---
+source: src/layout/golden.rs
+expression: "summary(&page_at(include_str!(\"../../corpus/long.md\"), ReadingFont::Literata,\nWIDTH))"
+---
+height 81102.0, 11604 fragments, 201 anchors

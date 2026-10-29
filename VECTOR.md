@@ -6,7 +6,7 @@ vector_version: "0.1"
 project:
   name: "mdbrowser-native"
   description: "A desktop browser for the web of Markdown that parses .md into a document tree and draws it natively, with no HTML, DOM or webview anywhere."
-  stage: "definition"  # discovery | definition | development | delivery | maintenance
+  stage: "development"  # discovery | definition | development | delivery | maintenance
   started: "2026-10-28"
   repo: "https://github.com/gbrettmiller/mdbrowser-native"
 owner:
@@ -58,17 +58,18 @@ Markdown is now a common format on the web (READMEs, docs sites, `llms.txt`, not
 
 ## Key Assumptions
 1. Enough content is published as Markdown (`.md` URLs, `Accept: text/markdown`, `llms.txt`) to make browsing worthwhile — hypothesis
-2. A purpose-built layout engine for Markdown's closed set of node types gives reading quality equal to or better than HTML rendering — testing (see spike findings)
-3. Re-layout and painting can stay smooth for 200 KB+ documents with per-block caching and viewport culling — hypothesis
+2. A purpose-built layout engine for Markdown's closed set of node types gives reading quality equal to or better than HTML rendering — testing (spike and phase 1 screenshots)
+3. Re-layout and painting can stay smooth for 200 KB+ documents — testing: painting is culled to the viewport and text is shaped once, but a full re-layout of the 206 KB spec takes 150–230 ms, so resizes defer it until the width settles
 
 ## Open Questions
 - Which discovery conventions to support, and in what order?
 - Remote images: load, click-to-load, or block?
-- How should in-page anchors map to headings (slug rules)?
+- ~~How should in-page anchors map to headings (slug rules)?~~ Resolved in phase 1: GitHub-style slugs (`model::slug`), so anchors written for GitHub work unchanged.
 
 ## Research Status
 | Artifact | Status | Location |
 |----------|--------|----------|
 | Rendering spike | Done (2026-10-28) | `./vector/research/2026-10-28-spike-findings.md` |
+| Phase 1 (local browsing) | Built (2026-10-29) | `features/browse.feature`, `features/reading.feature` |
 | Interviews | Not started | `./vector/research/` |
 | Assumptions | Not started | `./vector/research/` |

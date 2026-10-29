@@ -6,5 +6,28 @@ rust-version = "1.88"
 description = "A browser for the web of Markdown — no HTML, no DOM, no webview"
 
 [dependencies]
+dirs = "7.0.0"
 iced = { version = "0.14", features = ["canvas", "advanced"] }
+open = { version = "5.4.5", features = ["shellexecute-on-windows"] }
 pulldown-cmark = "0.13"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+yaml-rust2 = "0.13.0"
+
+[dev-dependencies]
+cucumber = "0.23.0"
+futures = "0.3.34"
+insta = "1.49.0"
+tempfile = "3.27.0"
+
+# Shaping and rendering crates are unusably slow unoptimised; our own code stays debuggable.
+[profile.dev.package."*"]
+opt-level = 2
+
+[[test]]
+name = "acceptance"
+path = "tests/acceptance/main.rs"
+harness = false
+
+[target."cfg(unix)".dependencies]
+libc = "0.2.191"
