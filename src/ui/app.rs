@@ -52,6 +52,12 @@ pub enum Message {
     ToggleHistory,
     /// Try to scroll to this pending anchor; the count bounds the retries.
     ResolveAnchor(String, u32),
+    /// Images arrived since the last layout: lay out again, keeping the reader's place.
+    ImagesArrived,
+    /// The document was scrolled to this offset.
+    Scrolled(f32),
+    /// A click on an image's clickable note.
+    LoadImage(String),
 }
 
 pub struct App {
@@ -73,6 +79,14 @@ pub struct App {
     /// When the laid-out width last changed.
     width_since: Cell<Instant>,
     relayout_scheduled: bool,
+    /// The image generation the drawn page was laid out with. Newer images wait
+    /// for `ImagesArrived`, which lays out again from `update` so the scroll can follow.
+    applied_images: Cell<u64>,
+    images_pending: bool,
+    scroll_y: Cell<f32>,
+    /// An anchor the view was scrolled to, and where: re-applied as images arrive,
+    /// until the reader scrolls away.
+    anchor_held: Option<(String, f32)>,
 }
 
 impl App {
@@ -94,6 +108,10 @@ impl App {
             laid_out: RefCell::new(Weak::new()),
             width_since: Cell::new(Instant::now()),
             relayout_scheduled: false,
+            applied_images: Cell::new(0),
+            images_pending: false,
+            scroll_y: Cell::new(0.0),
+            anchor_held: None,
         };
         let restore = app.dispatch(Event::Restore { visits, settings });
         let open = match std::env::args().nth(1) {
@@ -128,7 +146,53 @@ impl App {
         let effects: Vec<_> =
             effects.into_iter().map(|effect| runner::run(effect, store.clone()).map(Message::Effect)).collect();
         let scroll = self.scroll_after(before, fragment_before);
-        Task::batch(effects.into_iter().chain([scroll]))
+        let images = self.schedule_images();
+        Task::batch(effects.into_iter().chain([scroll, images]))
+    }
+
+    /// Images changed what the page shows: lay out again once arrivals settle, so a
+    /// burst of them costs one layout and one scroll correction.
+    fn schedule_images(&mut self) -> Task<Message> {
+        let changed = self.session().images.generation() != self.applied_images.get();
+        if !changed || self.images_pending || self.shown().is_none() {
+            return Task::none();
+        }
+        self.images_pending = true;
+        Task::perform(background::after(SETTLE), |_| Message::ImagesArrived)
+    }
+
+    /// The page as laid out at the applied image generation.
+    fn page(&self, document: &Arc<Doc>, width: f32) -> (Arc<crate::layout::Page>, bool) {
+        let images = &self.session().images;
+        let view = |src: &str| super::images::view(images, src);
+        let font = self.session().settings.font;
+        self.pages.borrow_mut().get(document, font, width, (&view, self.applied_images.get()), Instant::now())
+    }
+
+    /// Lays the page out with the newest images and scrolls so the text in view
+    /// stays put, or so a held anchor stays at the top.
+    fn images_arrived(&mut self) -> Task<Message> {
+        self.images_pending = false;
+        let Some(shown) = self.shown() else { return Task::none() };
+        let width = self.width.get();
+        let (before, _) = self.page(&shown.document, width);
+        self.applied_images.set(self.session().images.generation());
+        let (after, _) = self.page(&shown.document, width);
+        let scroll = self.scroll_y.get();
+        let gutter = theme::reading(self.session().settings.font).gutter;
+        let held = self.anchor_held.clone().filter(|(_, at)| (at - scroll).abs() < 1.0);
+        let target = match held.and_then(|(slug, _)| after.scroll_offset_for(&slug, gutter).map(|y| (slug, y))) {
+            Some((slug, y)) => {
+                self.anchor_held = Some((slug, y));
+                y
+            }
+            None => crate::layout::anchor::keep(&before, &after, scroll),
+        };
+        if (target - scroll).abs() < 0.5 {
+            return Task::none();
+        }
+        self.scroll_y.set(target);
+        operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(target) })
     }
 
     /// New documents start at the top; a pending anchor is resolved once the
@@ -136,6 +200,12 @@ impl App {
     fn scroll_after(&mut self, before: Option<Arc<Shown>>, fragment_before: Option<String>) -> Task<Message> {
         let Some(shown) = self.shown() else { return Task::none() };
         let is_new = !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
+        if is_new {
+            // A new page is laid out with its images as they are now.
+            self.applied_images.set(self.session().images.generation());
+            self.anchor_held = None;
+            self.scroll_y.set(0.0);
+        }
         let to_top = if is_new { operation::snap_to(SCROLL_ID, RelativeOffset::START) } else { Task::none() };
         // Start one resolution per new anchor; other dispatches leave a running one alone.
         match self.session().fragment.clone() {
@@ -160,9 +230,13 @@ impl App {
             };
         }
         let font = self.session().settings.font;
-        let (page, _) = self.pages.borrow_mut().get(&shown.document, font, self.width.get(), Instant::now());
+        let (page, _) = self.page(&shown.document, self.width.get());
         let scroll = match page.scroll_offset_for(&fragment, theme::reading(font).gutter) {
-            Some(y) => operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
+            Some(y) => {
+                self.anchor_held = Some((fragment.clone(), y));
+                self.scroll_y.set(y);
+                operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) })
+            }
             None => Task::none(),
         };
         Task::batch([self.dispatch(Event::FragmentHandled), scroll])
@@ -195,6 +269,18 @@ impl App {
                 Task::none()
             }
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
+            Message::ImagesArrived => self.images_arrived(),
+            Message::Scrolled(y) => {
+                self.scroll_y.set(y);
+                if self.anchor_held.as_ref().is_some_and(|(_, at)| (at - y).abs() >= 1.0) {
+                    self.anchor_held = None; // the reader scrolled away
+                }
+                Task::none()
+            }
+            Message::LoadImage(src) => match self.session().images.location(&src).cloned() {
+                Some(location) => self.dispatch(Event::LoadImage(location)),
+                None => Task::none(),
+            },
         }
     }
 
@@ -222,6 +308,10 @@ impl App {
             Key::Character("o" | "O") if modifiers.command() && modifiers.shift() => {
                 self.dispatch(Event::OpenInBrowser)
             }
+            // The keyboard route to every image note's click, and to images that are off.
+            Key::Character("i" | "I") if modifiers.command() && modifiers.shift() => {
+                self.dispatch(Event::LoadPageImages)
+            }
             _ => Task::none(),
         }
     }
@@ -248,14 +338,24 @@ impl App {
                 self.width_since.set(Instant::now());
             }
             self.width.set(width);
-            let (page, settling) = self.pages.borrow_mut().get(&shown.document, font, width, Instant::now());
+            let (page, settling) = self.page(&shown.document, width);
             self.settling.set(settling);
             if !settling {
                 *self.laid_out.borrow_mut() = Arc::downgrade(&shown.document);
             }
-            let document =
-                Document::new(page, theme::reading(font), |href| Message::Session(Event::Follow(href)), Message::Hover);
-            scrollable(document).id(SCROLL_ID).into()
+            let pictures = super::images::pictures(&page, &self.session().images);
+            let document = Document::new(
+                page,
+                pictures,
+                theme::reading(font),
+                |href| Message::Session(Event::Follow(href)),
+                Message::LoadImage,
+                Message::Hover,
+            );
+            scrollable(document)
+                .id(SCROLL_ID)
+                .on_scroll(|viewport| Message::Scrolled(viewport.absolute_offset().y))
+                .into()
         })
         .into()
     }

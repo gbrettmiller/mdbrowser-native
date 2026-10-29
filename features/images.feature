@@ -29,3 +29,101 @@ Feature: Images
       | mode     |
       | on click |
       | off      |
+
+  # ── step 8: drawn images (local files, then the web) ───────────────────────
+
+  Scenario: A local image is drawn at its own size
+    Given an image file "pic.png" of 12 by 8 pixels
+    And a file "local.md" containing "![a red box](pic.png)"
+    When I view "local.md"
+    Then the image "a red box" is shown at 12 by 8
+
+  Scenario: A web image on a web page is drawn
+    Given the site serves "/post.md" containing "![red](img/red.png)"
+    When I enter the URL of "/post.md"
+    Then the image "red" is shown at 40 by 20
+    And the site was asked for an image at "/img/red.png" with no cookie and no referrer
+
+  Scenario Outline: Formats that are drawn
+    Given the site serves "/post.md" containing "![x](<src>)"
+    When I enter the URL of "/post.md"
+    Then the image "x" is shown at <width> by <height>
+    Examples:
+      | src               | width | height |
+      | /img/alpha.png    | 8     | 8      |
+      | /img/anim.gif     | 30    | 30     |
+      | /img/photo.jpg    | 24    | 24     |
+      | /img/photo.webp   | 24    | 24     |
+      | /img/untyped.png  | 10    | 10     |
+      | /img/mislabel.png | 10    | 10     |
+      | /img/moved.png    | 40    | 20     |
+
+  Scenario Outline: Images that can't be shown say why
+    Given the site serves "/post.md" containing "Before ![a logo](<src>) after"
+    When I enter the URL of "/post.md"
+    Then the image "a logo" is not shown and says "<note>"
+    And the document text is "Before\n[image: a logo]\nafter"
+    Examples:
+      | src              | note                                           |
+      | /img/logo.svg    | This image's format isn't supported.           |
+      | /img/page.png    | This image's format isn't supported.           |
+      | /img/missing.png | Couldn't load this image. Click to try again.  |
+      | /img/tall.png    | This image is too large to show.               |
+      | /img/huge.png    | This image is too large to show.               |
+      | /img/to-file.png | This page can't show this image.               |
+
+  Scenario: An image wider than the column is scaled down
+    Given the site serves "/post.md" containing "![wide](img/wide.png)"
+    When I enter the URL of "/post.md"
+    Then the image "wide" is as wide as the column, with its aspect ratio kept
+
+  Scenario: A local file can show web images, including from the local network
+    Given a file "local.md" linking an image to the URL of "/img/red.png"
+    When I view "local.md"
+    Then the image is shown at 40 by 20
+
+  Scenario Outline: A web page can't show files from the disk
+    Given an image file "secret.png" of 4 by 4 pixels
+    And the site serves "/post.md" containing an image from <source>
+    When I enter the URL of "/post.md"
+    Then the image is not shown and says "This page can't show this image."
+    And nothing was read from disk
+    Examples:
+      | source                          |
+      | the file:// URL of "secret.png" |
+      | "C:\\secret.png"                |
+      | "\\\\host\\share\\secret.png"   |
+      | "data:image/png;base64,AAAA"    |
+
+  Scenario: A repeated image is fetched once
+    Given the site serves "/post.md" containing "![a](img/red.png) ![b](img/red.png)"
+    When I enter the URL of "/post.md"
+    Then the image "a" is shown at 40 by 20
+    And the image "b" is shown at 40 by 20
+    And the site has seen 1 request for "/img/red.png"
+
+  Scenario: A failed image can be tried again
+    Given the site serves "/post.md" containing "![x](img/flaky.png)"
+    And I am viewing the URL of "/post.md"
+    And the image "x" is not shown and says "Couldn't load this image. Click to try again."
+    When I click the note under "x"
+    Then the image "x" is shown at 40 by 20
+
+  Scenario: Reloading retries images that failed
+    Given the site serves "/post.md" containing "![x](img/flaky.png)"
+    And I am viewing the URL of "/post.md"
+    When I reload
+    Then the image "x" is shown at 40 by 20
+
+  Scenario: Copying across an image copies its description
+    Given an image file "pic.png" of 12 by 8 pixels
+    And a file "c.md" containing "Before\n\n![a red box](pic.png)\n\nafter"
+    And I am viewing "c.md"
+    When I select everything and copy
+    Then the copied text is "Before\n[image: a red box]\nafter"
+
+  Scenario: HTML img is never an image
+    Given the site serves "/post.md" containing "<img src='img/red.png'> text"
+    When I enter the URL of "/post.md"
+    Then no image is shown
+    And the site has seen 0 requests for "/img/red.png"

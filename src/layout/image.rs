@@ -196,6 +196,22 @@ mod tests {
     }
 
     #[test]
+    fn a_point_on_a_clickable_note_names_its_image_and_elsewhere_nothing() {
+        let clickable = |_: &str| ImageView::Placeholder { note: Some(("Click to load".into(), true)) };
+        let p = page_with("![a](a.png)", clickable);
+        let note = p.fragments[1].bounds;
+        let on_note = Point::new(note.x + 2.0, note.y + note.height / 2.0);
+        assert_eq!(p.action_at(on_note), Some("a.png"));
+        assert_eq!(p.link_at(on_note), None);
+        let description = p.fragments[0].bounds;
+        assert_eq!(p.action_at(Point::new(description.x + 2.0, description.y + 2.0)), None);
+        let off = |_: &str| ImageView::Placeholder { note: Some(("Web images are off.".into(), false)) };
+        let p = page_with("![a](a.png)", off);
+        let note = p.fragments[1].bounds;
+        assert_eq!(p.action_at(Point::new(note.x + 2.0, note.y + note.height / 2.0)), None);
+    }
+
+    #[test]
     fn fragments_know_their_top_level_block() {
         let p = page_with("one\n\n> two\n\n- three", no_images);
         let blocks: Vec<usize> = p.fragments.iter().map(|f| f.block).collect();

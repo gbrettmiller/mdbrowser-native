@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use iced::advanced::graphics::text::{Raw, Renderer as _};
+use iced::advanced::image::{Handle, Image, Renderer as _};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer::{self, Quad, Renderer as _};
 use iced::advanced::widget::{self, Widget, tree};
@@ -16,19 +17,32 @@ use crate::theme;
 
 pub struct Document<'a, Message> {
     page: Arc<Page>,
+    /// Shown images: their page-space boxes and the pixels to draw there.
+    pictures: Vec<(Rectangle, Handle)>,
     theme: theme::Theme,
     on_follow: Box<dyn Fn(String) -> Message + 'a>,
+    /// A click on an image's clickable note: the image source to load.
+    on_load: Box<dyn Fn(String) -> Message + 'a>,
     on_hover: Box<dyn Fn(Option<String>) -> Message + 'a>,
 }
 
 impl<'a, Message> Document<'a, Message> {
     pub fn new(
         page: Arc<Page>,
+        pictures: Vec<(Rectangle, Handle)>,
         theme: theme::Theme,
         on_follow: impl Fn(String) -> Message + 'a,
+        on_load: impl Fn(String) -> Message + 'a,
         on_hover: impl Fn(Option<String>) -> Message + 'a,
     ) -> Self {
-        Document { page, theme, on_follow: Box::new(on_follow), on_hover: Box::new(on_hover) }
+        Document {
+            page,
+            pictures,
+            theme,
+            on_follow: Box::new(on_follow),
+            on_load: Box::new(on_load),
+            on_hover: Box::new(on_hover),
+        }
     }
 }
 
@@ -112,6 +126,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
                 renderer.fill_quad(Quad { bounds: *rect + offset, ..Quad::default() }, self.theme.selection);
             }
         }
+        for (bounds, handle) in visible(&self.pictures, |(bounds, _)| *bounds, in_page) {
+            renderer.draw_image(Image::new(handle.clone()), *bounds + offset, view);
+        }
         for text in visible(&self.page.texts, |text| text.bounds, in_page) {
             renderer.fill_raw(Raw {
                 buffer: Arc::downgrade(&text.buffer),
@@ -143,6 +160,8 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
                 let Some(point) = cursor.position_in(bounds) else { return };
                 if let Some(href) = self.page.link_at(point) {
                     shell.publish((self.on_follow)(href.to_string()));
+                } else if let Some(src) = self.page.action_at(point) {
+                    shell.publish((self.on_load)(src.to_string()));
                 } else {
                     let caret = self.page.caret_at(point);
                     self.select(state, caret, caret);
@@ -198,7 +217,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
         _renderer: &Renderer,
     ) -> mouse::Interaction {
         match cursor.position_in(layout.bounds()) {
-            Some(p) if self.page.link_at(p).is_some() => mouse::Interaction::Pointer,
+            Some(p) if self.page.link_at(p).is_some() || self.page.action_at(p).is_some() => {
+                mouse::Interaction::Pointer
+            }
             Some(_) => mouse::Interaction::Text,
             None => mouse::Interaction::default(),
         }

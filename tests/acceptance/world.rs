@@ -16,6 +16,7 @@ use mdbrowser::session::{Effect, Event, State, step};
 use tempfile::TempDir;
 use url::Url;
 
+use crate::fixtures;
 use crate::http::{Reply, Server};
 
 const INDEX: &str = "---
@@ -70,9 +71,18 @@ fn routes() -> HashMap<String, Reply> {
         ("/slow.md", Reply::markdown("# Slow\n")),
     ]
     .into_iter()
+    .chain(fixtures::image_routes())
     .map(|(path, reply)| (path.to_string(), reply))
     .collect()
 }
+
+/// Whether a web load stays on the scenario's own server: nothing reaches the internet.
+pub fn on_test_server(url: &Url) -> bool {
+    url.host_str() == Some("127.0.0.1")
+}
+
+/// Fails the first time it is asked for, then serves an image.
+const FLAKY: &str = "/img/flaky.png";
 
 #[derive(Debug, cucumber::World)]
 #[world(init = Self::new)]
@@ -82,6 +92,8 @@ pub struct Browser {
     /// Every path a load effect actually read.
     pub reads: Vec<PathBuf>,
     pub opened: Vec<String>,
+    /// What the last "select everything and copy" copied.
+    pub copied: Option<String>,
     pub opener_fails: bool,
     /// Loads of these locations wait until released.
     held: HashSet<Location>,
@@ -105,7 +117,16 @@ impl Browser {
         let store = Store::at(home.path().join(".mdbrowser"));
         let routes = Arc::new(Mutex::new(routes()));
         let served = Arc::clone(&routes);
+        let flaky_seen = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let server = Server::start(move |request| {
+            if request.path == FLAKY {
+                let seen = flaky_seen.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                return if seen == 0 {
+                    Reply::new(500)
+                } else {
+                    Reply::new(200).header("Content-Type", "image/png").body(fixtures::png(40, 20))
+                };
+            }
             let routes = served.lock().expect("routes");
             routes.get(&request.path).cloned().unwrap_or_else(|| Reply::new(404))
         });
@@ -114,6 +135,7 @@ impl Browser {
             state: Some(state),
             reads: Vec::new(),
             opened: Vec::new(),
+            copied: None,
             opener_fails: false,
             held: HashSet::new(),
             parked: Vec::new(),
@@ -194,9 +216,7 @@ impl Browser {
     fn finish_load(&mut self, request_id: u64, location: Location, origin: Origin) {
         match &location {
             Location::File(path) => self.reads.push(path.clone()),
-            Location::Web(url) => {
-                assert_eq!(url.host_str(), Some("127.0.0.1"), "scenarios never leave the test server: {url}")
-            }
+            Location::Web(url) => assert!(on_test_server(url), "scenarios never leave the test server: {url}"),
         }
         self.clock += 1;
         let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() }, origin);
@@ -207,9 +227,7 @@ impl Browser {
     fn finish_image(&mut self, location: Location, origin: Origin) {
         match &location {
             Location::File(path) => self.reads.push(path.clone()),
-            Location::Web(url) => {
-                assert_eq!(url.host_str(), Some("127.0.0.1"), "scenarios never leave the test server: {url}")
-            }
+            Location::Web(url) => assert!(on_test_server(url), "scenarios never leave the test server: {url}"),
         }
         let result = images::load(location.clone(), origin);
         self.send(Event::ImageLoaded { location, result });

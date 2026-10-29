@@ -24,6 +24,11 @@ impl Page {
         self.fragments.iter().find(|f| f.bounds.contains(point)).and_then(|f| f.link.as_deref())
     }
 
+    /// The image a clickable note at `point` loads.
+    pub fn action_at(&self, point: Point) -> Option<&str> {
+        self.fragments.iter().find(|f| f.bounds.contains(point)).and_then(|f| f.action.as_deref())
+    }
+
     pub fn caret_at(&self, point: Point) -> Option<Caret> {
         let on_row = self
             .fragments

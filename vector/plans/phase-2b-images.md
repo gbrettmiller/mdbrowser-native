@@ -582,7 +582,7 @@ Also:
 **Files**: `src/layout/{mod,flow,select,anchor}.rs`, `corpus/images.md`
 **Commit**: `feat(layout): lay out images and keep the reading position`
 
-### Step 8: Draw images and wire them up
+### Step 8: Draw images and wire them up — done
 
 **Complexity**: standard
 **RED**:
