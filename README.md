@@ -55,6 +55,8 @@ CI runs the same gates on every pull request. Acceptance scenarios live in [`fea
 | [DESIGN.md](DESIGN.md) | The reader stylesheet: typefaces and tokens |
 | [vector/decisions/](vector/decisions/) | Architecture decision records |
 
-## Licences
+## Licence
 
-The bundled fonts are under the SIL Open Font License; each licence sits beside its font in `assets/fonts/`. The project itself has no licence yet.
+Licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option. See [LICENSE](LICENSE).
+
+The bundled fonts are not covered by that licence. They are under the SIL Open Font License, and each licence sits beside its font in `assets/fonts/`.
