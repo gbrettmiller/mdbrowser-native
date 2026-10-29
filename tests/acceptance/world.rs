@@ -1,15 +1,21 @@
-//! The acceptance world: a temporary home, the real reducer, real file reads,
-//! and fake opener/store so effects can be observed.
+//! The acceptance world: a temporary home, a local web server, the real reducer,
+//! real loads, and a fake opener so effects can be observed.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
-use mdbrowser::services::files;
+use mdbrowser::services::runner;
 use mdbrowser::services::store::Store;
+use mdbrowser::services::web::Limits;
+use mdbrowser::session::location::Location;
 use mdbrowser::session::visits::Visit;
 use mdbrowser::session::{Effect, Event, State, step};
 use tempfile::TempDir;
+use url::Url;
+
+use crate::http::{Reply, Server};
 
 const INDEX: &str = "---
 title: Home
@@ -27,6 +33,40 @@ const NOTE_A: &str = "# Note A
 [home](../index.md#intro)
 ";
 
+/// Small enough that `/huge.md` can exceed it cheaply.
+const SIZE_LIMIT: u64 = 4096;
+
+const REMOTE_INDEX: &str = "# Remote Home\n\n## Intro\n";
+
+/// The routes described at the top of features/remote.feature.
+fn routes() -> HashMap<String, Reply> {
+    let typed = |content_type: &str, body: &[u8]| Reply::new(200).header("Content-Type", content_type).body(body);
+    [
+        ("/index.md", Reply::markdown(REMOTE_INDEX)),
+        ("/notes/a.md", Reply::markdown("# Remote Note\n")),
+        ("/notes/b.md", Reply::markdown("# Note B\n")),
+        ("/post", Reply::markdown("# Post Without Extension\n")),
+        ("/plain.md", typed("text/plain", b"# Plain Served\n")),
+        ("/plain.txt", typed("text/plain", b"# Not this\n")),
+        ("/untyped.md", Reply::new(200).body("# Untyped\n")),
+        ("/page.html", typed("text/html", b"<h1>HTML</h1>")),
+        ("/fake.md", typed("text/html", b"<h1>Not Markdown</h1>")),
+        ("/moved.md", Reply::redirect(301, "/index.md")),
+        ("/loop.md", Reply::redirect(302, "/loop.md")),
+        ("/to-file.md", Reply::redirect(302, "file:///etc/hosts")),
+        ("/no-location.md", Reply::new(302)),
+        ("/gone.md", Reply::new(410)),
+        ("/broken.md", Reply::new(500)),
+        ("/latin1.md", typed("text/markdown; charset=iso-8859-1", b"# Caf\xe9\n")),
+        ("/bad-utf8.md", typed("text/markdown", b"# \xff\xfe\n")),
+        ("/huge.md", Reply::markdown(&"x".repeat(SIZE_LIMIT as usize + 1))),
+        ("/slow.md", Reply::markdown("# Slow\n")),
+    ]
+    .into_iter()
+    .map(|(path, reply)| (path.to_string(), reply))
+    .collect()
+}
+
 #[derive(Debug, cucumber::World)]
 #[world(init = Self::new)]
 pub struct Browser {
@@ -36,9 +76,12 @@ pub struct Browser {
     pub reads: Vec<PathBuf>,
     pub opened: Vec<String>,
     pub opener_fails: bool,
-    /// Loads for these paths wait until released.
-    pub held: HashSet<PathBuf>,
-    parked: Vec<(u64, PathBuf)>,
+    /// Loads of these locations wait until released.
+    held: HashSet<Location>,
+    parked: Vec<(u64, Location)>,
+    pub server: Server,
+    /// What the server answers, by path; anything else is a 404.
+    pub routes: Arc<Mutex<HashMap<String, Reply>>>,
     /// The real store, kept in the temporary home.
     pub store: Store,
     clock: u64,
@@ -53,6 +96,12 @@ impl Browser {
         fs::write(home.path().join("data.txt"), "not markdown").unwrap();
         let state = State::new(home.path());
         let store = Store::at(home.path().join(".mdbrowser"));
+        let routes = Arc::new(Mutex::new(routes()));
+        let served = Arc::clone(&routes);
+        let server = Server::start(move |request| {
+            let routes = served.lock().expect("routes");
+            routes.get(&request.path).cloned().unwrap_or_else(|| Reply::new(404))
+        });
         Browser {
             home,
             state: Some(state),
@@ -61,6 +110,8 @@ impl Browser {
             opener_fails: false,
             held: HashSet::new(),
             parked: Vec::new(),
+            server,
+            routes,
             store,
             clock: 0,
         }
@@ -82,6 +133,20 @@ impl Browser {
         format!("file://{slash}{path}")
     }
 
+    /// The test server's URL for `path`.
+    pub fn url(&self, path: &str) -> String {
+        self.server.url(path)
+    }
+
+    pub fn web(&self, path: &str) -> Location {
+        Location::web(Url::parse(&self.url(path)).expect("a test URL"))
+    }
+
+    /// A step's name for something to load: a server path (`/x.md`) or a file in the home.
+    fn location_named(&self, name: &str) -> Location {
+        if name.starts_with('/') { self.web(name) } else { Location::file(self.path(name)) }
+    }
+
     pub fn absolute(&self, name: &str) -> String {
         self.path(name).display().to_string()
     }
@@ -95,11 +160,10 @@ impl Browser {
     fn run(&mut self, effect: Effect) {
         match effect {
             Effect::Load { request_id, location } => {
-                let path = location.as_file().expect("a file location").to_path_buf();
-                if self.held.contains(&path) {
-                    self.parked.push((request_id, path));
+                if self.held.contains(&location) {
+                    self.parked.push((request_id, location));
                 } else {
-                    self.finish_load(request_id, path);
+                    self.finish_load(request_id, location);
                 }
             }
             Effect::OpenExternal(url) => {
@@ -118,18 +182,30 @@ impl Browser {
         }
     }
 
-    fn finish_load(&mut self, request_id: u64, path: PathBuf) {
-        self.reads.push(path.clone());
+    /// Loads through the app's own `runner::load`, with a lowered size limit.
+    fn finish_load(&mut self, request_id: u64, location: Location) {
+        match &location {
+            Location::File(path) => self.reads.push(path.clone()),
+            Location::Web(url) => {
+                assert_eq!(url.host_str(), Some("127.0.0.1"), "scenarios never leave the test server: {url}")
+            }
+        }
         self.clock += 1;
-        let result = files::read_markdown(&path);
+        let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() });
         self.send(Event::Loaded { request_id, result, now: self.clock });
+    }
+
+    pub fn hold(&mut self, name: &str) {
+        let location = self.location_named(name);
+        self.held.insert(location);
     }
 
     /// Lets a held load complete, with the request id it was issued under.
     pub fn release(&mut self, name: &str) {
-        let path = self.path(name);
-        self.held.remove(&path);
-        let (ready, still): (Vec<_>, Vec<_>) = self.parked.drain(..).partition(|(_, p)| *p == path);
+        let location = self.location_named(name);
+        self.held.remove(&location);
+        let (ready, still): (Vec<_>, Vec<_>) = self.parked.drain(..).partition(|(_, held)| *held == location);
+        assert_eq!(ready.len(), 1, "exactly one load of {name} was waiting");
         self.parked = still;
         ready.into_iter().for_each(|(id, p)| self.finish_load(id, p));
     }

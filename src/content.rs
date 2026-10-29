@@ -6,9 +6,9 @@ use crate::theme::ReadingFont;
 
 pub fn error(code: ErrorCode) -> &'static str {
     match code {
-        ErrorCode::Empty => "Type the path of a Markdown file.",
-        ErrorCode::NotAbsolute => "Use a full path, starting with / or ~/.",
-        ErrorCode::UnsupportedScheme => "Only local files can be opened for now.",
+        ErrorCode::Empty => "Type the path or web address of a Markdown file.",
+        ErrorCode::NotAbsolute => "Use a full path starting with / or ~/, or a web address starting with https://.",
+        ErrorCode::UnsupportedScheme => "Only files and http or https addresses can be opened.",
         ErrorCode::NotMarkdown => "That isn't a Markdown file.",
         ErrorCode::NotFound => "There's no file at this address.",
         ErrorCode::Unreadable => "This file couldn't be read as text.",
@@ -30,6 +30,19 @@ pub fn web_error(code: ErrorCode) -> Option<(&'static str, &'static str)> {
         ErrorCode::Unreachable => Some((error(code), "Check your connection, then reload.")),
         ErrorCode::BadRedirect => Some((error(code), "Try opening the address in your web browser.")),
     }
+}
+
+/// What went wrong, plus what to try next for a page on the web.
+pub fn failure(code: ErrorCode, web: bool) -> (&'static str, Option<&'static str>) {
+    match web_error(code).filter(|_| web) {
+        Some((message, hint)) => (message, Some(hint)),
+        None => (error(code), None),
+    }
+}
+
+/// "Loading example.com…" for a page, plain "Loading…" for a file.
+pub fn loading(host: Option<&str>) -> String {
+    host.map_or_else(|| LOADING.to_string(), |host| format!("Loading {host}…"))
 }
 
 pub fn notice(kind: NoticeKind) -> &'static str {
@@ -57,8 +70,8 @@ pub const HISTORY: &str = "History";
 pub const CLEAR_HISTORY: &str = "Clear History";
 pub const HISTORY_EMPTY: &str = "Nothing here yet. Documents you open are listed here.";
 pub const DISMISS: &str = "Dismiss";
-pub const ADDRESS_PLACEHOLDER: &str = "Path to a Markdown file, e.g. ~/notes/index.md";
-pub const WELCOME: &str = "Type the path of a Markdown file above, or pass one on the command line.";
+pub const ADDRESS_PLACEHOLDER: &str = "Path or web address of a Markdown file, e.g. ~/notes/index.md";
+pub const WELCOME: &str = "Type the path or web address of a Markdown file above, or pass one on the command line.";
 pub const LOADING: &str = "Loading…";
 
 #[cfg(test)]
@@ -97,6 +110,23 @@ mod tests {
         }
         let messages: Vec<_> = WEB_ERRORS.iter().filter_map(|code| web_error(*code)).map(|(m, _)| m).collect();
         distinct_and_non_empty(&messages);
+    }
+
+    #[test]
+    fn loading_names_the_site_when_there_is_one() {
+        assert_eq!(loading(Some("example.com")), "Loading example.com…");
+        assert_eq!(loading(None), LOADING);
+    }
+
+    #[test]
+    fn failures_on_the_web_carry_a_hint_and_local_ones_do_not() {
+        for code in WEB_ERRORS {
+            let (message, hint) = failure(code, true);
+            assert!(!message.is_empty() && hint.is_some_and(|hint| !hint.is_empty()), "{code:?}");
+            assert_eq!(failure(code, false), (error(code), None), "{code:?}");
+        }
+        assert_eq!(failure(ErrorCode::NotFound, true).0, "There's no page at this address.");
+        assert_eq!(failure(ErrorCode::NotAbsolute, true), (error(ErrorCode::NotAbsolute), None));
     }
 
     #[test]

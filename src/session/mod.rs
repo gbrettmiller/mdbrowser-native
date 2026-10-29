@@ -27,6 +27,13 @@ pub struct Settings {
     pub font: ReadingFont,
 }
 
+/// What a load found: the source, and where it was finally found (after redirects).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Loaded {
+    pub source: String,
+    pub location: Location,
+}
+
 /// A document ready to show.
 #[derive(Debug, PartialEq)]
 pub struct Shown {
@@ -67,7 +74,7 @@ pub enum Event {
     Back,
     Forward,
     Reload,
-    Loaded { request_id: u64, result: Result<String, ErrorCode>, now: u64 },
+    Loaded { request_id: u64, result: Result<Loaded, ErrorCode>, now: u64 },
     OpenerFailed,
     OpenHistory(String),
     ClearHistory,
@@ -135,8 +142,27 @@ mod tests {
         events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))
     }
 
-    fn loaded(request_id: u64, source: &str) -> Event {
-        Event::Loaded { request_id, result: Ok(source.into()), now: 1 }
+    fn loaded_at(request_id: u64, location: Location, source: &str) -> Event {
+        Event::Loaded { request_id, result: Ok(Loaded { source: source.into(), location }), now: 1 }
+    }
+
+    fn loaded(request_id: u64, path: &str, source: &str) -> Event {
+        loaded_at(request_id, Location::file(native(path)), source)
+    }
+
+    fn web(url: &str) -> Location {
+        Location::web(url::Url::parse(url).unwrap())
+    }
+
+    fn fetched(request_id: u64, url: &str, source: &str) -> Event {
+        loaded_at(request_id, web(url), source)
+    }
+
+    fn history(effects: &[Effect]) -> Vec<String> {
+        match effects {
+            [Effect::PersistVisits(visits)] => visits.iter().map(|visit| visit.address.clone()).collect(),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]
@@ -148,7 +174,7 @@ mod tests {
 
     #[test]
     fn a_load_shows_the_document_and_records_history() {
-        let (state, effects) = run([Event::Enter(format!("{}#intro", native("/d/a.md"))), loaded(1, "# A")]);
+        let (state, effects) = run([Event::Enter(format!("{}#intro", native("/d/a.md"))), loaded(1, "/d/a.md", "# A")]);
         let Status::Ready(shown) = &state.status else { panic!("{:?}", state.status) };
         assert_eq!(shown.title, "A");
         assert_eq!(state.fragment.as_deref(), Some("intro"));
@@ -158,9 +184,76 @@ mod tests {
     #[test]
     fn stale_loads_are_ignored() {
         let (state, effects) =
-            run([Event::Enter(native("/d/a.md")), Event::Enter(native("/d/b.md")), loaded(1, "# A")]);
+            run([Event::Enter(native("/d/a.md")), Event::Enter(native("/d/b.md")), loaded(1, "/d/a.md", "# A")]);
         assert_eq!(state.status, Status::Loading);
         assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn entering_a_web_address_requests_a_load_and_waits() {
+        let (state, effects) = run([Event::Enter("https://x.org/a.md".into())]);
+        assert_eq!(state.status, Status::Loading);
+        assert_eq!(effects, [Effect::Load { request_id: 1, location: web("https://x.org/a.md") }]);
+    }
+
+    #[test]
+    fn a_redirected_load_settles_on_its_final_address() {
+        let (state, effects) =
+            run([Event::Enter("https://x.org/old.md#intro".into()), fetched(1, "https://x.org/new.md", "# New")]);
+        assert_eq!(state.address(), "https://x.org/new.md");
+        assert_eq!(state.current_location(), Some(&web("https://x.org/new.md")));
+        assert_eq!(state.fragment.as_deref(), Some("intro"));
+        assert_eq!(history(&effects), ["https://x.org/new.md"]);
+    }
+
+    #[test]
+    fn a_redirect_to_a_visited_address_moves_that_visit_to_the_top() {
+        let (_, effects) = run([
+            Event::Enter("https://x.org/b.md".into()),
+            fetched(1, "https://x.org/b.md", "# B"),
+            Event::Enter("https://x.org/c.md".into()),
+            fetched(2, "https://x.org/c.md", "# C"),
+            Event::Enter("https://x.org/old.md".into()),
+            fetched(3, "https://x.org/b.md", "# B"),
+        ]);
+        assert_eq!(history(&effects), ["https://x.org/b.md", "https://x.org/c.md"]);
+    }
+
+    #[test]
+    fn a_stale_redirected_load_settles_nothing() {
+        let (state, effects) = run([
+            Event::Enter("https://x.org/old.md".into()),
+            Event::Enter("https://x.org/b.md".into()),
+            fetched(1, "https://x.org/new.md", "# New"),
+        ]);
+        assert_eq!((state.status.clone(), state.address()), (Status::Loading, "https://x.org/b.md".into()));
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn a_failed_web_load_keeps_the_typed_address_and_records_nothing() {
+        let failure = Event::Loaded { request_id: 1, result: Err(ErrorCode::NotFound), now: 1 };
+        let (state, effects) = run([Event::Enter("https://x.org/a.md".into()), failure]);
+        assert_eq!(state.status, Status::Failed(ErrorCode::NotFound));
+        assert_eq!(state.address(), "https://x.org/a.md");
+        assert!(effects.is_empty() && state.visits.is_empty());
+    }
+
+    #[test]
+    fn going_back_to_or_reloading_a_settled_entry_loads_its_final_address() {
+        let (_, effects) = run([
+            Event::Enter("https://x.org/old.md".into()),
+            fetched(1, "https://x.org/new.md", "# New"),
+            Event::Reload,
+        ]);
+        assert_eq!(effects, [Effect::Load { request_id: 2, location: web("https://x.org/new.md") }]);
+        let (_, effects) = run([
+            Event::Enter("https://x.org/old.md".into()),
+            fetched(1, "https://x.org/new.md", "# New"),
+            Event::Enter("https://x.org/c.md".into()),
+            Event::Back,
+        ]);
+        assert_eq!(effects, [Effect::Load { request_id: 3, location: web("https://x.org/new.md") }]);
     }
 
     #[test]

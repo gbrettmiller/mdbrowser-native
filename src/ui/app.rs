@@ -17,6 +17,7 @@ use crate::content;
 use crate::model::Document as Doc;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
+use crate::session::location::Location;
 use crate::session::{self, Event, Shown, State, Status};
 use crate::theme::{self, fonts};
 
@@ -251,8 +252,11 @@ impl App {
         let reader = theme::reading(state.settings.font);
         let main: Element<'_, Message> = match &state.status {
             Status::Idle => body::message(content::WELCOME),
-            Status::Loading => body::message(content::LOADING),
-            Status::Failed(code) => body::error(*code, state.address(), &reader),
+            Status::Loading => body::message(content::loading(state.current_location().and_then(Location::host))),
+            Status::Failed(code) => {
+                let web = state.current_location().is_some_and(Location::is_web);
+                body::error(*code, state.address(), web, &reader)
+            }
             Status::Ready(shown) => self.document_view(shown.clone()),
         };
         let background = reader.background;

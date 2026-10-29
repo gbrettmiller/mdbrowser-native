@@ -40,6 +40,18 @@ impl Location {
         }
     }
 
+    pub fn is_web(&self) -> bool {
+        matches!(self, Location::Web(_))
+    }
+
+    /// A web page's host name; files have none.
+    pub fn host(&self) -> Option<&str> {
+        match self {
+            Location::File(_) => None,
+            Location::Web(url) => url.host_str(),
+        }
+    }
+
     /// What the address bar shows: the path, or the full URL.
     pub fn address(&self) -> String {
         match self {
@@ -116,6 +128,14 @@ mod tests {
         assert_eq!(web("https://example.com/docs/my%20notes.md").label(), "my notes.md");
         assert_eq!(web("https://example.com/docs/").label(), "docs");
         assert_eq!(web("https://example.com/").label(), "example.com");
+    }
+
+    #[test]
+    fn only_web_locations_have_a_host() {
+        assert_eq!(web("https://example.com/a.md").host(), Some("example.com"));
+        assert_eq!(web("http://127.0.0.1:8080/a.md").host(), Some("127.0.0.1"));
+        assert_eq!(Location::file("/x/a.md").host(), None);
+        assert!(web("https://example.com/a.md").is_web() && !Location::file("/x/a.md").is_web());
     }
 
     #[test]

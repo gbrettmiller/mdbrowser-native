@@ -407,7 +407,7 @@ The existing file tests still pass.
 **Files**: `Cargo.toml` (ureq; flate2 as a dev-dependency for the gzip test, already in the tree through ureq), `src/services/{web,mod,runner}.rs`, `src/session/web.rs` (`decode`), `tests/support/http.rs`
 **Commit**: `feat(services): fetch Markdown over http(s)`
 
-### Step 7: Typed web addresses load
+### Step 7: Typed web addresses load — done
 
 **Complexity**: complex (parse → reducer → runner → acceptance)
 **RED**:

@@ -1,5 +1,7 @@
 //! Acceptance suite: runs the Gherkin scenarios in features/ against the session.
 
+#[path = "../support/http.rs"]
+mod http;
 mod steps;
 mod world;
 

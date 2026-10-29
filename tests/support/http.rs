@@ -67,6 +67,7 @@ impl Reply {
 type Handler = dyn Fn(&Request) -> Reply + Send + Sync;
 
 /// Serves every connection on its own thread until the process ends.
+#[derive(Debug)]
 pub struct Server {
     addr: SocketAddr,
     requests: Arc<Mutex<Vec<Request>>>,

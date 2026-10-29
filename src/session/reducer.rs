@@ -7,7 +7,7 @@ use super::error::ErrorCode;
 use super::links::{self, Link};
 use super::navigation::{Entry, Navigation};
 use super::visits;
-use super::{Effect, Event, Notice, NoticeKind, Settings, Shown, State, Status};
+use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status};
 use crate::model;
 
 type Step = (State, Vec<Effect>);
@@ -86,17 +86,20 @@ fn failed(state: State, code: ErrorCode) -> State {
     State { pending: None, status: Status::Failed(code), fragment: None, ..state }
 }
 
-fn loaded(state: State, request_id: u64, result: Result<String, ErrorCode>, now: u64) -> Step {
+/// A finished load for the current entry. A redirect settles the entry on the
+/// final location, so the address bar, History and relative links all use it.
+fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now: u64) -> Step {
     let target = state.nav.current().and_then(|entry| entry.target.clone());
     let (Some(target), true) = (target, state.pending == Some(request_id)) else { return none(state) };
     match result {
-        Ok(source) => {
+        Ok(Loaded { source, location }) => {
             let document = model::parse(&source);
-            let title = document.title(&target.location.label());
-            let visits = visits::record(&state.visits, &target.location.address(), &title, now);
+            let title = document.title(&location.label());
+            let visits = visits::record(&state.visits, &location.address(), &title, now);
             let shown = Arc::new(Shown { document: Arc::new(document), title });
-            let state = State { pending: None, status: Status::Ready(shown), fragment: target.fragment, ..state };
-            persist_visits(State { visits, ..state })
+            let nav = if location == target.location { state.nav } else { state.nav.settle(location) };
+            let status = Status::Ready(shown);
+            persist_visits(State { nav, visits, pending: None, status, fragment: target.fragment, ..state })
         }
         Err(code) => none(failed(state, code)),
     }

@@ -1,5 +1,4 @@
-//! Step definitions for features/browse.feature and features/reading.feature. Steps assert on session state
-//! and recorded effects, never on pixels.
+//! Steps for local files: features/browse.feature and features/reading.feature.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -15,20 +14,7 @@ use mdbrowser::theme::{self, ReadingFont, fonts};
 
 use crate::world::Browser;
 
-fn unescape(text: &str) -> String {
-    text.replace("\\n", "\n")
-}
-
-fn enter(w: &mut Browser, input: String) {
-    w.send(Event::Enter(input));
-}
-
-fn shown_title(w: &Browser) -> Option<String> {
-    match &w.state().status {
-        Status::Ready(shown) => Some(shown.title.clone()),
-        _ => None,
-    }
-}
+use super::{enter, shown_title, unescape};
 
 // ── Files and fixtures ──────────────────────────────────────────────────────
 
@@ -65,8 +51,7 @@ fn opener_fails(w: &mut Browser) {
 
 #[given(expr = "loading {string} is slow")]
 fn slow(w: &mut Browser, name: String) {
-    let path = w.path(&name);
-    w.held.insert(path);
+    w.hold(&name);
 }
 
 // ── Entering addresses ──────────────────────────────────────────────────────
@@ -164,7 +149,7 @@ fn see_title(w: &mut Browser, title: String) {
 }
 
 #[then(expr = "I see the error {string}")]
-fn see_error(w: &mut Browser, code: String) {
+pub(super) fn see_error(w: &mut Browser, code: String) {
     match &w.state().status {
         Status::Failed(actual) => assert_eq!(actual.key(), code),
         other => panic!("expected error {code}, got {other:?}"),

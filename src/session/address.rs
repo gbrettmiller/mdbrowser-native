@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use url::Url;
+
 use super::error::ErrorCode;
 use super::location::{Location, Target, is_markdown};
 
@@ -93,6 +95,19 @@ fn expand_home(path: &str, home: &Path) -> PathBuf {
     }
 }
 
+const WEB_SCHEMES: [&str; 2] = ["http", "https"];
+
+/// An http(s) address. Any extension may be Markdown (the server says), so only
+/// a host is required. Credentials are dropped; the fragment moves to the target.
+pub(super) fn parse_web_url(input: &str) -> Result<Target, ErrorCode> {
+    let mut url = Url::parse(input).map_err(|_| ErrorCode::NotAbsolute)?;
+    let fragment = url.fragment().map(decode).filter(|fragment| !fragment.is_empty());
+    // Infallible for http(s) URLs, which always have a host.
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    Ok(Target { location: Location::web(url), fragment })
+}
+
 /// Validation order: empty → scheme → absolute → extension. Nothing touches the disk.
 pub fn parse_address(input: &str, home: &Path) -> Result<Target, ErrorCode> {
     let input = input.trim();
@@ -100,6 +115,7 @@ pub fn parse_address(input: &str, home: &Path) -> Result<Target, ErrorCode> {
         return Err(ErrorCode::Empty);
     }
     let (path, fragment) = match scheme_of(input).as_deref() {
+        Some(scheme) if WEB_SCHEMES.contains(&scheme) => return parse_web_url(input),
         Some("file") => parse_file_url(input).ok_or(ErrorCode::NotAbsolute)?,
         Some(_) => return Err(ErrorCode::UnsupportedScheme),
         None => {
@@ -151,11 +167,34 @@ mod tests {
     fn rejects_in_validation_order_without_touching_disk() {
         assert_eq!(parse(""), Err(ErrorCode::Empty));
         assert_eq!(parse("   "), Err(ErrorCode::Empty));
-        assert_eq!(parse("https://example.com/readme.md"), Err(ErrorCode::UnsupportedScheme));
         assert_eq!(parse("ftp://x/a.md"), Err(ErrorCode::UnsupportedScheme));
         assert_eq!(parse("notes/a.md"), Err(ErrorCode::NotAbsolute));
         assert_eq!(parse(&native("/x/data.txt")), Err(ErrorCode::NotMarkdown));
         assert_eq!(parse("~"), Err(ErrorCode::NotMarkdown));
+    }
+
+    #[test]
+    fn web_addresses_are_accepted_whatever_their_extension() {
+        assert_eq!(parse("https://example.com/readme.md"), Ok(("https://example.com/readme.md".into(), None)));
+        assert_eq!(parse("HTTP://X.ORG/a"), Ok(("http://x.org/a".into(), None)));
+        assert_eq!(parse(" https://x.org/post "), Ok(("https://x.org/post".into(), None)));
+        assert_eq!(parse("https://x.org"), Ok(("https://x.org/".into(), None)));
+        assert_eq!(parse("http://127.0.0.1:8080/a.md?v=1"), Ok(("http://127.0.0.1:8080/a.md?v=1".into(), None)));
+        assert_eq!(parse("http://[::1]:80/a.md"), Ok(("http://[::1]/a.md".into(), None)));
+    }
+
+    #[test]
+    fn web_fragments_split_off_decoded() {
+        assert_eq!(parse("https://x.org/a.md#caf%C3%A9"), Ok(("https://x.org/a.md".into(), Some("café".into()))));
+        assert_eq!(parse("https://x.org/a.md#"), Ok(("https://x.org/a.md".into(), None)));
+    }
+
+    #[test]
+    fn web_addresses_need_a_host_and_lose_their_credentials() {
+        assert_eq!(parse("http://"), Err(ErrorCode::NotAbsolute));
+        assert_eq!(parse("https://user:pw@x.org/a.md"), Ok(("https://x.org/a.md".into(), None)));
+        assert_eq!(parse("https://user@x.org/a.md"), Ok(("https://x.org/a.md".into(), None)));
+        assert_eq!(parse("ftp://x.org/a.md"), Err(ErrorCode::UnsupportedScheme));
     }
 
     #[test]
