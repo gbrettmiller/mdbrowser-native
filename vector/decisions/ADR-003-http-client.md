@@ -75,7 +75,7 @@ ureq's blocking model fits the existing `run_blocking` service with no second ru
 Fetch settings, all owned by `services::web` and passed as `Limits`:
 - `max_redirects(0)`. `session::web::next_hop` follows hops, up to its own limit.
 - 10 s to connect and 30 s overall.
-- Bodies are capped at 16 MiB.
+- Bodies are capped at 16 MiB, counted after gzip decompression. A body in an encoding the client didn't decode is unreadable.
 - No cookie store.
 - `Accept` comes from `session::web::ACCEPT` and prefers `text/markdown`.
 

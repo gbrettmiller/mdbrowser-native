@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-29
 **Branches**: `feat/strip-html` (PR A, step 1), then `feat/phase-2a` (PR B, steps 2–10), both from `main`
-**Status**: approved (2026-10-29, revision 3)
+**Status**: built (2026-10-29); PR A merged, PR B in review. Approved as revision 3.
 
 ## Goal
 
@@ -25,13 +25,13 @@ Decisions already made by the product owner (2026-10-29):
 
 ## Acceptance Criteria
 
-1. [ ] **Typed addresses.** An `http://` or `https://` address (scheme in any case) is fetched with an `Accept` header that ranks `text/markdown` highest. A Markdown response is shown with its title. The address bar always shows the full final URL, including its scheme.
-2. [ ] **What counts as Markdown.**
+1. [x] **Typed addresses.** An `http://` or `https://` address (scheme in any case) is fetched with an `Accept` header that ranks `text/markdown` highest. A Markdown response is shown with its title. The address bar always shows the full final URL, including its scheme.
+2. [x] **What counts as Markdown.**
    - Markdown: Content-Type `text/markdown` or `text/x-markdown` (case-insensitive, parameters allowed). Also `text/plain` or no Content-Type, when the final URL's *path* ends in `.md` or `.markdown`. Query and fragment are ignored, and case doesn't matter.
    - `notMarkdown`: anything else.
    - An empty 2xx body is a valid, empty document.
-3. [ ] **Open in browser.** On `notMarkdown` for any web location (typed or followed), the error offers **Open in browser**, which hands the URL to the system browser. Local files never offer it.
-4. [ ] **Redirects.** Statuses 301, 302, 303, 307 and 308 are followed up to 5 hops. The address bar, History and relative links use the final URL.
+3. [x] **Open in browser.** On `notMarkdown` for any web location (typed or followed), the error offers **Open in browser**, which hands the URL to the system browser. Local files never offer it.
+4. [x] **Redirects.** Statuses 301, 302, 303, 307 and 308 are followed up to 5 hops. The address bar, History and relative links use the final URL.
    - These give `badRedirect`:
      - a 6th hop
      - https→http
@@ -40,17 +40,17 @@ Decisions already made by the product owner (2026-10-29):
      - a public host redirecting to a loopback, private or link-local address, or to `localhost` (ADR-003)
    - Any other 3xx gives `serverError`. Any 2xx is a success.
    - User names and passwords in a redirect target are dropped, never sent.
-5. [ ] **Failures.**
+5. [x] **Failures.**
    - 404 and 410 → `notFound`.
    - Other 4xx and 5xx → `serverError`.
    - Refused connection, DNS, TLS and timeout failures → `unreachable`.
    - A body over 16 MiB, invalid UTF-8, or a declared charset other than UTF-8 or US-ASCII → `unreadable`.
    - Every web error shows the address it was for, plus a hint: a non-empty sentence saying what to try next. The content test asserts this for every web error code.
-6. [ ] **Links in a remote page.** Relative, root-relative and scheme-relative links resolve against the page's final URL. `.md`/`.markdown` links open in the app; other `http(s)` and `mailto:` links go to the system browser; `#fragment` links scroll.
-7. [ ] **Remote pages can't reach the disk.** `file:` links, drive-letter paths (`C:\x.md`) and UNC paths (`\\host\x.md`) are refused with the notice "Web pages can't open files on your computer." The page stays put, and nothing is read from disk. Bare absolute paths resolve as URLs on the same site. A public page's Markdown link into the local network (loopback, private, link-local, `localhost`, however spelled) is refused with "Web pages can't open addresses on your local network." (added in step 8).
-8. [ ] **Links in a local file.** An `http(s)` link to `.md`/`.markdown` opens in the app. Other web links still go to the system browser.
-9. [ ] **History and navigation.** Back, forward and reload work across files and pages, and between pages. Reload re-fetches. Remote visits go into History under their final URL and can be reopened from there.
-10. [ ] **Stale loads.** A fetch still running when the reader navigates away is ignored when it finishes.
+6. [x] **Links in a remote page.** Relative, root-relative and scheme-relative links resolve against the page's final URL. `.md`/`.markdown` links open in the app; other `http(s)` and `mailto:` links go to the system browser; `#fragment` links scroll.
+7. [x] **Remote pages can't reach the disk.** `file:` links, drive-letter paths (`C:\x.md`) and UNC paths (`\\host\x.md`) are refused with the notice "Web pages can't open files on your computer." The page stays put, and nothing is read from disk. Bare absolute paths resolve as URLs on the same site. A public page's Markdown link into the local network (loopback, private, link-local, `localhost`, however spelled) is refused with "Web pages can't open addresses on your local network." (added in step 8).
+8. [x] **Links in a local file.** An `http(s)` link to `.md`/`.markdown` opens in the app. Other web links still go to the system browser.
+9. [x] **History and navigation.** Back, forward and reload work across files and pages, and between pages. Reload re-fetches. Remote visits go into History under their final URL and can be reopened from there.
+10. [x] **Stale loads.** A fetch still running when the reader navigates away is ignored when it finishes.
 11. [x] **HTML stripping.** Raw HTML is stripped in files and pages, in paragraphs, headings (including the title), list items, table cells and link text. Tags, comments and declarations go, quoted attributes containing `>` included. The text between them stays. Code spans, fenced code and indented code are untouched.
 12. [ ] **CI.** `format`, `platform (ubuntu-22.04)`, `platform (ubuntu-24.04-arm)`, `platform (macos-latest)`, `platform (windows-latest)` and `ci` are all green (`.github/workflows/ci.yml`). The acceptance suite runs against a real HTTP server on 127.0.0.1 on all four platforms.
 
@@ -325,7 +325,7 @@ Replace `html_is_shown_as_literal_text_not_interpreted`. **Before GREEN**, list 
 ### Step 2: ADR-003, the HTTP client and URL handling, plus doctrine — done
 
 **Complexity**: trivial
-**GREEN**: Use `invest-adr` to record ureq 3 (blocking, which fits `background::run_blocking`; rustls with webpki roots, so no OpenSSL anywhere) and `url`. The alternatives are reqwest with tokio (a second runtime alongside iced's) and hand-rolled HTTP (no TLS). Costs to record: about 2 MB of binary, and corporate MITM proxies fail as `unreachable`. Also record the accepted **private-network risk**: a page can link to `http://192.168.x.x/…`, which is fetched only on a click, with no cookies. It is tracked as a follow-up.
+**GREEN**: Use `invest-adr` to record ureq 3 (blocking, which fits `background::run_blocking`; rustls with webpki roots, so no OpenSSL anywhere) and `url`. The alternatives are reqwest with tokio (a second runtime alongside iced's) and hand-rolled HTTP (no TLS). Costs to record: about 2 MB of binary, and corporate MITM proxies fail as `unreachable`. Also record the accepted **private-network risk**: a page can link to `http://192.168.x.x/…`, which is fetched only on a click, with no cookies. It is tracked as a follow-up. (Narrowed in step 8: public pages are now refused; see the ADR-003 amendment.)
 
 In ARCHITECTURE.md:
 - add `ureq` and `url` to the stack table
@@ -486,13 +486,13 @@ Rewrite `only_web_and_mail_links_leave_the_app`. Acceptance: the remaining `remo
 
 ## Pre-PR Quality Gate (each PR)
 
-- [ ] `cargo test` passes (unit and acceptance)
-- [ ] `cargo build --release` passes
-- [ ] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass
+- [x] `cargo test` passes (unit and acceptance)
+- [x] `cargo build --release` passes
+- [x] `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass
 - [ ] `/code-review` passes, including `arch-review` (session may use `url`, and `services::web` matches ARCHITECTURE.md) and `a11y-review` on the new button
 - [ ] Manual check (PR B): open `https://raw.githubusercontent.com/scripting/markdownWeb/main/readme.md` and `https://andrewshell.org/`, and follow a link from one page to another
 - [ ] All six CI checks are green
-- [ ] Documentation is updated
+- [x] Documentation is updated
 
 ## Risks & Open Questions
 
