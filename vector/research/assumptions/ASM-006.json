@@ -1,0 +1,12 @@
+{
+  "id": "ASM-006",
+  "version": "0.1",
+  "created": "2026-10-28",
+  "status": "draft",
+  "assumption": "Discovery works through existing conventions: llms.txt as a site's index of Markdown pages, RSS 2.0 feeds (via the source field) and OPML, without a new protocol.",
+  "category": "technical",
+  "confidence": "low",
+  "evidence": "INT-001: Dirk Primbs uses llms.txt for this; Winer says the work will 'work extremely well with RSS 2.0 and OPML'. Neither is yet specified for this use.",
+  "test_method": "Spike: open an llms.txt as a navigable index and a source feed as a list of posts; see whether they lead to readable .md pages.",
+  "result": ""
+}

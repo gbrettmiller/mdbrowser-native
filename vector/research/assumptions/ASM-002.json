@@ -1,0 +1,12 @@
+{
+  "id": "ASM-002",
+  "version": "0.1",
+  "created": "2026-10-28",
+  "status": "draft",
+  "assumption": "A purpose-built layout engine for Markdown's closed set of node types gives reading quality equal to or better than HTML rendering.",
+  "category": "technical",
+  "confidence": "medium",
+  "evidence": "Spike (2026-10-28) and phase 1 screenshots across four fonts and the corpus.",
+  "test_method": "Render the markdownWeb examples 0-8 and compare side by side with their scripting.com HTML versions and with Winer's own Markdown browser (screenshots/rendered0.png).",
+  "result": ""
+}

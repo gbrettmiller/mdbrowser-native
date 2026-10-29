@@ -1,6 +1,6 @@
 # Architecture
 
-**Last Updated:** 2026-10-29
+**Last Updated:** 2026-10-28
 
 This file is the technical specification: layers, stack, conventions, structure and import rules. For project intent and direction, see VECTOR.md. Read VECTOR.md first, then this file, before writing code. `/invest-architecture` audits the codebase against what is declared here.
 

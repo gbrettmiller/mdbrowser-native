@@ -1,0 +1,12 @@
+{
+  "id": "ASM-004",
+  "version": "0.1",
+  "created": "2026-10-28",
+  "status": "draft",
+  "assumption": "Writers and tools will converge on a shared front matter vocabulary drawn from RSS 2.0 (title, author, pubDate, description, source, enclosure) plus urlPrev, urlNext, image, inlineImage and metaImage, so acting on those names reaches most Markdown-web content.",
+  "category": "market",
+  "confidence": "low",
+  "evidence": "INT-001 asks for it explicitly and cites overlap with Jekyll, Hugo, Eleventy, Astro and Obsidian. Only one corpus (scripting.com) uses it today, and the vocabulary is undocumented.",
+  "test_method": "Survey front matter keys in the markdownWeb archive, Andrew Shell's site and a sample of Jekyll/Hugo/Obsidian repos; track whether other Markdown-web browsers adopt the names.",
+  "result": ""
+}

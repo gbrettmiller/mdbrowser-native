@@ -1,0 +1,12 @@
+{
+  "id": "ASM-001",
+  "version": "0.1",
+  "created": "2026-10-28",
+  "status": "draft",
+  "assumption": "Enough content is published as Markdown (.md URLs, Accept: text/markdown, llms.txt) to make browsing worthwhile.",
+  "category": "market",
+  "confidence": "medium",
+  "evidence": "INT-001: the full scripting.com archive (May 2017 to October 2026) is published as Markdown; Andrew Shell's site and Dirk Primbs' llms.txt publish Markdown; READMEs and docs sites are already Markdown. Still a small, early community.",
+  "test_method": "Phase 2: browse the markdownWeb archive, the community sites and a sample of llms.txt sites over http(s); count how many render without fallback or errors.",
+  "result": ""
+}

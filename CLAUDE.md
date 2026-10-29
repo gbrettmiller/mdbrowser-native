@@ -32,3 +32,4 @@ The global JS style defaults (quotes, semicolons, pnpm) don't apply here. rustfm
 
 - `~/projects/mdbrowser`: the predecessor (Tauri + Svelte + webview). Its acceptance behaviour is carried over in `features/`.
 - `~/projects/mdbrowser-spike`: the throwaway spike that validated this stack. Findings are in `vector/research/2026-10-28-spike-findings.md`. Its tested `src/{model,session,links,layout}.rs` are reference material: port them deliberately, test first, rather than copying them wholesale.
+- [scripting/markdownWeb](https://github.com/scripting/markdownWeb): the Web of Markdown proposal, a community front matter vocabulary and an example corpus (the scripting.com archive in Markdown). This is the interop target; see `vector/research/interviews/INT-001.json`.
