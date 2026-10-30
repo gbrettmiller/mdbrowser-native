@@ -7,7 +7,7 @@ use std::time::Instant;
 use iced::Task;
 use iced::widget::operation::{self, AbsoluteOffset, RelativeOffset};
 
-use super::{ANCHOR_ATTEMPTS, ANCHOR_RETRY, App, Message, SCROLL_ID};
+use super::{ANCHOR_ATTEMPTS, ANCHOR_RETRY, App, Message, PAGE_ID, SCROLL_ID};
 use crate::model::Document as Doc;
 use crate::services::background;
 use crate::session::{Event, Shown};
@@ -70,6 +70,11 @@ impl App {
         scroll_task(self.viewport.relaid(&before, &after, theme::reading(self.look()).gutter))
     }
 
+    /// Scrolls the focused stop, spanning `top` to `bottom` of the page, into view.
+    pub(super) fn reveal(&mut self, top: f32, bottom: f32) -> Task<Message> {
+        scroll_task(self.viewport.reveal(top, bottom))
+    }
+
     /// New documents start at the top; a pending anchor is resolved once the
     /// view has laid the page out at its real width.
     pub(super) fn scroll_after(
@@ -82,7 +87,12 @@ impl App {
         if is_new {
             self.viewport.new_page(self.session().images.generation());
         }
-        let to_top = if is_new { operation::snap_to(SCROLL_ID, RelativeOffset::START) } else { Task::none() };
+        let to_top = if is_new {
+            // A page you open is the page you read: the scroll keys work at once.
+            Task::batch([operation::snap_to(SCROLL_ID, RelativeOffset::START), operation::focus(PAGE_ID)])
+        } else {
+            Task::none()
+        };
         // Start one resolution per new anchor; other dispatches leave a running one alone.
         match self.session().fragment.clone() {
             Some(fragment) if is_new || Some(&fragment) != fragment_before.as_ref() => {

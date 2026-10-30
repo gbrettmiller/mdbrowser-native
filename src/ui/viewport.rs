@@ -13,7 +13,12 @@ use crate::model::Document;
 /// new window (e.g. tiling it) doesn't move the heading after we've scrolled to it.
 const ANCHOR_STABLE: Duration = Duration::from_millis(150);
 
+/// A revealed stop stays this far from the edge of the view.
+const REVEAL_MARGIN: f32 = 24.0;
+
 pub struct Viewport {
+    /// Last laid-out height of the view.
+    height: Cell<f32>,
     /// Last laid-out width, for scrolling to anchors outside `view`.
     width: Cell<f32>,
     /// When the laid-out width last changed.
@@ -35,8 +40,9 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    pub fn new(width: f32) -> Self {
+    pub fn new(width: f32, height: f32) -> Self {
         Viewport {
+            height: Cell::new(height),
             width: Cell::new(width),
             width_since: Cell::new(Instant::now()),
             settling: Cell::new(false),
@@ -50,6 +56,11 @@ impl Viewport {
 
     pub fn width(&self) -> f32 {
         self.width.get()
+    }
+
+    /// `view` was given a window of this height.
+    pub fn sized(&self, height: f32) {
+        self.height.set(height);
     }
 
     pub fn applied_images(&self) -> u64 {
@@ -104,6 +115,25 @@ impl Viewport {
         self.scroll_y.set(y);
     }
 
+    /// Where to scroll so the page-space span `top` to `bottom` can be seen: `None` if it already
+    /// is, the centre of the view if it was off screen, and its top if it is taller than the view.
+    pub fn reveal(&mut self, top: f32, bottom: f32) -> Option<f32> {
+        let (scroll, height) = (self.scroll_y.get(), self.height.get());
+        let target = if bottom - top > height - 2.0 * REVEAL_MARGIN {
+            top - REVEAL_MARGIN
+        } else if top >= scroll + REVEAL_MARGIN && bottom <= scroll + height - REVEAL_MARGIN {
+            return None;
+        } else {
+            (top + bottom) / 2.0 - height / 2.0
+        };
+        let target = target.max(0.0);
+        if (target - scroll).abs() < 0.5 {
+            return None;
+        }
+        self.scroll_y.set(target);
+        Some(target)
+    }
+
     pub fn scrolled(&mut self, y: f32) {
         self.scroll_y.set(y);
         if self.anchor_held.as_ref().is_some_and(|(_, at)| (at - y).abs() >= 1.0) {
@@ -156,11 +186,56 @@ mod tests {
         layout(&parse(POST).blocks, &reading(Look::default()), 600.0, &view)
     }
 
+    fn scrolled_to(y: f32) -> Viewport {
+        let mut viewport = Viewport::new(600.0, 600.0);
+        viewport.scrolled(y);
+        viewport
+    }
+
+    #[test]
+    fn a_stop_already_in_view_stays_put() {
+        assert_eq!(scrolled_to(100.0).reveal(200.0, 220.0), None);
+    }
+
+    #[test]
+    fn a_stop_below_or_above_the_view_is_brought_to_its_centre() {
+        assert_eq!(scrolled_to(0.0).reveal(1000.0, 1020.0), Some(710.0));
+        assert_eq!(scrolled_to(900.0).reveal(500.0, 520.0), Some(210.0));
+    }
+
+    #[test]
+    fn a_stop_near_the_top_cannot_scroll_above_the_page() {
+        assert_eq!(scrolled_to(500.0).reveal(50.0, 70.0), Some(0.0));
+    }
+
+    #[test]
+    fn a_stop_hard_against_an_edge_is_moved_in() {
+        assert!(scrolled_to(100.0).reveal(105.0, 125.0).is_some(), "too close to the top");
+        assert!(scrolled_to(100.0).reveal(670.0, 695.0).is_some(), "too close to the bottom");
+    }
+
+    #[test]
+    fn a_stop_taller_than_the_view_shows_its_top() {
+        let mut viewport = scrolled_to(0.0);
+        assert_eq!(viewport.reveal(1000.0, 1800.0), Some(976.0));
+        assert_eq!(viewport.reveal(1000.0, 1800.0), None, "already there");
+    }
+
+    #[test]
+    fn a_reveal_lets_go_of_a_held_anchor_when_the_view_follows_it() {
+        let mut viewport = scrolled_to(0.0);
+        viewport.hold_anchor("x".into(), 0.0);
+        let target = viewport.reveal(1000.0, 1020.0).unwrap();
+        viewport.scrolled(target);
+        let (before, after) = (page(10), page(300));
+        assert_ne!(viewport.images_arrived(&before, &after, 0.0, 1), Some(0.0), "not pulled back to the anchor");
+    }
+
     #[test]
     fn a_held_anchor_follows_its_heading_as_images_arrive() {
         let (before, after) = (page(10), page(300));
         let gutter = reading(Look::default()).gutter;
-        let mut viewport = Viewport::new(600.0);
+        let mut viewport = Viewport::new(600.0, 600.0);
         let at = before.scroll_offset_for("later", gutter).unwrap();
         viewport.hold_anchor("later".into(), at);
         let target = viewport.images_arrived(&before, &after, gutter, 1);
@@ -177,7 +252,7 @@ mod tests {
         };
         let ((before, gutter), (after, gutter_after)) = (at(TextSize::default()), at(TextSize::default().larger()));
         assert_ne!(gutter, gutter_after);
-        let mut viewport = Viewport::new(600.0);
+        let mut viewport = Viewport::new(600.0, 600.0);
         viewport.hold_anchor("later".into(), before.scroll_offset_for("later", gutter).unwrap());
         let target = viewport.images_arrived(&before, &after, gutter_after, 0);
         assert_eq!(target, after.scroll_offset_for("later", gutter_after));
@@ -187,7 +262,7 @@ mod tests {
     fn scrolling_away_lets_go_of_the_anchor() {
         let (before, after) = (page(10), page(300));
         let gutter = reading(Look::default()).gutter;
-        let mut viewport = Viewport::new(600.0);
+        let mut viewport = Viewport::new(600.0, 600.0);
         viewport.hold_anchor("later".into(), before.scroll_offset_for("later", gutter).unwrap());
         viewport.scrolled(0.0);
         assert_eq!(viewport.images_arrived(&before, &after, gutter, 1), None, "at the top, the top stays put");
@@ -195,7 +270,7 @@ mod tests {
 
     #[test]
     fn image_relayouts_are_scheduled_one_at_a_time() {
-        let mut viewport = Viewport::new(600.0);
+        let mut viewport = Viewport::new(600.0, 600.0);
         assert!(!viewport.begin_images(0), "nothing new");
         assert!(viewport.begin_images(1));
         assert!(!viewport.begin_images(2), "one is already scheduled");
@@ -209,7 +284,7 @@ mod tests {
 
     #[test]
     fn a_new_page_starts_at_the_top_holding_nothing() {
-        let mut viewport = Viewport::new(600.0);
+        let mut viewport = Viewport::new(600.0, 600.0);
         viewport.hold_anchor("x".into(), 400.0);
         viewport.new_page(7);
         assert_eq!(viewport.applied_images(), 7);

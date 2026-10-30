@@ -26,6 +26,7 @@ impl App {
         let reader = theme::reading(self.look());
         responsive(move |size| {
             let width = size.width - SCROLLBAR;
+            self.viewport.sized(size.height);
             let (page, settling) = self.page(&shown.document, width);
             self.viewport.laid_out(&shown.document, width, settling);
             let pictures = images::pictures(&page, &self.session().images);
@@ -33,6 +34,7 @@ impl App {
                 follow: Box::new(|href| Message::Session(Event::Follow(href))),
                 load_image: Box::new(|src| Message::Session(Event::LoadImage(src))),
                 hover: Box::new(Message::Hover),
+                reveal: Box::new(Message::Reveal),
             };
             let document = Document::new(Arc::as_ptr(&shown.document) as usize, page, pictures, reader, on).id(PAGE_ID);
             scrollable(document)

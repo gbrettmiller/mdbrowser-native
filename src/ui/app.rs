@@ -62,6 +62,8 @@ pub enum Message {
     ImagesArrived,
     /// The document was scrolled to this offset.
     Scrolled(f32),
+    /// Focus moved to a stop spanning these heights of the page: scroll it into view.
+    Reveal(f32, f32),
 }
 
 pub struct App {
@@ -97,7 +99,7 @@ impl App {
             home_draft: settings.home.clone(),
             colour_drafts: ColourDrafts::of(settings.colours()),
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
-            viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR),
+            viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR, WINDOW_SIZE.1),
             relayout_scheduled: false,
         };
         let restore = app.dispatch(Event::Restore { visits, settings });
@@ -214,6 +216,7 @@ impl App {
             })),
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
             Message::ImagesArrived => self.images_arrived(),
+            Message::Reveal(top, bottom) => self.reveal(top, bottom),
             Message::Scrolled(y) => {
                 self.viewport.scrolled(y);
                 Task::none()

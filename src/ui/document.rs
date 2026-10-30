@@ -13,7 +13,7 @@ use iced::advanced::{Clipboard, Shell, clipboard};
 use iced::keyboard::{self, Key, key::Named};
 use iced::{Border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 
-use crate::layout::{Caret, Direction, Page, Reach, Stop, reach};
+use crate::layout::{Caret, Direction, Page, Reach, Stop, Target, reach};
 use crate::theme;
 
 /// How far the focus ring sits outside a link, and how thick it is.
@@ -37,6 +37,8 @@ pub struct Handlers<'a, Message> {
     /// A click on an image's clickable note: the image source to load.
     pub load_image: Box<dyn Fn(String) -> Message + 'a>,
     pub hover: Box<dyn Fn(Option<String>) -> Message + 'a>,
+    /// Focus moved to a stop at these heights of the page (top, bottom): bring it into view.
+    pub reveal: Box<dyn Fn(f32, f32) -> Message + 'a>,
 }
 
 impl<'a, Message> Document<'a, Message> {
@@ -81,19 +83,25 @@ fn page_id(page: &Arc<Page>) -> usize {
 }
 
 impl State {
-    /// The state for `page` of `document`. Focus carries over from `previous` when it is the
-    /// same document, kept on the same stop if the page still has it; the selection does not.
+    /// The state for `page` of `document`. The page keeps the keyboard if it had it, and keeps
+    /// its stop if this is the same document and the page still has that stop; the selection
+    /// does not carry over.
     fn on(page: &Arc<Page>, document: usize, previous: Option<&State>) -> State {
         let stops = page.stops();
-        let kept = previous.filter(|before| before.document == document && before.focused);
+        let same = previous.filter(|before| before.document == document);
         State {
             page: page_id(page),
             document,
-            focused: kept.is_some(),
-            stop: kept.and_then(|before| before.stop).filter(|&stop| stop < stops.len()),
+            focused: previous.is_some_and(|before| before.focused),
+            stop: same.and_then(|before| before.stop).filter(|&stop| stop < stops.len()),
             stops,
             ..State::default()
         }
+    }
+
+    /// What Enter does on the focused stop.
+    fn target(&self) -> Option<&Target> {
+        self.stop.and_then(|stop| self.stops.get(stop)).map(|stop| &stop.target)
     }
 
     /// Tab (or Shift+Tab) on the page: true when it moved to a stop, so the key is used up;
@@ -317,9 +325,22 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
             {
                 let direction = if modifiers.shift() { Direction::Back } else { Direction::Forward };
                 if state.tab(direction) {
+                    if let Some(line) = state.ring().first() {
+                        shell.publish((self.on.reveal)(line.y, line.y + line.height));
+                    }
                     shell.request_redraw();
                     shell.capture_event();
                 }
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed { key: Key::Named(Named::Enter), modifiers, .. })
+                if state.focused && !modifiers.command() && !modifiers.alt() && !shell.is_event_captured() =>
+            {
+                match state.target() {
+                    Some(Target::Link(href)) => shell.publish((self.on.follow)(href.clone())),
+                    Some(Target::Image(src)) => shell.publish((self.on.load_image)(src.clone())),
+                    None => return,
+                }
+                shell.capture_event();
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key: Key::Character(c), modifiers, .. })
                 if modifiers.command() && !shell.is_event_captured() =>
@@ -434,11 +455,27 @@ mod tests {
     }
 
     #[test]
-    fn a_different_document_starts_without_focus() {
+    fn a_different_document_keeps_the_keyboard_but_not_the_stop() {
         let mut before = focused(&page(THREE_LINKS));
         before.tab(Direction::Forward);
         let after = State::on(&page(THREE_LINKS), 2, Some(&before));
-        assert_eq!((after.focused, after.stop), (false, None));
+        assert_eq!((after.focused, after.stop), (true, None));
+    }
+
+    #[test]
+    fn a_page_that_never_had_the_keyboard_does_not_take_it() {
+        let before = State::on(&page(THREE_LINKS), 1, None);
+        assert!(!State::on(&page(THREE_LINKS), 2, Some(&before)).focused);
+    }
+
+    #[test]
+    fn enter_acts_on_the_focused_stop_only() {
+        let mut state = focused(&page("[a](a.md) ![x](x.png)"));
+        assert_eq!(state.target(), None, "the page itself has nothing to follow");
+        state.tab(Direction::Forward);
+        assert_eq!(state.target(), Some(&Target::Link("a.md".into())));
+        state.unfocus();
+        assert_eq!(state.target(), None);
     }
 
     #[test]
