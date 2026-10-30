@@ -102,3 +102,44 @@ fn spec_timing() {
         println!("spec.md @{width}: {} fragments in {:?}", page.fragments.len(), started.elapsed());
     }
 }
+
+fn framed_page(source: &str) -> Page {
+    use crate::layout::{layout, no_images};
+    use crate::model::{Labels, assemble, parse};
+    use crate::theme::{Palette, reading};
+    let labels = Labels { listen: "Listen:", previous: "← Previous", next: "Next →" };
+    let document = parse(source);
+    layout(&assemble(&document, &labels), &reading(ReadingFont::Literata, Palette::Light), WIDTH, &no_images)
+}
+
+/// Example 1 of the markdownWeb examples: a byline under no heading, and a previous/next row.
+#[test]
+fn a_post_with_front_matter() {
+    let source = include_str!("../../corpus/markdownweb/2024/03/05/200550.md");
+    insta::assert_snapshot!(geometry(&framed_page(source)));
+}
+
+/// Every markdownWeb post lays out with its byline and links, and shows them.
+#[test]
+fn every_markdownweb_post_shows_its_front_matter() {
+    let mut files = vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus/markdownweb")];
+    let mut checked = 0;
+    while let Some(path) = files.pop() {
+        if path.is_dir() {
+            files.extend(std::fs::read_dir(&path).unwrap().map(|entry| entry.unwrap().path()));
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).unwrap_or_default();
+        if path.extension().is_none_or(|ext| ext != "md") || !source.starts_with("---") {
+            continue;
+        }
+        let page = framed_page(&source);
+        let text: String = page.fragments.iter().map(|f| f.text.as_str()).collect::<Vec<_>>().join("\n");
+        assert!(page.height > 0.0 && text.contains("Dave Winer"), "{path:?}");
+        let front = crate::model::parse(&source).front;
+        assert_eq!(front.url_prev.is_some(), text.contains("← Previous"), "{path:?}");
+        assert_eq!(front.url_next.is_some(), text.contains("Next →"), "{path:?}");
+        checked += 1;
+    }
+    assert!(checked >= 9, "checked {checked} files");
+}

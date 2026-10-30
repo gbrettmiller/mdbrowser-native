@@ -83,6 +83,9 @@ fn routes() -> HashMap<String, Reply> {
         ("/folder/index.md", Reply::markdown("# Folder Index\n")),
         ("/old", Reply::redirect(302, "/article")),
         ("/ghost.md", Reply::markdown("# Ghost\n")),
+        ("/blog/two.md", Reply::markdown("---\nurlPrev: one.md\nurlNext: ../three.md\n---\n# Post Two\n")),
+        ("/blog/one.md", Reply::markdown("# Post One\n")),
+        ("/three.md", Reply::markdown("# Post Three\n")),
     ]
     .into_iter()
     .chain(fixtures::image_routes())

@@ -2,6 +2,7 @@
 //! requests the test server saw, never on pixels.
 
 mod fallbacks;
+mod frontmatter;
 mod images;
 mod local;
 mod remote;

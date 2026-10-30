@@ -2,7 +2,7 @@
 
 use iced::keyboard::{Key, Modifiers, key::Named};
 
-use crate::session::Event;
+use crate::session::{Event, Neighbour};
 
 /// What a shortcut asks for.
 #[derive(Debug, Clone, PartialEq)]
@@ -24,6 +24,9 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         Key::Character("l") if primary => Command::FocusAddress,
         Key::Character("h") if primary => Command::ToggleHistory,
         Key::Character(",") if primary => Command::ToggleSettings,
+        // The previous and next post of a blog. Not bare keys: those type into the address bar.
+        Key::Character("[") if primary => Command::Session(Event::Neighbour(Neighbour::Previous)),
+        Key::Character("]") if primary => Command::Session(Event::Neighbour(Neighbour::Next)),
         Key::Named(Named::Home) if alt => Command::Session(Event::Home),
         // The only keyboard route to the button; the session ignores it unless offered.
         Key::Character("o" | "O") if primary && shift => Command::Session(Event::OpenInBrowser),
@@ -53,12 +56,16 @@ mod tests {
         assert_eq!(command(Key::Named(Named::Home), Modifiers::ALT), Some(Command::Session(Event::Home)));
         assert_eq!(command(Key::Named(Named::F5), Modifiers::empty()), Some(Command::Session(Event::Reload)));
         assert_eq!(command(Key::Named(Named::ArrowLeft), Modifiers::ALT), Some(Command::Session(Event::Back)));
+        let neighbour = |which| Some(Command::Session(Event::Neighbour(which)));
+        assert_eq!(command(Key::Character("["), primary()), neighbour(Neighbour::Previous));
+        assert_eq!(command(Key::Character("]"), primary()), neighbour(Neighbour::Next));
     }
 
     #[test]
     fn plain_keys_and_missing_modifiers_do_nothing() {
         assert_eq!(command(Key::Character("i"), primary()), None, "Shift is needed");
         assert_eq!(command(Key::Character("i"), Modifiers::empty()), None);
+        assert_eq!(command(Key::Character("]"), Modifiers::empty()), None, "a bare bracket is typing");
         assert_eq!(command(Key::Named(Named::ArrowLeft), Modifiers::empty()), None);
         assert_eq!(command(Key::Named(Named::Home), Modifiers::empty()), None, "Home scrolls; it needs Alt");
     }

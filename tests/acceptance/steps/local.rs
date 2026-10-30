@@ -20,7 +20,9 @@ use super::{enter, shown_title, unescape};
 
 #[given(expr = "a file {string} containing {string}")]
 fn a_file_containing(w: &mut Browser, name: String, content: String) {
-    fs::write(w.path(&name), unescape(&content)).unwrap();
+    let path = w.path(&name);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, unescape(&content)).unwrap();
 }
 
 #[given(expr = "{string} exists with invalid UTF-8 content")]

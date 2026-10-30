@@ -1,12 +1,12 @@
 # Architecture
 
-**Last Updated:** 2026-10-29
+**Last Updated:** 2026-10-30
 
 This file is the technical specification: layers, stack, conventions, structure and import rules. For project intent and direction, see VECTOR.md. Read VECTOR.md first, then this file, before writing code. `/invest-architecture` audits the codebase against what is declared here.
 
 ## Stack
 
-Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003; images: ADR-004.
+Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003; images: ADR-004; front matter: ADR-006.
 
 | Concern | Crate |
 |---|---|
@@ -18,9 +18,11 @@ Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003; images: ADR-004
 | Per-user data directory | dirs |
 | HTTP(S) fetching | ureq 3, with rustls and webpki roots; no cookies, redirects off |
 | URLs and relative-reference resolution | url |
+| Handing links to the system | open, behind `services::opener` |
+| Non-blocking file opens (unix only) | libc, in `services::files` |
 | Image decoding | image 0.25, with only the png, jpeg, gif and webp codecs; drawn through iced's `image-without-codecs` |
 | Unit tests | `cargo test` (built-in), insta for golden layout snapshots |
-| Acceptance | Gherkin in `features/`, run by the `cucumber` crate (`tests/acceptance/`), with tempfile and futures |
+| Acceptance | Gherkin in `features/`, run by the `cucumber` crate (`tests/acceptance/`), with tempfile and futures; flate2 builds compressed test responses |
 | Lint | rustfmt (`rustfmt.toml`) and clippy with `-D warnings` |
 
 Fonts are bundled: `assets/fonts/` holds static Literata, Source Serif 4, iA Writer Quattro, Inter and JetBrains Mono (each with its OFL licence), embedded at build time. `theme::fonts::install()` evicts host faces with the same family names and corrects variant metadata that upstream files get wrong.
@@ -39,9 +41,9 @@ bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, wi
 
 | Layer | Location | Rule |
 |-------|----------|------|
-| **Model** | `src/model/` | Markdown source → owned document tree. Pure. Depends only on pulldown-cmark and yaml-rust2 (frontmatter). |
+| **Model** | `src/model/` | Markdown source → owned document tree, and the shared front matter (ADR-006) read into `FrontMatter`. `frame` turns that front matter into the blocks around the body (byline, description, enclosure line, previous/next row), and `date` says RFC 822 dates in words. Pure. Depends only on pulldown-cmark and yaml-rust2 (frontmatter). |
 | **Layout** | `src/layout/` | Tree + theme + width + known image sizes → `Page`; image boxes and their placeholders, hit-testing, carets, selection and copy text, and `anchor` (keeping the reading position across relayouts). Pure apart from reading the shared font database. |
-| **Session** | `src/session/` | Address parsing (files and `http(s)` URLs, and the built-in `Welcome` location with a blank address, no History entry and its own link and image policy), link classification, web fetch policy (`Accept`, status, redirects, which responses are readable Markdown, and refusing a public page's way into the local network), images (where each comes from, which load and when, the image limits, and the decoded-image cache), back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
+| **Session** | `src/session/` | Address parsing (files and `http(s)` URLs, and the built-in `Welcome` location with a blank address, no History entry and its own link and image policy), link classification, web fetch policy (`Accept`, status, redirects, which responses are readable Markdown, and refusing a public page's way into the local network), images (where each comes from, which load and when, the image limits, and the decoded-image cache), back/forward, previous/next post (`Neighbour`, from the document's `urlPrev` and `urlNext`), History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
 | **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) for the light and dark palettes, the `Appearance` choice (System resolves to a palette given the OS mode), and bundled fonts. Data only, with one exception: `fonts::install()` loads the bundled faces into iced's process-wide font system once at startup. |
 | **Content** | `src/content.rs` | All user-facing strings. |
 | **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `images` reads or fetches an image and decodes it, one decode at a time, within ADR-004's limits. `web` fetches a page or an image through ureq: one fresh request per redirect hop carrying only `Accept`, fixed limits, and no cookies. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` serves the welcome page bundled in the binary (`assets/welcome.md`) and turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net` (only through ureq, in `web`), `std::process` or `std::thread`. |
@@ -72,7 +74,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - Functional style: functions take values and return new values. Mutation stays local to a function (builders, accumulators) and never leaks through shared state. No trait-object hierarchies without an ADR.
 - No `unsafe`.
 - Tests live beside the code in `#[cfg(test)] mod tests`. Layout gets golden snapshots for the corpus documents whose glyphs are all in the bundled fonts. Documents that fall back to host fonts (mixed scripts, symbols) get smoke tests only, because fallback faces differ between machines.
-- Files stay under roughly 300 lines. Split by responsibility before that.
+- Non-test code stays under roughly 300 lines per file: count up to the `#[cfg(test)]` module, and test files (`tests/`, `*_tests.rs`, `tests.rs`, golden snapshots) are exempt. Split by responsibility before that.
 
 ## What Not to Do
 
@@ -90,7 +92,9 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `assets/fonts/` — bundled typefaces and their licences
 - `assets/welcome.md` — the built-in welcome page, a document served by `services::runner`
 - `features/` — Gherkin acceptance scenarios
+- `tests/` — `acceptance/` (the cucumber runner, steps and a local test web server) and `support/` (the shared HTTP test helper)
+- `DESIGN.md` — documents the reader stylesheet in `src/theme/`; the code wins when they disagree
 - `corpus/` — sample Markdown documents for golden tests and manual checks
 - `scripts/shoot.sh` — screenshots documents in each font and appearance (Hyprland + grim); with no document it shoots the welcome page. It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
-- `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`
+- `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`, `audits/` (the latest `invest-doctrine` and `invest-architecture` reports)
 - `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check

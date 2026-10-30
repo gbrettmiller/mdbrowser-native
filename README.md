@@ -4,7 +4,7 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 2d, local files and remote Markdown over `http(s)`, with images, a Settings panel (font, Web images, light, dark or system appearance, home page) a built-in welcome page, a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), and an offer of the site's `llms.txt`. Front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 3, local files and remote Markdown over `http(s)`, with images, a Settings panel (font, Web images, light, dark or system appearance, home page) a built-in welcome page, a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), and an offer of the site's `llms.txt`. Shared front matter (byline, previous and next, description, enclosure) is read. More reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## What it does today
 
@@ -17,6 +17,7 @@ Writers own the words. Readers own the presentation. The document chooses nothin
 - Back, forward, reload, and a History panel that persists across restarts.
 - Four bundled reading faces: Literata (default), Source Serif 4, iA Writer Quattro and Inter. Code is set in JetBrains Mono.
 - A **Settings** panel (Ctrl+, or Cmd+,) holds the reading font, Web images, Appearance (System, Light or Dark) and a Home page. System follows the operating system. Home (the toolbar button or Alt+Home) opens the home page, or a built-in welcome page when none is set, and the app opens it on launch unless you give an address.
+- Reads the shared Web of Markdown front matter: a byline under the title from `author`, `pubDate` and the `source` site name, a `description`, a **Listen** line for an `enclosure` (it opens in your system's player), and **Previous** and **Next** links from `urlPrev` and `urlNext`. Other keys, and the `image`, `inlineImage` and `metaImage` fields, are ignored.
 - Select text with the mouse and copy it with Ctrl+C.
 - Other `http` and `https` links, and `mailto` links, open in your system's handler. Other schemes are blocked.
 - Raw HTML in a document is stripped, never interpreted: the tags go and the text between them stays.
@@ -55,6 +56,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Focus the address bar | Ctrl+L | Cmd+L |
 | Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
 | Show or hide Settings | Ctrl+, | Cmd+, |
+| Previous / next post | Ctrl+[ / Ctrl+] | Cmd+[ / Cmd+] |
 | Open the home page | Alt+Home | Option+Home |
 | Open a page that isn't Markdown in your browser | Ctrl+Shift+O | Cmd+Shift+O |
 | Load this page's images | Ctrl+Shift+I | Cmd+Shift+I |

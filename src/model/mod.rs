@@ -2,7 +2,12 @@
 //! nothing downstream ever sees HTML.
 
 mod blocks;
+mod date;
+mod frame;
 mod frontmatter;
+pub use date::readable as readable_date;
+pub use frame::{EnclosureLine, Frame, Labels, assemble, frame};
+pub use frontmatter::{Enclosure, FrontMatter, Source};
 mod html;
 mod inlines;
 pub mod slug;
@@ -18,6 +23,8 @@ pub struct Style {
     pub emphasis: bool,
     pub strike: bool,
     pub code: bool,
+    /// The browser's own aside (a byline): drawn muted. Markdown never sets it.
+    pub quiet: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,7 +80,7 @@ pub enum Block {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Document {
     pub blocks: Vec<Block>,
-    pub frontmatter_title: Option<String>,
+    pub front: FrontMatter,
 }
 
 pub fn text_of(spans: &[Span]) -> String {
@@ -111,7 +118,7 @@ impl Document {
                 _ => None,
             })
         };
-        self.frontmatter_title.clone().or_else(first_heading).unwrap_or_else(|| fallback.to_string())
+        self.front.title.clone().or_else(first_heading).unwrap_or_else(|| fallback.to_string())
     }
 }
 
@@ -141,9 +148,9 @@ pub fn parse(source: &str) -> Document {
     let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
     let (yaml, body) = frontmatter::split(source);
     let events: Vec<Event> = Parser::new_ext(body, options).collect();
-    let frontmatter_title = yaml.and_then(frontmatter::title);
+    let front = yaml.map(frontmatter::parse).unwrap_or_default();
     let blocks = blocks::blocks(&mut blocks::Events::new(events));
-    Document { blocks, frontmatter_title }
+    Document { blocks, front }
 }
 
 #[cfg(test)]

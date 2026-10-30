@@ -609,3 +609,43 @@ fn llms_txt_is_offered_for_nothing_else() {
         assert_eq!(state.llms_offer(), None, "{events:?}");
     }
 }
+
+#[test]
+fn a_post_names_its_neighbours() {
+    let (state, _) = run([
+        Event::Enter(native("/d/two.md")),
+        loaded(1, "/d/two.md", "---\nurlPrev: one.md\nurlNext: ../three.md\n---\n# Two"),
+    ]);
+    assert_eq!(state.neighbour(Neighbour::Previous).as_deref(), Some("one.md"));
+    assert_eq!(state.neighbour(Neighbour::Next).as_deref(), Some("../three.md"));
+}
+
+#[test]
+fn no_neighbours_without_front_matter_or_a_page() {
+    let (state, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
+    assert_eq!((state.neighbour(Neighbour::Previous), state.neighbour(Neighbour::Next)), (None, None));
+    let (loading, _) = run([Event::Enter(native("/d/a.md"))]);
+    assert_eq!(loading.neighbour(Neighbour::Next), None);
+}
+
+#[test]
+fn following_a_neighbour_is_an_ordinary_navigation() {
+    let (state, effects) = run([
+        Event::Enter(native("/d/two.md")),
+        loaded(1, "/d/two.md", "---\nurlNext: three.md\n---\n# Two"),
+        Event::Neighbour(Neighbour::Next),
+    ]);
+    assert_eq!(
+        effects,
+        [Effect::Load { request_id: 2, location: Location::file(native("/d/three.md")), origin: Origin::Trusted }]
+    );
+    assert_eq!(state.status, Status::Loading);
+}
+
+#[test]
+fn a_neighbour_that_is_not_there_does_nothing() {
+    let (state, effects) =
+        run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A"), Event::Neighbour(Neighbour::Next)]);
+    assert!(effects.iter().all(|effect| !matches!(effect, Effect::Load { .. })), "{effects:?}");
+    assert!(matches!(state.status, Status::Ready(_)));
+}

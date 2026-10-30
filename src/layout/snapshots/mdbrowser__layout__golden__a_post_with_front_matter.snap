@@ -1,0 +1,30 @@
+---
+source: src/layout/golden.rs
+expression: geometry(&framed_page(source))
+---
+height 988.0, 25 fragments, anchors []
+   32.0   32.0  368.9 "Dave Winer · 5 March 2024 · Scripting News"
+   77.0   32.0  638.7 "People learn to make art by studying previous artists. Would we want it any"
+  106.0   32.0   94.7 "other way?"
+  151.0   32.0  583.6 "Imagine if everyone had to reinvent everything that anyone had ever"
+  180.0   32.0  323.6 "invented just to make something new."
+  225.0   32.0  621.6 "There is a lot of that in software, people won't put in an API so you have to"
+  254.0   32.0  383.0 "rebuild the whole house just to get a window."
+  299.0   32.0  564.8 "We can make progress when people don't try to lock up their ideas."
+  344.0   32.0  642.8 "Individuals live just a short time, we can't do that much in a lifetime, but we"
+  373.0   32.0  653.1 "are an amazing species, because we leave behind what we learn and we build."
+  418.0   32.0  324.5 "[image: We learn by studying ourselves.]"
+  463.0   32.0  611.0 "So why shouldn't our machines be able to learn too? They already can do"
+  492.0   32.0  590.8 "things vastly more complex than we can. We've invented a huge lever."
+  537.0   32.0  591.9 "Science fiction tells us that we will lose control and be enslaved by our"
+  566.0   32.0  632.2 "machines. I love those stories, like the Matrix and Battlestar Galactica. But"
+  595.0   32.0  607.8 "those are stories, they didn't happen. The future is rarely so predictable."
+  624.0   32.0  317.2 "Things interact in unforseeable ways."
+  669.0   32.0  610.8 "We're at dead-ends in climate and government. We need to make radical"
+  698.0   32.0  639.6 "changes, and a fresh invention as radically progressive as any that has come"
+  727.0   32.0  231.6 "before is now in our hands."
+  772.0   32.0  236.2 "[image: We're going to use it.]"
+  817.0   32.0  402.6 "PS: I wrote the words, ChatGPT did the images."
+  895.0   32.0   88.8 "← Previous"
+  895.0  120.8   13.2 " · "
+  895.0  134.0   54.6 "Next →"

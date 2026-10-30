@@ -125,6 +125,9 @@ pub const APPEARANCE_LABEL: &str = "Appearance";
 pub const HOME_PAGE_LABEL: &str = "Home page";
 pub const HOME_PAGE_PLACEHOLDER: &str = "Empty for the welcome page";
 pub const LOADING: &str = "Loading…";
+pub const LISTEN: &str = "Listen:";
+pub const PREVIOUS: &str = "← Previous";
+pub const NEXT: &str = "Next →";
 pub const TRY_LLMS_TXT: &str = "Try this site's llms.txt";
 
 /// The banner over a page whose Markdown version was found instead of `original`.

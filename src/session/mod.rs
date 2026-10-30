@@ -82,10 +82,19 @@ pub struct Notice {
     pub kind: NoticeKind,
 }
 
+/// A post's neighbour in its blog, named by its `urlPrev` and `urlNext` front matter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Neighbour {
+    Previous,
+    Next,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Enter(String),
     Follow(String),
+    /// Go to the shown post's previous or next one; nothing happens if it names none.
+    Neighbour(Neighbour),
     Back,
     Forward,
     Reload,
@@ -175,6 +184,16 @@ impl State {
     /// What the address bar shows.
     pub fn address(&self) -> String {
         self.nav.current().map(|entry| entry.input.clone()).unwrap_or_default()
+    }
+
+    /// The link, as written, to the shown post's previous or next post.
+    pub fn neighbour(&self, which: Neighbour) -> Option<String> {
+        let Status::Ready(shown) = &self.status else { return None };
+        let front = &shown.document.front;
+        match which {
+            Neighbour::Previous => front.url_prev.clone(),
+            Neighbour::Next => front.url_next.clone(),
+        }
     }
 
     pub fn current_location(&self) -> Option<&Location> {
