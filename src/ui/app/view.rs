@@ -12,7 +12,7 @@ use crate::session::location::Location;
 use crate::session::{Event, Shown, Status};
 use crate::theme;
 use crate::ui::document::{Document, Handlers};
-use crate::ui::{body, history, images, toolbar};
+use crate::ui::{body, history, images, settings, toolbar};
 
 impl App {
     pub(super) fn title(&self) -> String {
@@ -23,7 +23,7 @@ impl App {
     }
 
     fn document_view(&self, shown: Arc<Shown>) -> Element<'_, Message> {
-        let font = self.session().settings.font;
+        let reader = theme::reading(self.session().settings.font, self.palette());
         responsive(move |size| {
             let width = size.width - SCROLLBAR;
             let (page, settling) = self.page(&shown.document, width);
@@ -34,7 +34,7 @@ impl App {
                 load_image: Box::new(|src| Message::Session(Event::LoadImage(src))),
                 hover: Box::new(Message::Hover),
             };
-            let document = Document::new(page, pictures, theme::reading(font), on);
+            let document = Document::new(page, pictures, reader, on);
             scrollable(document)
                 .id(SCROLL_ID)
                 .on_scroll(|viewport| Message::Scrolled(viewport.absolute_offset().y))
@@ -45,9 +45,9 @@ impl App {
 
     pub(super) fn view(&self) -> Element<'_, Message> {
         let state = self.session();
-        let reader = theme::reading(state.settings.font);
+        let reader = theme::reading(state.settings.font, self.palette());
         let main: Element<'_, Message> = match &state.status {
-            Status::Idle => body::message(content::WELCOME),
+            Status::Idle => body::message(""),
             Status::Loading => body::message(content::loading(state.current_location().and_then(Location::host))),
             Status::Failed(code) => body::error(*code, state, &reader),
             Status::Ready(shown) => self.document_view(shown.clone()),
@@ -57,15 +57,16 @@ impl App {
             .width(Fill)
             .height(Fill)
             .style(move |_| container::Style { background: Some(background.into()), ..container::Style::default() });
-        let content: Element<'_, Message> =
-            if self.history_open { row![page, history::panel(state)].into() } else { page.into() };
+        let panels = row![page]
+            .push(self.history_open.then(|| history::panel(state, self.palette())))
+            .push(self.settings_open.then(|| settings::panel(state, &self.home_draft)));
+        let content: Element<'_, Message> = panels.into();
         let status = self.hover.clone().unwrap_or_default();
-        column![
-            toolbar::toolbar(state, &self.draft, self.window_width),
-            body::notices(&state.notices),
-            content,
-            container(text(status).size(12)).padding([2, 8]),
-        ]
-        .into()
+        column![toolbar::toolbar(state, &self.draft)]
+            .push(body::title_line(&state.status).map(|title| body::title_bar(title, &reader)))
+            .push(body::notices(&state.notices))
+            .push(content)
+            .push(container(text(status).size(12)).padding([2, 8]))
+            .into()
     }
 }

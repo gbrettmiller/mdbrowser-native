@@ -19,16 +19,19 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::model::Document;
-use crate::theme::ReadingFont;
+use crate::theme::{Appearance, ReadingFont};
 use error::ErrorCode;
 use location::Location;
 use navigation::Navigation;
 use visits::Visit;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Settings {
     pub font: ReadingFont,
     pub images: images::ImageLoading,
+    pub appearance: Appearance,
+    /// A canonical address; empty means the built-in welcome page.
+    pub home: String,
 }
 
 /// What a load found: the source, and where it was finally found (after redirects).
@@ -59,11 +62,14 @@ pub enum NoticeKind {
     UnsupportedLink,
     LocalFromWeb,
     LocalNetworkFromWeb,
+    /// The Home page setting wasn't an address we can open.
+    BadHome,
 }
 
 impl NoticeKind {
     /// Every kind, for exhaustive content tests.
-    pub const ALL: [Self; 4] = [Self::OpenFailed, Self::UnsupportedLink, Self::LocalFromWeb, Self::LocalNetworkFromWeb];
+    pub const ALL: [Self; 5] =
+        [Self::OpenFailed, Self::UnsupportedLink, Self::LocalFromWeb, Self::LocalNetworkFromWeb, Self::BadHome];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +96,14 @@ pub enum Event {
     OpenHistory(String),
     ClearHistory,
     ChooseFont(ReadingFont),
+    ChooseAppearance(Appearance),
+    /// Set the home page from typed input; empty clears it.
+    ChooseHome(String),
+    /// Open the home page, or the welcome page when none is set.
+    Home,
+    /// The app started, with the address given on the command line if any. That
+    /// address wins; otherwise the home page opens.
+    Launch(Option<String>),
     ChooseImageLoading(images::ImageLoading),
     /// An image load finished.
     ImageLoaded {

@@ -4,6 +4,7 @@ use super::*;
 use crate::session::address::native;
 use crate::session::images::{ImageLoading, Note, Problem, View};
 use crate::session::web::Origin;
+use crate::theme::Appearance;
 
 fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
     events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))
@@ -186,8 +187,8 @@ fn notices_accumulate_and_dismiss_by_id() {
 fn choosing_a_font_persists_it_and_restore_brings_it_back() {
     let (state, effects) = run([Event::ChooseFont(ReadingFont::Inter)]);
     let settings = Settings { font: ReadingFont::Inter, ..Settings::default() };
-    assert_eq!((state.settings, effects), (settings, vec![Effect::PersistSettings(settings)]));
-    let (restored, _) = run([Event::Restore { visits: vec![], settings }]);
+    assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings.clone())]));
+    let (restored, _) = run([Event::Restore { visits: vec![], settings: settings.clone() }]);
     assert_eq!(restored.settings.font, ReadingFont::Inter);
 }
 
@@ -195,8 +196,123 @@ fn choosing_a_font_persists_it_and_restore_brings_it_back() {
 fn choosing_how_web_images_load_persists_it_and_keeps_the_font() {
     let (state, effects) =
         run([Event::ChooseFont(ReadingFont::Inter), Event::ChooseImageLoading(ImageLoading::OnClick)]);
-    let settings = Settings { font: ReadingFont::Inter, images: ImageLoading::OnClick };
-    assert_eq!((state.settings, effects), (settings, vec![Effect::PersistSettings(settings)]));
+    let settings = Settings { font: ReadingFont::Inter, images: ImageLoading::OnClick, ..Settings::default() };
+    assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings)]));
+}
+
+#[test]
+fn choosing_an_appearance_persists_it_and_keeps_the_other_settings() {
+    let (state, effects) = run([Event::ChooseFont(ReadingFont::Inter), Event::ChooseAppearance(Appearance::Dark)]);
+    let settings = Settings { font: ReadingFont::Inter, appearance: Appearance::Dark, ..Settings::default() };
+    assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings)]));
+}
+
+#[test]
+fn a_home_page_is_stored_as_its_canonical_address() {
+    let (state, effects) = run([Event::ChooseHome(" HTTPS://Example.COM/index.md ".into())]);
+    assert_eq!(state.settings.home, "https://example.com/index.md");
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+    let (state, _) = run([Event::ChooseHome(native("/d/start.md"))]);
+    assert_eq!(state.settings.home, native("/d/start.md"));
+}
+
+#[test]
+fn an_empty_home_page_clears_it() {
+    let (state, effects) = run([Event::ChooseHome(native("/d/a.md")), Event::ChooseHome("  ".into())]);
+    assert_eq!(state.settings.home, "");
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+}
+
+#[test]
+fn an_invalid_home_page_is_refused_and_the_old_one_stays() {
+    let (state, effects) = run([Event::ChooseHome(native("/d/a.md")), Event::ChooseHome("notes.txt".into())]);
+    assert_eq!(state.settings.home, native("/d/a.md"));
+    assert_eq!(state.notices, [Notice { id: 1, kind: NoticeKind::BadHome }]);
+    assert_eq!(effects, vec![]);
+}
+
+#[test]
+fn home_opens_the_home_page_like_any_navigation() {
+    let (state, effects) = run([Event::ChooseHome(native("/d/start.md"))]);
+    assert_eq!(state.settings.home, native("/d/start.md"));
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+    let (state, effects) = run([Event::ChooseHome(native("/d/start.md")), Event::Home]);
+    assert_eq!(state.address(), native("/d/start.md"));
+    assert_eq!(
+        effects,
+        vec![Effect::Load { request_id: 1, location: Location::file(native("/d/start.md")), origin: Origin::Trusted }]
+    );
+}
+
+#[test]
+fn without_a_home_page_home_is_the_welcome_page_with_a_blank_address() {
+    let (state, effects) = run([Event::Home]);
+    assert_eq!(state.address(), "");
+    assert_eq!(effects, vec![Effect::Load { request_id: 1, location: Location::Welcome, origin: Origin::Trusted }]);
+    let (state, effects) = run([Event::Home, loaded_at(1, Location::Welcome, "# Welcome\n\nHello")]);
+    let Status::Ready(shown) = &state.status else { panic!("{:?}", state.status) };
+    assert_eq!(shown.title, "Welcome");
+    assert_eq!(state.address(), "");
+    assert!(state.visits.is_empty(), "the welcome page has no address to revisit");
+    assert!(history(&effects).is_empty());
+}
+
+#[test]
+fn launching_without_an_address_opens_the_home_page() {
+    let (state, effects) = run([Event::ChooseHome(native("/d/start.md")), Event::Launch(None)]);
+    assert_eq!(state.address(), native("/d/start.md"));
+    assert_eq!(
+        effects,
+        vec![Effect::Load { request_id: 1, location: Location::file(native("/d/start.md")), origin: Origin::Trusted }]
+    );
+    let (state, effects) = run([Event::Launch(None)]);
+    assert_eq!(state.address(), "");
+    assert_eq!(effects, vec![Effect::Load { request_id: 1, location: Location::Welcome, origin: Origin::Trusted }]);
+}
+
+#[test]
+fn a_launch_address_wins_over_the_home_page() {
+    let (state, effects) = run([Event::ChooseHome(native("/d/start.md")), Event::Launch(Some(native("/d/a.md")))]);
+    assert_eq!(state.address(), native("/d/a.md"));
+    assert_eq!(
+        effects,
+        vec![Effect::Load { request_id: 1, location: Location::file(native("/d/a.md")), origin: Origin::Trusted }]
+    );
+}
+
+#[test]
+fn a_home_page_that_fails_shows_the_error_and_the_reader_can_move_on() {
+    let missing = Event::Loaded { request_id: 1, result: Err(ErrorCode::NotFound), now: 1 };
+    let (state, _) = run([Event::ChooseHome(native("/d/gone.md")), Event::Launch(None), missing]);
+    assert!(matches!(state.status, Status::Failed(ErrorCode::NotFound)), "{:?}", state.status);
+    let (state, effects) = step(state, Event::Enter(native("/d/a.md")));
+    assert_eq!(state.address(), native("/d/a.md"));
+    assert_eq!(effects.len(), 1);
+}
+
+#[test]
+fn back_returns_from_home_and_reload_reloads_the_welcome_page() {
+    let (state, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "x"), Event::Home]);
+    assert!(state.nav.can_go_back());
+    let (state, effects) = step(state, Event::Reload);
+    assert_eq!(effects, vec![Effect::Load { request_id: 3, location: Location::Welcome, origin: Origin::Trusted }]);
+    let (state, _) = step(state, Event::Back);
+    assert_eq!(state.address(), native("/d/a.md"));
+}
+
+#[test]
+fn welcome_page_links_go_to_the_web_and_anchors_scroll() {
+    let (state, _) = run([Event::Home, loaded_at(1, Location::Welcome, "# Welcome")]);
+    let (state, effects) = step(state, Event::Follow("https://example.com/a.md".into()));
+    assert_eq!(state.address(), "https://example.com/a.md");
+    assert_eq!(
+        load_origins(&effects),
+        [Origin::Public],
+        "the bundled page points at the web, not the reader's network"
+    );
+    let (state, _) = run([Event::Home, loaded_at(1, Location::Welcome, "# Welcome")]);
+    let (state, effects) = step(state, Event::Follow("relative.md".into()));
+    assert_eq!((state.notices.len(), effects), (1, vec![]));
 }
 
 fn load_origins(effects: &[Effect]) -> Vec<Origin> {

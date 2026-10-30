@@ -6,7 +6,7 @@ Documents carry no presentation (VECTOR principle 2), so every visual decision l
 
 ## Typefaces
 
-All faces are bundled static files (OFL), so the app never depends on host font metadata. The reader picks the body face from the toolbar's font menu, and the choice persists.
+All faces are bundled static files (OFL), so the app never depends on host font metadata. The reader picks the body face in the Settings panel, and the choice persists.
 
 | Menu name | Family in file | Role |
 |---|---|---|
@@ -27,7 +27,8 @@ Task-list checkboxes are drawn as shapes rather than typed glyphs, because none 
 | Measure | 720 px max, 32 px gutter | Text column centred in the window |
 | Headings | 1.9 / 1.5 / 1.25 / 1.1 / 1.0 / 0.9 × body, bold | Rule under H1 and H2 |
 | Block gap | 16 px; list items 4 px; indent 28 px | A sublist hugs its item |
-| Palette (light) | background `#fbfaf7`, ink `#222`, muted `#6b6b6b`, link `#1f5fbf`, code background `#efede8`, rule `#d8d5ce`, selection link at 22% | Dark palette still to come |
+| Palette (light) | background `#fbfaf7`, ink `#222`, muted `#6b6b6b`, link `#1f5fbf`, code background `#efede8`, rule `#d8d5ce`, selection link at 22% | Chosen in Settings: System (follows the OS, light if it reports nothing), Light or Dark |
+| Palette (dark) | background `#1b1b1a`, ink `#e4e2dc`, muted `#a19f98`, link `#7faff0`, code ink `#d6d4ce`, code background `#262624`, rule `#3a3936`, selection link at 30% | Ink, muted and link meet WCAG AA (4.5:1) on the page and code backgrounds; a unit test checks it |
 
 The bundled fonts add about 5.3 MB to the binary (`du -sh assets/fonts`, 2026-10-28).
 

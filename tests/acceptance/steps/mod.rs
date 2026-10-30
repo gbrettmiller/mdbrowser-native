@@ -4,6 +4,7 @@
 mod images;
 mod local;
 mod remote;
+mod settings;
 
 use mdbrowser::session::{Event, Status};
 

@@ -36,10 +36,12 @@ fn no_image_shown(w: &mut Browser) {
     assert!(sources.iter().all(|src| !matches!(w.state().images.view(src), View::Shown { .. })), "{sources:?}");
 }
 
-/// The mode whose menu entry reads "Web images: <name>".
+/// The mode whose Settings entry reads `name`, ignoring case.
 fn mode_named(name: &str) -> ImageLoading {
-    let label = format!("Web images: {name}");
-    ImageLoading::ALL.into_iter().find(|mode| content::image_loading(*mode) == label).expect("a Web images menu entry")
+    ImageLoading::ALL
+        .into_iter()
+        .find(|mode| content::image_loading(*mode).eq_ignore_ascii_case(name))
+        .expect("a Web images entry")
 }
 
 #[given(expr = "I set web images to {string}")]
@@ -86,7 +88,12 @@ fn laid_page(w: &Browser) -> Page {
     let Status::Ready(shown) = &w.state().status else { panic!("no document: {:?}", w.state().status) };
     let view = |src: &str| ui::images::view(&w.state().images, src);
     theme::fonts::install();
-    layout::layout(&shown.document.blocks, &theme::reading(w.state().settings.font), WIDTH, &view)
+    layout::layout(
+        &shown.document.blocks,
+        &theme::reading(w.state().settings.font, theme::Palette::Light),
+        WIDTH,
+        &view,
+    )
 }
 
 /// Feature files write the shortcut with Ctrl; macOS says Cmd.
@@ -154,7 +161,7 @@ fn image_fills_column(w: &mut Browser, alt: String) {
     let src = source_of(w, &alt);
     let page = laid_page(w);
     let laid = page.images.iter().find(|laid| laid.src == src).expect("a laid-out image");
-    let reader = theme::reading(w.state().settings.font);
+    let reader = theme::reading(w.state().settings.font, theme::Palette::Light);
     let column = reader.column_width(WIDTH).floor();
     assert_eq!(laid.bounds.width, column);
     let View::Shown { width: own_width, height: own_height } = w.state().images.view(&src) else {

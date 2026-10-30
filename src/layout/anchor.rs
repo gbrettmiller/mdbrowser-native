@@ -27,11 +27,11 @@ mod tests {
     use super::*;
     use crate::layout::{ImageNote, ImageView, no_images};
     use crate::model::parse;
-    use crate::theme::{ReadingFont, fonts, reading};
+    use crate::theme::{Palette, ReadingFont, fonts, reading};
 
     fn page(source: &str, view: &dyn Fn(&str) -> ImageView) -> Page {
         fonts::install();
-        layout(&parse(source).blocks, &reading(ReadingFont::Literata), 400.0, view)
+        layout(&parse(source).blocks, &reading(ReadingFont::Literata, Palette::Light), 400.0, view)
     }
 
     const POST: &str = "Intro paragraph.\n\n![pic](a.png)\n\nFirst after.\n\nSecond after.\n\nThird after.";

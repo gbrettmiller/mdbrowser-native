@@ -1,4 +1,4 @@
-//! Caches the laid-out page for (document, font, width, image generation). While
+//! Caches the laid-out page for (document, font, palette, width, image generation). While
 //! the window is being resized, expensive documents keep their previous layout
 //! until the width settles, so dragging stays smooth. The image generation is the
 //! one the app last applied: arriving images are coalesced and laid out from
@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use crate::layout::{self, ImageView, Page};
 use crate::model::Document;
-use crate::theme::{self, ReadingFont};
+use crate::theme::{self, Palette, ReadingFont};
 
 /// How long the width must stay put before an expensive document is re-laid out.
 pub const SETTLE: Duration = Duration::from_millis(150);
@@ -18,6 +18,7 @@ struct Laid {
     /// Held so its address can't be reused by a later document while cached.
     document: Arc<Document>,
     font: ReadingFont,
+    palette: Palette,
     width: f32,
     generation: u64,
     page: Arc<Page>,
@@ -42,19 +43,24 @@ impl Pages {
     pub fn get(
         &mut self,
         document: &Arc<Document>,
-        font: ReadingFont,
+        look: (ReadingFont, Palette),
         width: f32,
         images: (&dyn Fn(&str) -> ImageView, u64),
         now: Instant,
     ) -> (Arc<Page>, bool) {
         let (view, generation) = images;
+        let (font, palette) = look;
         let same_width = |a: f32, b: f32| (a - b).abs() < 0.5;
         if !self.requested.is_some_and(|(requested, _)| same_width(requested, width)) {
             self.requested = Some((width, now));
         }
         let since_resize = self.requested.map_or(Duration::ZERO, |(_, at)| now.saturating_duration_since(at));
-        let same =
-            |laid: &&Laid| Arc::ptr_eq(&laid.document, document) && laid.font == font && laid.generation == generation;
+        let same = |laid: &&Laid| {
+            Arc::ptr_eq(&laid.document, document)
+                && laid.font == font
+                && laid.palette == palette
+                && laid.generation == generation
+        };
         if let Some(laid) = self.laid.as_ref().filter(same) {
             if same_width(laid.width, width) {
                 return (laid.page.clone(), false);
@@ -64,9 +70,10 @@ impl Pages {
             }
         }
         let started = Instant::now();
-        let page = Arc::new(layout::layout(&document.blocks, &theme::reading(font), width, view));
+        let page = Arc::new(layout::layout(&document.blocks, &theme::reading(font, palette), width, view));
         let cost = started.elapsed();
-        self.laid = Some(Laid { document: document.clone(), font, width, generation, page: page.clone(), cost });
+        self.laid =
+            Some(Laid { document: document.clone(), font, palette, width, generation, page: page.clone(), cost });
         (page, false)
     }
 }
@@ -83,7 +90,7 @@ mod tests {
     }
 
     fn get(pages: &mut Pages, doc: &Arc<Document>, width: f32, generation: u64, now: Instant) -> (Arc<Page>, bool) {
-        pages.get(doc, ReadingFont::Literata, width, (&layout::no_images, generation), now)
+        pages.get(doc, (ReadingFont::Literata, Palette::Light), width, (&layout::no_images, generation), now)
     }
 
     #[test]
@@ -111,9 +118,38 @@ mod tests {
         let (doc, now) = (document(), Instant::now());
         let mut pages = Pages::new(Duration::MAX);
         let (first, _) = get(&mut pages, &doc, 500.0, 0, now);
-        let (inter, _) = pages.get(&doc, ReadingFont::Inter, 500.0, (&layout::no_images, 0), now);
-        let (other, _) = pages.get(&document(), ReadingFont::Inter, 500.0, (&layout::no_images, 0), now);
+        let (inter, _) = pages.get(&doc, (ReadingFont::Inter, Palette::Light), 500.0, (&layout::no_images, 0), now);
+        let (other, _) =
+            pages.get(&document(), (ReadingFont::Inter, Palette::Light), 500.0, (&layout::no_images, 0), now);
         assert!(!Arc::ptr_eq(&first, &inter) && !Arc::ptr_eq(&inter, &other));
+    }
+
+    #[test]
+    fn a_new_palette_lays_out_again() {
+        let (doc, now) = (document(), Instant::now());
+        let mut pages = Pages::new(Duration::MAX);
+        let (light, _) = get(&mut pages, &doc, 500.0, 0, now);
+        let look = (ReadingFont::Literata, Palette::Dark);
+        let (dark, settling) = pages.get(&doc, look, 500.0, (&layout::no_images, 0), now);
+        assert!(!Arc::ptr_eq(&light, &dark) && !settling);
+    }
+
+    /// The reader keeps their place across a palette change because only colours move.
+    #[test]
+    fn a_new_palette_changes_no_geometry() {
+        fonts::install();
+        let doc = Arc::new(parse(
+            "# Title\n\nWords that wrap onto several lines when the column is narrow enough to need it.\n\n\
+             ## Second\n\n- one\n- two\n\n```\ncode\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n",
+        ));
+        let mut pages = Pages::new(Duration::MAX);
+        let (light, _) = get(&mut pages, &doc, 400.0, 0, Instant::now());
+        let look = (ReadingFont::Literata, Palette::Dark);
+        let (dark, _) = pages.get(&doc, look, 400.0, (&layout::no_images, 0), Instant::now());
+        assert_eq!((light.height, &light.anchors), (dark.height, &dark.anchors));
+        let boxes = |page: &Page| page.fragments.iter().map(|f| (f.bounds, f.text.clone())).collect::<Vec<_>>();
+        assert!(!light.fragments.is_empty());
+        assert_eq!(boxes(&light), boxes(&dark));
     }
 
     #[test]
