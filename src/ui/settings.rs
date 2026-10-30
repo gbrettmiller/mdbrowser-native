@@ -3,14 +3,14 @@
 
 use std::fmt;
 
-use iced::widget::{column, container, pick_list, text, text_input};
+use iced::widget::{button, column, container, pick_list, row, text, text_input};
 use iced::{Element, Length};
 
 use super::app::Message;
 use crate::content;
 use crate::session::images::ImageLoading;
-use crate::session::{Event, State};
-use crate::theme::{Appearance, ReadingFont};
+use crate::session::{Event, State, TextStep};
+use crate::theme::{Appearance, ReadingFont, Spacing};
 
 const WIDTH: f32 = 300.0;
 
@@ -47,6 +47,27 @@ fn choice<'a, T: Copy + PartialEq + 'static>(
     .into()
 }
 
+/// Smaller, the size in pixels, larger. The buttons are disabled at the ends of the scale.
+fn text_size<'a>(state: &State) -> Element<'a, Message> {
+    let size = state.settings.text_size;
+    let step = |label: &'static str, step, enabled: bool| {
+        button(text(label).size(14).center())
+            .on_press_maybe(enabled.then_some(Message::Session(Event::StepTextSize(step))))
+    };
+    column![
+        text(content::TEXT_SIZE_LABEL).size(14),
+        row![
+            step(content::SMALLER_TEXT, TextStep::Smaller, size != size.smaller()),
+            text(content::text_size(size)).size(14).width(Length::Fill).center(),
+            step(content::LARGER_TEXT, TextStep::Larger, size != size.larger()),
+        ]
+        .spacing(8)
+        .align_y(iced::Center),
+    ]
+    .spacing(4)
+    .into()
+}
+
 pub fn panel<'a>(state: &'a State, home_draft: &'a str) -> Element<'a, Message> {
     let settings = &state.settings;
     let home = column![
@@ -74,6 +95,10 @@ pub fn panel<'a>(state: &'a State, home_draft: &'a str) -> Element<'a, Message> 
                 content::appearance,
                 Event::ChooseAppearance
             ),
+            text_size(state),
+            choice(content::SPACING_LABEL, &Spacing::ALL, settings.spacing, content::spacing, Event::ChooseSpacing),
+            button(text(content::RESET_READER_CONTROLS).size(14))
+                .on_press(Message::Session(Event::ResetReaderControls)),
             home,
         ]
         .spacing(16),
