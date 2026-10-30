@@ -18,9 +18,11 @@ Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003; images: ADR-004
 | Per-user data directory | dirs |
 | HTTP(S) fetching | ureq 3, with rustls and webpki roots; no cookies, redirects off |
 | URLs and relative-reference resolution | url |
+| Handing links to the system | open, behind `services::opener` |
+| Non-blocking file opens (unix only) | libc, in `services::files` |
 | Image decoding | image 0.25, with only the png, jpeg, gif and webp codecs; drawn through iced's `image-without-codecs` |
 | Unit tests | `cargo test` (built-in), insta for golden layout snapshots |
-| Acceptance | Gherkin in `features/`, run by the `cucumber` crate (`tests/acceptance/`), with tempfile and futures |
+| Acceptance | Gherkin in `features/`, run by the `cucumber` crate (`tests/acceptance/`), with tempfile and futures; flate2 builds compressed test responses |
 | Lint | rustfmt (`rustfmt.toml`) and clippy with `-D warnings` |
 
 Fonts are bundled: `assets/fonts/` holds static Literata, Source Serif 4, iA Writer Quattro, Inter and JetBrains Mono (each with its OFL licence), embedded at build time. `theme::fonts::install()` evicts host faces with the same family names and corrects variant metadata that upstream files get wrong.
@@ -90,7 +92,9 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `assets/fonts/` — bundled typefaces and their licences
 - `assets/welcome.md` — the built-in welcome page, a document served by `services::runner`
 - `features/` — Gherkin acceptance scenarios
+- `tests/` — `acceptance/` (the cucumber runner, steps and a local test web server) and `support/` (the shared HTTP test helper)
+- `DESIGN.md` — documents the reader stylesheet in `src/theme/`; the code wins when they disagree
 - `corpus/` — sample Markdown documents for golden tests and manual checks
 - `scripts/shoot.sh` — screenshots documents in each font and appearance (Hyprland + grim); with no document it shoots the welcome page. It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
-- `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`
+- `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`, `audits/` (the latest `invest-doctrine` and `invest-architecture` reports)
 - `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check

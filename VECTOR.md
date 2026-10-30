@@ -119,4 +119,4 @@ Detail and test methods are in `vector/research/assumptions/`.
 | Phase 3 (shared front matter) | Built (2026-10-30), screenshots to check | `features/frontmatter.feature`, `vector/plans/phase-3-shared-front-matter.md` |
 | Interviews | 1, draft. The markdownWeb readme was treated as a transcript: a published manifesto, not a live session. | `./vector/research/interviews/INT-001.json` |
 | Assumptions | 6, draft | `./vector/research/assumptions/` |
-| Community examples | Not yet in the corpus | [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |
+| Community examples | In the corpus (examples 0–8 and three extras), indexed by `corpus/examples.md` | `./corpus/markdownweb/`, [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |
