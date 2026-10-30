@@ -117,6 +117,13 @@ impl Viewport {
     pub fn images_arrived(&mut self, before: &Page, after: &Page, gutter: f32, image_generation: u64) -> Option<f32> {
         self.images_pending = false;
         self.applied_images.set(image_generation);
+        self.relaid(before, after, gutter)
+    }
+
+    /// The page moved from `before` to `after` without new images (the reader changed size or
+    /// spacing). Where to scroll so a held anchor stays at the top, or else the text in view
+    /// stays put; `None` if the view is already there.
+    pub fn relaid(&mut self, before: &Page, after: &Page, gutter: f32) -> Option<f32> {
         let scroll = self.scroll_y.get();
         let held = self.anchor_held.take().filter(|(_, at)| (at - scroll).abs() < 1.0);
         let target = match held.and_then(|(slug, _)| after.scroll_offset_for(&slug, gutter).map(|y| (slug, y))) {
@@ -137,9 +144,9 @@ impl Viewport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::{ImageView, layout};
+    use crate::layout::{self, ImageView, layout};
     use crate::model::parse;
-    use crate::theme::{Look, fonts, reading};
+    use crate::theme::{Look, TextSize, fonts, reading};
 
     const POST: &str = "![a](a.png)\n\n# Intro\n\nText.\n\n# Later\n\nMore.";
 
@@ -159,6 +166,21 @@ mod tests {
         let target = viewport.images_arrived(&before, &after, gutter, 1);
         assert_eq!(target, after.scroll_offset_for("later", gutter));
         assert_eq!(viewport.applied_images(), 1);
+    }
+
+    #[test]
+    fn a_held_anchor_survives_a_change_of_text_size() {
+        fonts::install();
+        let at = |size| {
+            let look = Look { size, ..Look::default() };
+            (layout(&parse(POST).blocks, &reading(look), 600.0, &layout::no_images), reading(look).gutter)
+        };
+        let ((before, gutter), (after, gutter_after)) = (at(TextSize::default()), at(TextSize::default().larger()));
+        assert_ne!(gutter, gutter_after);
+        let mut viewport = Viewport::new(600.0);
+        viewport.hold_anchor("later".into(), before.scroll_offset_for("later", gutter).unwrap());
+        let target = viewport.images_arrived(&before, &after, gutter_after, 0);
+        assert_eq!(target, after.scroll_offset_for("later", gutter_after));
     }
 
     #[test]

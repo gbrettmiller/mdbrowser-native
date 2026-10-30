@@ -35,8 +35,7 @@ impl App {
     fn page_at(&self, document: &Arc<Doc>, width: f32, generation: u64) -> (Arc<crate::layout::Page>, bool) {
         let images = &self.session().images;
         let view = |src: &str| images::view(images, src);
-        let look = (self.session().settings.font, self.palette());
-        self.pages.borrow_mut().get(document, look, width, (&view, generation), Instant::now())
+        self.pages.borrow_mut().get(document, self.look(), width, (&view, generation), Instant::now())
     }
 
     /// Lays the page out with the newest images and scrolls so the text in view
@@ -49,14 +48,29 @@ impl App {
         let width = self.viewport.width();
         let (before, _) = self.page(&shown.document, width);
         let generation = self.session().images.generation();
-        let gutter = theme::reading(theme::Look {
-            font: self.session().settings.font,
-            palette: self.palette(),
-            ..theme::Look::default()
-        })
-        .gutter;
+        let gutter = theme::reading(self.look()).gutter;
         let (after, _) = self.page_at(&shown.document, width, generation);
         match self.viewport.images_arrived(&before, &after, gutter, generation) {
+            Some(y) => operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
+            None => Task::none(),
+        }
+    }
+
+    /// A new look moves everything on the page, so lay it out again now and scroll so the
+    /// text in view (or the held anchor) stays where it was. `page_before` is the page as
+    /// it was laid out before the change.
+    pub(super) fn keep_place(
+        &mut self,
+        look_before: theme::Look,
+        page_before: Option<Arc<crate::layout::Page>>,
+    ) -> Task<Message> {
+        let (Some(shown), Some(before)) = (self.shown(), page_before) else { return Task::none() };
+        if self.look() == look_before {
+            return Task::none();
+        }
+        let generation = self.viewport.applied_images();
+        let (after, _) = self.page_at(&shown.document, self.viewport.width(), generation);
+        match self.viewport.relaid(&before, &after, theme::reading(self.look()).gutter) {
             Some(y) => operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
             None => Task::none(),
         }
@@ -96,12 +110,8 @@ impl App {
                 self.dispatch(Event::FragmentHandled)
             };
         }
-        let font = self.session().settings.font;
         let (page, _) = self.page(&shown.document, self.viewport.width());
-        let scroll = match page.scroll_offset_for(
-            &fragment,
-            theme::reading(theme::Look { font, palette: self.palette(), ..theme::Look::default() }).gutter,
-        ) {
+        let scroll = match page.scroll_offset_for(&fragment, theme::reading(self.look()).gutter) {
             Some(y) => {
                 self.viewport.hold_anchor(fragment.clone(), y);
                 operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) })

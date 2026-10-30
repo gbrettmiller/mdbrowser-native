@@ -23,11 +23,7 @@ impl App {
     }
 
     fn document_view(&self, shown: Arc<Shown>) -> Element<'_, Message> {
-        let reader = theme::reading(theme::Look {
-            font: self.session().settings.font,
-            palette: self.palette(),
-            ..theme::Look::default()
-        });
+        let reader = theme::reading(self.look());
         responsive(move |size| {
             let width = size.width - SCROLLBAR;
             let (page, settling) = self.page(&shown.document, width);
@@ -49,11 +45,7 @@ impl App {
 
     pub(super) fn view(&self) -> Element<'_, Message> {
         let state = self.session();
-        let reader = theme::reading(theme::Look {
-            font: state.settings.font,
-            palette: self.palette(),
-            ..theme::Look::default()
-        });
+        let reader = theme::reading(self.look());
         let main: Element<'_, Message> = match &state.status {
             Status::Idle => body::message(""),
             Status::Loading => body::message(content::loading(state.current_location().and_then(Location::host))),

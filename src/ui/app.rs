@@ -119,12 +119,25 @@ impl App {
         self.session().settings.appearance.palette(self.system_palette)
     }
 
+    /// How pages look: the reader's font, size and spacing, in the palette in use.
+    pub(super) fn look(&self) -> theme::Look {
+        let settings = &self.session().settings;
+        theme::Look {
+            font: settings.font,
+            palette: self.palette(),
+            size: settings.text_size,
+            spacing: settings.spacing,
+        }
+    }
+
     /// Steps the reducer, runs its effects, and keeps the view in step with it.
     fn dispatch(&mut self, event: Event) -> Task<Message> {
         let before = self.shown();
         let fragment_before = self.session().fragment.clone();
         let previous_address = self.session().address();
         let home_before = self.session().settings.home.clone();
+        let look_before = self.look();
+        let page_before = self.shown().map(|shown| self.page(&shown.document, self.viewport.width()).0);
         let (state, effects) = session::step(self.session.take().expect("session"), event);
         self.session = Some(state);
         if self.session().address() != previous_address {
@@ -138,7 +151,8 @@ impl App {
             effects.into_iter().map(|effect| runner::run(effect, store.clone()).map(Message::Effect)).collect();
         let scroll = self.scroll_after(before, fragment_before);
         let images = self.schedule_images();
-        Task::batch(effects.into_iter().chain([scroll, images]))
+        let kept = self.keep_place(look_before, page_before);
+        Task::batch(effects.into_iter().chain([scroll, images, kept]))
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
