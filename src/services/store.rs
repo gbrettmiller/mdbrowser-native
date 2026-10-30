@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::session::Settings;
 use crate::session::images::ImageLoading;
 use crate::session::visits::{self, Visit};
+use crate::theme::colours::{self, Colours};
 use crate::theme::{Appearance, ReadingFont, Spacing, TextSize};
 
 /// Orders saves: issued when an effect is created (in dispatch order), so a
@@ -79,6 +80,7 @@ impl Store {
                 .and_then(TextSize::from_px)
                 .unwrap_or_default(),
             spacing: key("spacing").and_then(Spacing::from_key).unwrap_or_default(),
+            custom: json.as_ref().and_then(|json| json.get("custom")).and_then(stored_colours),
             home: key("home").map(str::to_string).unwrap_or_default(),
         }
     }
@@ -90,10 +92,23 @@ impl Store {
             "appearance": settings.appearance.key(),
             "text_size": settings.text_size.px(),
             "spacing": settings.spacing.key(),
+            "custom": settings.custom.map(|own| serde_json::json!({
+                "page": colours::hex(own.page),
+                "text": colours::hex(own.text),
+                "link": colours::hex(own.link),
+            })),
             "home": settings.home,
         });
         self.save(SETTINGS, ticket, &json.to_string())
     }
+}
+
+/// The reader's colours as stored: all three as hex, and readable together. Anything
+/// else is as if they had never chosen any.
+fn stored_colours(stored: &serde_json::Value) -> Option<Colours> {
+    let hex = |name: &str| stored.get(name)?.as_str().and_then(colours::parse_hex);
+    let own = Colours { page: hex("page")?, text: hex("text")?, link: hex("link")? };
+    colours::check(own).ok()
 }
 
 const HISTORY: &str = "history.json";
@@ -197,6 +212,37 @@ mod tests {
             assert_eq!(defaults(&format!(r#"{{"text_size":{text_size}}}"#)), expected, "{text_size}");
         }
         assert_eq!(defaults(r#"{"text_size":28}"#).0.px(), 28);
+    }
+
+    #[test]
+    fn custom_colours_round_trip_and_odd_files_have_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::at(dir.path());
+        let own = Colours { page: [0xfd, 0xf6, 0xe3], text: [0x33, 0x33, 0x33], link: [0x0b, 0x5f, 0xa5] };
+        let settings = Settings { appearance: Appearance::Custom, custom: Some(own), ..Settings::default() };
+        store.save_settings(store.ticket(), settings.clone()).unwrap();
+        assert_eq!(store.load_settings(), settings);
+        let custom = |stored: &str| {
+            std::fs::write(dir.path().join("settings.json"), stored).unwrap();
+            store.load_settings().custom
+        };
+        assert_eq!(custom(r##"{"custom":{"page":"#FDF6E3","text":"#333","link":"#0b5fa5"}}"##), Some(own));
+        assert_eq!(custom(r#"{"font":"inter","appearance":"dark"}"#), None, "a phase 3 file");
+        for odd in [
+            r#"{"ink":"red"}"#,
+            r##"{"page":"#fdf6e3","text":"#333"}"##,
+            r##"{"page":"#fdf6e3","text":"red","link":"#0b5fa5"}"##,
+            r##"{"page":"#ffffff","text":"#eeeeee","link":"#0b5fa5"}"##,
+            r##"{"page":"#ffffff","text":"#222222","link":"#ffff00"}"##,
+            r##"{"page":1,"text":2,"link":3}"##,
+            r##""#fdf6e3""##,
+            "null",
+            "[]",
+        ] {
+            let stored = format!(r#"{{"appearance":"custom","custom":{odd}}}"#);
+            assert_eq!(custom(&stored), None, "{stored}");
+            assert_eq!(store.load_settings().appearance, Appearance::Custom, "{stored}");
+        }
     }
 
     #[test]

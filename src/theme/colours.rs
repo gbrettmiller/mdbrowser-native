@@ -16,6 +16,50 @@ pub struct Colours {
     pub link: [u8; 3],
 }
 
+impl Colours {
+    /// The page, text and link colours of a palette's tokens.
+    pub fn of(palette: Palette) -> Self {
+        let theme = tokens(palette);
+        Colours { page: rgb8(theme.background), text: rgb8(theme.ink), link: rgb8(theme.link) }
+    }
+
+    /// The set with one colour replaced.
+    pub const fn with(self, which: Which, to: [u8; 3]) -> Self {
+        match which {
+            Which::Page => Colours { page: to, ..self },
+            Which::Text => Colours { text: to, ..self },
+            Which::Link => Colours { link: to, ..self },
+        }
+    }
+
+    pub const fn get(self, which: Which) -> [u8; 3] {
+        match which {
+            Which::Page => self.page,
+            Which::Text => self.text,
+            Which::Link => self.link,
+        }
+    }
+}
+
+/// Starts from the light palette, so choosing Custom the first time changes nothing.
+impl Default for Colours {
+    fn default() -> Self {
+        Colours::of(Palette::Light)
+    }
+}
+
+/// The three colours the reader types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Which {
+    Page,
+    Text,
+    Link,
+}
+
+impl Which {
+    pub const ALL: [Which; 3] = [Self::Page, Self::Text, Self::Link];
+}
+
 /// Why a set of colours is refused: the text, or the links, can't be read on the page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unreadable {
@@ -166,6 +210,18 @@ mod tests {
             assert_eq!(parse_hex(&hex(rgb)), Some(rgb));
         }
         assert_eq!(hex([0x1f, 0x5f, 0xbf]), "#1f5fbf");
+    }
+
+    #[test]
+    fn one_colour_can_be_read_and_replaced_at_a_time() {
+        let own = Colours::default();
+        for which in Which::ALL {
+            let changed = own.with(which, [1, 2, 3]);
+            assert_eq!(changed.get(which), [1, 2, 3]);
+            for other in Which::ALL.into_iter().filter(|other| *other != which) {
+                assert_eq!(changed.get(other), own.get(other));
+            }
+        }
     }
 
     #[test]

@@ -12,7 +12,8 @@ use super::visits;
 use super::web::Origin;
 use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status, TextStep};
 use crate::model;
-use crate::theme::{Spacing, TextSize};
+use crate::theme::colours::{self, Unreadable};
+use crate::theme::{Appearance, Colours, Spacing, TextSize, Which};
 
 type Step = (State, Vec<Effect>);
 
@@ -50,8 +51,15 @@ pub fn step(state: State, event: Event) -> Step {
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
         Event::ChooseFont(font) => persist_settings(with_settings(state, |settings| Settings { font, ..settings })),
         Event::ChooseAppearance(appearance) => {
-            persist_settings(with_settings(state, |settings| Settings { appearance, ..settings }))
+            let seed = Colours::of(state.palette());
+            persist_settings(with_settings(state, |settings| Settings {
+                appearance,
+                custom: settings.custom.or((appearance == Appearance::Custom).then_some(seed)),
+                ..settings
+            }))
         }
+        Event::ChooseCustomColour(which, typed) => choose_colour(state, which, &typed),
+        Event::SystemPalette(system_palette) => none(State { system_palette, ..state }),
         Event::StepTextSize(by) => persist_settings(with_settings(state, |settings| Settings {
             text_size: match by {
                 TextStep::Larger => settings.text_size.larger(),
@@ -223,6 +231,18 @@ fn choose_home(state: State, input: &str) -> Step {
             persist_settings(with_settings(state, |settings| Settings { home, ..settings }))
         }
         Err(_) => notice(state, NoticeKind::BadHome),
+    }
+}
+
+/// Sets one of the reader's colours if it is a hex value and the set stays readable;
+/// otherwise tells them why not and changes nothing.
+fn choose_colour(state: State, which: Which, typed: &str) -> Step {
+    let Some(rgb) = colours::parse_hex(typed) else { return notice(state, NoticeKind::BadColour) };
+    let current = state.settings.custom.unwrap_or_else(|| Colours::of(state.palette()));
+    match colours::check(current.with(which, rgb)) {
+        Ok(custom) => persist_settings(with_settings(state, |settings| Settings { custom: Some(custom), ..settings })),
+        Err(Unreadable::Text) => notice(state, NoticeKind::UnreadableText),
+        Err(Unreadable::Link) => notice(state, NoticeKind::UnreadableLink),
     }
 }
 

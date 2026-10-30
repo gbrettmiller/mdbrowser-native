@@ -70,7 +70,6 @@ pub struct App {
     /// What the Home page field shows; follows the saved value until the reader types.
     home_draft: String,
     /// The OS palette, when it reports one; System appearance follows it.
-    system_palette: Option<Palette>,
     pages: RefCell<Pages>,
     viewport: Viewport,
     relayout_scheduled: bool,
@@ -90,7 +89,6 @@ impl App {
             history_open: false,
             settings_open: false,
             home_draft: settings.home.clone(),
-            system_palette: None,
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
             viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR),
             relayout_scheduled: false,
@@ -116,7 +114,7 @@ impl App {
 
     /// The palette in use: the reader's choice, or the OS's for System.
     pub(super) fn palette(&self) -> Palette {
-        self.session().settings.appearance.palette(self.system_palette)
+        self.session().palette()
     }
 
     /// How pages look: the reader's font, size and spacing, in the palette in use.
@@ -187,14 +185,11 @@ impl App {
                 Task::none()
             }
             Message::SubmitHome => self.dispatch(Event::ChooseHome(self.home_draft.clone())),
-            Message::SystemMode(mode) => {
-                self.system_palette = match mode {
-                    iced::theme::Mode::None => None,
-                    iced::theme::Mode::Light => Some(Palette::Light),
-                    iced::theme::Mode::Dark => Some(Palette::Dark),
-                };
-                Task::none()
-            }
+            Message::SystemMode(mode) => self.dispatch(Event::SystemPalette(match mode {
+                iced::theme::Mode::None => None,
+                iced::theme::Mode::Light => Some(Palette::Light),
+                iced::theme::Mode::Dark => Some(Palette::Dark),
+            })),
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
             Message::ImagesArrived => self.images_arrived(),
             Message::Scrolled(y) => {

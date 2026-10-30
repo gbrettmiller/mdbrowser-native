@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::model::Document;
-use crate::theme::{Appearance, ReadingFont, Spacing, TextSize};
+use crate::theme::{Appearance, Colours, Palette, ReadingFont, Spacing, TextSize, Which};
 use error::ErrorCode;
 use location::Location;
 use navigation::Navigation;
@@ -32,8 +32,18 @@ pub struct Settings {
     pub appearance: Appearance,
     pub text_size: TextSize,
     pub spacing: Spacing,
+    /// The reader's own colours, once they have chosen Custom or typed one. Kept when
+    /// another appearance is chosen.
+    pub custom: Option<Colours>,
     /// A canonical address; empty means the built-in welcome page.
     pub home: String,
+}
+
+impl Settings {
+    /// The reader's colours, or the light palette's before they have any.
+    pub fn colours(&self) -> Colours {
+        self.custom.unwrap_or_default()
+    }
 }
 
 /// How the text size moves.
@@ -78,12 +88,26 @@ pub enum NoticeKind {
     LocalNetworkFromWeb,
     /// The Home page setting wasn't an address we can open.
     BadHome,
+    /// A custom colour wasn't a hex value.
+    BadColour,
+    /// A custom set whose text can't be read on its page.
+    UnreadableText,
+    /// A custom set whose links can't be read on its page.
+    UnreadableLink,
 }
 
 impl NoticeKind {
     /// Every kind, for exhaustive content tests.
-    pub const ALL: [Self; 5] =
-        [Self::OpenFailed, Self::UnsupportedLink, Self::LocalFromWeb, Self::LocalNetworkFromWeb, Self::BadHome];
+    pub const ALL: [Self; 8] = [
+        Self::OpenFailed,
+        Self::UnsupportedLink,
+        Self::LocalFromWeb,
+        Self::LocalNetworkFromWeb,
+        Self::BadHome,
+        Self::BadColour,
+        Self::UnreadableText,
+        Self::UnreadableLink,
+    ];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,6 +147,10 @@ pub enum Event {
     ClearHistory,
     ChooseFont(ReadingFont),
     ChooseAppearance(Appearance),
+    /// One of the reader's own colours, as typed: `#rgb` or `#rrggbb`.
+    ChooseCustomColour(Which, String),
+    /// What the operating system reports for light or dark, if anything.
+    SystemPalette(Option<Palette>),
     /// Move the text size one step, or back to the default.
     StepTextSize(TextStep),
     ChooseSpacing(Spacing),
@@ -175,11 +203,18 @@ pub struct State {
     pub notices: Vec<Notice>,
     pub notice_seq: u64,
     pub settings: Settings,
+    /// What the operating system reports for light or dark, if anything.
+    pub system_palette: Option<Palette>,
     /// Images: their states, the current page's sources, and the cache.
     pub images: images::Images,
 }
 
 impl State {
+    /// The palette in use: the reader's choice, or the OS's for System.
+    pub fn palette(&self) -> Palette {
+        self.settings.appearance.palette(self.system_palette, self.settings.colours())
+    }
+
     pub fn new(home: impl Into<PathBuf>) -> Self {
         State {
             home: home.into(),
@@ -192,6 +227,7 @@ impl State {
             notices: Vec::new(),
             notice_seq: 0,
             settings: Settings::default(),
+            system_palette: None,
             images: images::Images::new(),
         }
     }

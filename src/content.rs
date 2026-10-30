@@ -62,6 +62,13 @@ pub fn notice(kind: NoticeKind) -> &'static str {
         NoticeKind::LocalFromWeb => "Web pages can't open files on your computer.",
         NoticeKind::LocalNetworkFromWeb => "Web pages can't open addresses on your local network.",
         NoticeKind::BadHome => "That isn't a path or web address of a Markdown file, so the home page is unchanged.",
+        NoticeKind::BadColour => "That isn't a colour. Use a hex value such as #222 or #fdf6e3.",
+        NoticeKind::UnreadableText => {
+            "That text colour is too close to the page colour to read comfortably, so the colours are unchanged."
+        }
+        NoticeKind::UnreadableLink => {
+            "That link colour is too close to the page colour to read comfortably, so the colours are unchanged."
+        }
     }
 }
 
@@ -198,6 +205,13 @@ mod tests {
         distinct_and_non_empty(&ErrorCode::ALL.map(error));
         distinct_and_non_empty(&ErrorCode::ALL.map(ErrorCode::key));
         distinct_and_non_empty(&NoticeKind::ALL.map(notice));
+    }
+
+    #[test]
+    fn the_colour_notices_say_what_to_type_and_what_failed() {
+        assert!(notice(NoticeKind::BadColour).contains("#222") && notice(NoticeKind::BadColour).contains("hex"));
+        assert!(notice(NoticeKind::UnreadableText).contains("text colour is too close to the page colour"));
+        assert!(notice(NoticeKind::UnreadableLink).contains("link colour is too close to the page colour"));
     }
 
     #[test]

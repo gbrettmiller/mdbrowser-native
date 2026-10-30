@@ -78,7 +78,7 @@ impl Pages {
 mod tests {
     use super::*;
     use crate::model::parse;
-    use crate::theme::{Palette, ReadingFont, Spacing, TextSize, fonts};
+    use crate::theme::{Colours, Palette, ReadingFont, Spacing, TextSize, fonts};
 
     fn looking(font: ReadingFont, palette: Palette) -> Look {
         Look { font, palette, ..Look::default() }
@@ -149,6 +149,20 @@ mod tests {
         let spacious = Look { spacing: Spacing::Spacious, ..larger };
         let (loose, settling) = at(&mut pages, spacious);
         assert!(!Arc::ptr_eq(&big, &loose) && !settling);
+    }
+
+    #[test]
+    fn a_changed_custom_colour_lays_out_again_and_the_same_colours_reuse() {
+        let (doc, now) = (document(), Instant::now());
+        let mut pages = Pages::new(Duration::MAX);
+        let at = |pages: &mut Pages, own| {
+            pages.get(&doc, looking(ReadingFont::Literata, Palette::Custom(own)), 500.0, (&layout::no_images, 0), now).0
+        };
+        let sepia = Colours { page: [0xfd, 0xf6, 0xe3], ..Colours::default() };
+        let (first, same) = (at(&mut pages, sepia), at(&mut pages, sepia));
+        assert!(Arc::ptr_eq(&first, &same));
+        let changed = at(&mut pages, Colours { link: [0x0b, 0x5f, 0xa5], ..sepia });
+        assert!(!Arc::ptr_eq(&first, &changed));
     }
 
     /// The reader keeps their place across a palette change because only colours move.

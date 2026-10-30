@@ -7,6 +7,7 @@ pub mod scale;
 use iced::font::{Style, Weight};
 use iced::{Color, Font};
 
+pub use colours::{Colours, Which};
 pub use scale::{Spacing, TextSize};
 
 /// The body typeface the reader has chosen. Code is always JetBrains Mono.
@@ -75,13 +76,13 @@ impl Appearance {
         Self::ALL.into_iter().find(|appearance| appearance.key() == key)
     }
 
-    /// The palette to draw with, given what the operating system reports (if anything).
-    pub const fn palette(self, system: Option<Palette>) -> Palette {
+    /// The palette to draw with, given what the operating system reports (if anything)
+    /// and the reader's own colours.
+    pub const fn palette(self, system: Option<Palette>, custom: Colours) -> Palette {
         match (self, system) {
             (Self::Light, _) => Palette::Light,
             (Self::Dark, _) => Palette::Dark,
-            // Until the palette carries the reader's colours (next step), Custom reads as light.
-            (Self::Custom, _) => Palette::Light,
+            (Self::Custom, _) => Palette::Custom(custom),
             (Self::System, Some(palette)) => palette,
             (Self::System, None) => Palette::Light,
         }
@@ -94,6 +95,7 @@ pub enum Palette {
     #[default]
     Light,
     Dark,
+    Custom(Colours),
 }
 
 pub const MONO_FAMILY: &str = "JetBrains Mono";
@@ -178,10 +180,11 @@ impl Theme {
 }
 
 /// The palette's tokens with the default body typeface: where only colours matter.
-pub const fn tokens(palette: Palette) -> Theme {
+pub fn tokens(palette: Palette) -> Theme {
     match palette {
         Palette::Light => LIGHT,
         Palette::Dark => DARK,
+        Palette::Custom(colours) => colours::derive(colours),
     }
 }
 
@@ -252,11 +255,41 @@ mod tests {
 
     #[test]
     fn system_follows_the_os_and_is_light_when_it_says_nothing() {
-        assert_eq!(Appearance::System.palette(Some(Palette::Dark)), Palette::Dark);
-        assert_eq!(Appearance::System.palette(Some(Palette::Light)), Palette::Light);
-        assert_eq!(Appearance::System.palette(None), Palette::Light);
-        assert_eq!(Appearance::Dark.palette(Some(Palette::Light)), Palette::Dark);
-        assert_eq!(Appearance::Light.palette(Some(Palette::Dark)), Palette::Light);
+        let own = Colours::default();
+        assert_eq!(Appearance::System.palette(Some(Palette::Dark), own), Palette::Dark);
+        assert_eq!(Appearance::System.palette(Some(Palette::Light), own), Palette::Light);
+        assert_eq!(Appearance::System.palette(None, own), Palette::Light);
+        assert_eq!(Appearance::Dark.palette(Some(Palette::Light), own), Palette::Dark);
+        assert_eq!(Appearance::Light.palette(Some(Palette::Dark), own), Palette::Light);
+    }
+
+    #[test]
+    fn custom_is_the_readers_colours_whatever_the_os_says_and_system_is_never_custom() {
+        let own = Colours { page: [0xfd, 0xf6, 0xe3], text: [0x33, 0x33, 0x33], link: [0x0b, 0x5f, 0xa5] };
+        for system in [None, Some(Palette::Light), Some(Palette::Dark)] {
+            assert_eq!(Appearance::Custom.palette(system, own), Palette::Custom(own));
+            assert!(!matches!(Appearance::System.palette(system, own), Palette::Custom(_)));
+        }
+    }
+
+    #[test]
+    fn a_custom_palette_has_the_derived_tokens() {
+        let own = Colours { page: [0xfd, 0xf6, 0xe3], text: [0x33, 0x33, 0x33], link: [0x0b, 0x5f, 0xa5] };
+        assert_eq!(tokens(Palette::Custom(own)), colours::derive(own));
+        assert_eq!(
+            reading(look(ReadingFont::Inter, Palette::Custom(own))).background,
+            tokens(Palette::Custom(own)).background
+        );
+    }
+
+    #[test]
+    fn the_default_colours_are_the_light_palettes_page_text_and_link() {
+        let light = tokens(Palette::Light);
+        let own = Colours::default();
+        assert_eq!(
+            (own.page, own.text, own.link),
+            (colours::rgb8(light.background), colours::rgb8(light.ink), colours::rgb8(light.link))
+        );
     }
 
     #[test]
