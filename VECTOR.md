@@ -40,7 +40,7 @@ Each phase has its own plan. This is the order, not a commitment to dates.
    - **2c, settings and home** (built): a Settings panel (font, images, home page, and a light, dark or system palette), a home page and a bundled welcome page.
    - **2d, Markdown fallbacks** (built): when a page isn't Markdown, try its `Link` alternate (same host), then the `.md` sibling (`/post` → `/post.md`), and tell the reader which address was shown. `llms.txt` is an explicit button, never a silent substitute. ADR-005; plan in `vector/plans/phase-2d-markdown-fallbacks.md`. Scanning HTML for `<link rel="alternate">` is left out.
 3. **Shared front matter** (built): a byline from `author`, `pubDate` and the `source` site name, previous/next navigation from `urlPrev` and `urlNext` (links and Ctrl+[ / Ctrl+]), `description`, and an `enclosure` link that opens in the system. `image`, `inlineImage` and `metaImage` are parsed and draw nothing beyond the body's images. Unknown keys are ignored. ADR-006; plan in `vector/plans/phase-3-shared-front-matter.md`.
-4. **Reader controls**: text size, spacing and custom colours, beyond the typeface and light/dark choices.
+4. **Reader controls** (built): text size (12 to 32 px in steps of 2; Ctrl+= , Ctrl+- and Ctrl+0), three spacings (Compact, Comfortable, Spacious), and a Custom appearance where the reader types page, text and link colours and the rest are derived. A set whose text or links fall below WCAG AA on the page is refused. Reset puts size and spacing back. ADR-007; plan in `vector/plans/phase-4-reader-controls.md`. Column width stays out.
 5. **Discovery**: `llms.txt` as a site index (beyond the 2d fallback), RSS 2.0 feeds and OPML.
 
 Downloadable apps for Linux, Windows and macOS, so non-technical readers can install without building from source, come after phase 3 (decided 2026-10-29). The plan is in `vector/plans/release-distribution.md`.
@@ -117,6 +117,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 | Phase 2c (settings and home) | Built (2026-10-29) | `features/settings.feature`, `vector/plans/phase-2c-settings-and-home.md` |
 | Phase 2d (Markdown fallbacks) | Built (2026-10-29) | `features/fallbacks.feature`, `vector/plans/phase-2d-markdown-fallbacks.md` |
 | Phase 3 (shared front matter) | Built (2026-10-30) | `features/frontmatter.feature`, `vector/plans/phase-3-shared-front-matter.md` |
+| Phase 4 (reader controls) | Built (2026-10-30) | `features/reader-controls.feature`, `vector/plans/phase-4-reader-controls.md` |
 | Interviews | 1, draft. The markdownWeb readme was treated as a transcript: a published manifesto, not a live session. | `./vector/research/interviews/INT-001.json` |
 | Assumptions | 6, draft | `./vector/research/assumptions/` |
 | Community examples | In the corpus (examples 0–8 and three extras), indexed by `corpus/examples.md` | `./corpus/markdownweb/`, [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |

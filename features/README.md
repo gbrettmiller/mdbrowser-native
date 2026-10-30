@@ -6,6 +6,7 @@ Gherkin specs for user-visible behaviour, ported from the predecessor `mdbrowser
 
 - `browse.feature` — addresses, links, back/forward, reload, errors and History (ported from `mdbrowser`)
 - `reading.feature` — choosing the reading font
+- `reader-controls.feature` — text size and its limits, the three spacings, custom colours (hex, refusals, readability), reset, and settings files from earlier phases
 - `settings.feature` — appearance (System, Light, Dark), the home page and the Home button, and the built-in welcome page
 - `fallbacks.feature` — a page that isn't Markdown: its Link alternate or `.md` sibling is shown, the reader is told, and `llms.txt` is offered, never substituted
 - `frontmatter.feature` — the shared front matter: byline, description, previous and next, the enclosure line, and values that are missing, of the wrong kind or unknown
