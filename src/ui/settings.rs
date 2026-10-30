@@ -12,7 +12,7 @@ use crate::content;
 use crate::session::images::ImageLoading;
 use crate::session::{Event, State, TextStep};
 use crate::theme::colours::hex;
-use crate::theme::{Appearance, Colours, ReadingFont, Spacing, Which};
+use crate::theme::{Appearance, Colours, ReadingFont, Spacing, Which, chrome_text};
 
 const WIDTH: f32 = 300.0;
 /// Space beside the controls so the panel's scrollbar doesn't cover them.
@@ -44,7 +44,7 @@ fn choice<'a, T: Copy + PartialEq + 'static>(
     let options: Vec<_> = all.iter().map(|&value| Shown(value, name)).collect();
     let step = |forward| neighbour(all, current, forward).map(|value| Message::Session(event(value)));
     column![
-        text(label).size(14),
+        text(label).size(chrome_text::LABEL),
         focus::choice(
             pick_list(options, Some(Shown(current, name)), move |Shown(value, _)| Message::Session(event(value)))
                 .width(Length::Fill),
@@ -60,13 +60,16 @@ fn choice<'a, T: Copy + PartialEq + 'static>(
 fn text_size<'a>(state: &State) -> Element<'a, Message> {
     let size = state.settings.text_size;
     let step = |label: &'static str, step, enabled: bool| {
-        button(text(label).size(14).center(), enabled.then_some(Message::Session(Event::StepTextSize(step))))
+        button(
+            text(label).size(chrome_text::LABEL).center(),
+            enabled.then_some(Message::Session(Event::StepTextSize(step))),
+        )
     };
     column![
-        text(content::TEXT_SIZE_LABEL).size(14),
+        text(content::TEXT_SIZE_LABEL).size(chrome_text::LABEL),
         row![
             step(content::SMALLER_TEXT, TextStep::Smaller, size != size.smaller()),
-            text(content::text_size(size)).size(14).width(Length::Fill).center(),
+            text(content::text_size(size)).size(chrome_text::LABEL).width(Length::Fill).center(),
             step(content::LARGER_TEXT, TextStep::Larger, size != size.larger()),
         ]
         .spacing(8)
@@ -100,7 +103,7 @@ impl ColourDrafts {
 fn colour_fields<'a>(drafts: &'a ColourDrafts) -> Element<'a, Message> {
     let field = |which| -> Element<'a, Message> {
         column![
-            text(content::colour_name(which)).size(14),
+            text(content::colour_name(which)).size(chrome_text::LABEL),
             text_input(content::COLOUR_PLACEHOLDER, drafts.get(which))
                 .on_input(move |typed| Message::ColourDraftChanged(which, typed))
                 .on_submit(Message::SubmitColour(which)),
@@ -108,20 +111,20 @@ fn colour_fields<'a>(drafts: &'a ColourDrafts) -> Element<'a, Message> {
         .spacing(4)
         .into()
     };
-    column![text(content::COLOURS_LABEL).size(14)].extend(Which::ALL.map(field)).spacing(8).into()
+    column![text(content::COLOURS_LABEL).size(chrome_text::LABEL)].extend(Which::ALL.map(field)).spacing(8).into()
 }
 
 pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDrafts) -> Element<'a, Message> {
     let settings = &state.settings;
     let home = column![
-        text(content::HOME_PAGE_LABEL).size(14),
+        text(content::HOME_PAGE_LABEL).size(chrome_text::LABEL),
         text_input(content::HOME_PAGE_PLACEHOLDER, home_draft)
             .on_input(Message::HomeDraftChanged)
             .on_submit(Message::SubmitHome),
     ]
     .spacing(4);
     let fields = column![
-        text(content::SETTINGS).size(18),
+        text(content::SETTINGS).size(chrome_text::HEADING),
         choice(content::FONT_LABEL, &ReadingFont::ALL, settings.font, content::font_name, Event::ChooseFont),
         choice(
             content::IMAGES_LABEL,
@@ -142,7 +145,10 @@ pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDraft
     .push((settings.appearance == Appearance::Custom).then(|| colour_fields(colours)))
     .push(text_size(state))
     .push(choice(content::SPACING_LABEL, &Spacing::ALL, settings.spacing, content::spacing, Event::ChooseSpacing))
-    .push(button(text(content::RESET_READER_CONTROLS).size(14), Some(Message::Session(Event::ResetReaderControls))))
+    .push(button(
+        text(content::RESET_READER_CONTROLS).size(chrome_text::LABEL),
+        Some(Message::Session(Event::ResetReaderControls)),
+    ))
     .push(home)
     .spacing(16)
     .padding(iced::Padding::ZERO.right(SCROLLBAR_ROOM));

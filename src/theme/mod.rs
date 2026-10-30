@@ -1,5 +1,6 @@
 //! The reader's stylesheet. Documents carry no presentation; all of it lives here.
 
+pub mod chrome_text;
 pub mod colours;
 pub mod fonts;
 pub mod scale;

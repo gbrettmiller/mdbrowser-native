@@ -10,7 +10,7 @@ use super::{App, Message, PAGE_ID, SCROLL_ID, SCROLLBAR};
 use crate::content;
 use crate::session::location::Location;
 use crate::session::{Event, Shown, Status};
-use crate::theme;
+use crate::theme::{self, chrome_text};
 use crate::ui::document::{Document, Handlers};
 use crate::ui::{body, history, images, settings, toolbar};
 
@@ -70,7 +70,7 @@ impl App {
             .push(body::fallback_banner(&state.status))
             .push(body::notices(&state.notices))
             .push(content)
-            .push(container(text(status).size(12)).padding([2, 8]))
+            .push(container(text(status).size(chrome_text::NOTE)).padding([2, 8]))
             .into()
     }
 }
