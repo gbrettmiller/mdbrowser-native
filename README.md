@@ -4,7 +4,7 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 2b, local files and remote Markdown over `http(s)`, with images. A Settings panel and a home page (phase 2c), front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 2c, local files and remote Markdown over `http(s)`, with images, a Settings panel (font, Web images, light, dark or system appearance, home page) and a built-in welcome page. Markdown fallbacks (2d), front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## What it does today
 
@@ -16,11 +16,12 @@ Writers own the words. Readers own the presentation. The document chooses nothin
 - Takes the window title from front matter `title`, then the first heading, then the file name.
 - Back, forward, reload, and a History panel that persists across restarts.
 - Four bundled reading faces: Literata (default), Source Serif 4, iA Writer Quattro and Inter. Code is set in JetBrains Mono.
+- A **Settings** panel (Ctrl+, or Cmd+,) holds the reading font, Web images, Appearance (System, Light or Dark) and a Home page. System follows the operating system. Home (the toolbar button or Alt+Home) opens the home page, or a built-in welcome page when none is set, and the app opens it on launch unless you give an address.
 - Select text with the mouse and copy it with Ctrl+C.
 - Other `http` and `https` links, and `mailto` links, open in your system's handler. Other schemes are blocked.
 - Raw HTML in a document is stripped, never interpreted: the tags go and the text between them stays.
 - Draws Markdown images (`![description](src)`) from files and the web: PNG, JPEG, GIF (its first frame) and WebP. An image is never shown larger than it is, and is scaled down to fit the text. An image that can't be shown leaves its description and a note saying why; one that failed to load can be clicked to try again.
-- The **Web images** menu chooses whether images from the web load automatically, on click, or not at all. Images in local files always load. Ctrl+Shift+I (Cmd+Shift+I on macOS) loads the current page's images whatever the setting.
+- The **Web images** setting (in Settings, Ctrl+, or Cmd+,) chooses whether images from the web load automatically, on click, or not at all. Images in local files always load. Ctrl+Shift+I (Cmd+Shift+I on macOS) loads the current page's images whatever the setting.
 - Loading web images tells the sites that host them that you are reading the post, as in any browser, though mdbrowser sends no cookies or referrer. Choose "on click" or "off" if you'd rather not.
 - A web page can't show images from your disk, and a public page can't show images from your local network.
 
@@ -43,7 +44,7 @@ cd mdbrowser-native
 cargo run --release -- corpus/index.md
 ```
 
-The first build takes a few minutes. The app ends up at `target/release/mdbrowser` (`mdbrowser.exe` on Windows). Pass it a path to a `.md` file or a web address (`target/release/mdbrowser https://andrewshell.org/`), or start it with none and type one in the address bar.
+The first build takes a few minutes. The app ends up at `target/release/mdbrowser` (`mdbrowser.exe` on Windows). Pass it a path to a `.md` file or a web address (`target/release/mdbrowser https://andrewshell.org/`), or start it with none to open your home page (the built-in welcome page until you set one) and type an address in the address bar.
 
 ### Keyboard
 
@@ -53,6 +54,8 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Reload | Ctrl+R or F5 | Cmd+R or F5 |
 | Focus the address bar | Ctrl+L | Cmd+L |
 | Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
+| Show or hide Settings | Ctrl+, | Cmd+, |
+| Open the home page | Alt+Home | Option+Home |
 | Open a page that isn't Markdown in your browser | Ctrl+Shift+O | Cmd+Shift+O |
 | Load this page's images | Ctrl+Shift+I | Cmd+Shift+I |
 | Select all / copy | Ctrl+A / Ctrl+C | Cmd+A / Cmd+C |

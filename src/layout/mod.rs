@@ -118,13 +118,13 @@ impl Page {
 pub(crate) mod tests {
     use super::*;
     use crate::model::parse;
-    use crate::theme::{ReadingFont, fonts, reading};
+    use crate::theme::{Palette, ReadingFont, fonts, reading};
 
     const WIDTH: f32 = 400.0;
 
     pub fn page_at(source: &str, font: ReadingFont, width: f32) -> Page {
         fonts::install();
-        layout(&parse(source).blocks, &reading(font), width, &no_images)
+        layout(&parse(source).blocks, &reading(font, Palette::Light), width, &no_images)
     }
 
     fn page(source: &str) -> Page {
@@ -141,7 +141,7 @@ pub(crate) mod tests {
         let lines: std::collections::BTreeSet<_> = p.fragments.iter().map(|f| f.line).collect();
         assert!(lines.len() > 3, "expected wrapping, got {} lines", lines.len());
         let left = p.fragments.iter().map(|f| f.bounds.x).fold(f32::MAX, f32::min);
-        let measure = reading(ReadingFont::Literata).measure.min(WIDTH);
+        let measure = reading(ReadingFont::Literata, Palette::Light).measure.min(WIDTH);
         assert!(p.fragments.iter().all(|f| f.bounds.x + f.bounds.width <= left + measure + 0.5));
     }
 

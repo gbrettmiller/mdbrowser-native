@@ -6,7 +6,7 @@ use super::address::parse_address;
 use super::error::ErrorCode;
 use super::images::Images;
 use super::links::{self, Link};
-use super::location::Location;
+use super::location::{Location, Target};
 use super::navigation::{Entry, Navigation};
 use super::visits;
 use super::web::Origin;
@@ -39,11 +39,18 @@ pub fn step(state: State, event: Event) -> Step {
             None => none(state),
         },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
-        Event::ChooseFont(font) => persist_settings(State { settings: Settings { font, ..state.settings }, ..state }),
+        Event::ChooseFont(font) => persist_settings(with_settings(state, |settings| Settings { font, ..settings })),
+        Event::ChooseAppearance(appearance) => {
+            persist_settings(with_settings(state, |settings| Settings { appearance, ..settings }))
+        }
+        Event::ChooseHome(input) => choose_home(state, &input),
+        Event::Home => home(state),
+        Event::Launch(Some(input)) => step(state, Event::Enter(input)),
+        Event::Launch(None) => home(state),
         Event::ChooseImageLoading(mode) => {
             let (state, mut effects) = with_images(state, |images| images.mode_changed(mode));
             let (state, persist) =
-                persist_settings(State { settings: Settings { images: mode, ..state.settings }, ..state });
+                persist_settings(with_settings(state, |settings| Settings { images: mode, ..settings }));
             effects.extend(persist);
             (state, effects)
         }
@@ -114,7 +121,11 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
         Ok(Loaded { source, location }) => {
             let document = model::parse(&source);
             let title = document.title(&location.label());
-            let visits = visits::record(&state.visits, &location.address(), &title, now);
+            let visits = if location.is_welcome() {
+                state.visits
+            } else {
+                visits::record(&state.visits, &location.address(), &title, now)
+            };
             let shown = Arc::new(Shown { document: Arc::new(document), title });
             let sources = shown.document.image_sources();
             let (images, loads) = state.images.open_page(&sources, &location, &state.home, state.settings.images);
@@ -167,7 +178,40 @@ fn with_images(state: State, change: impl FnOnce(Images) -> (Images, Vec<Locatio
     (State { images, ..state }, effects)
 }
 
+/// Stores the home page as its canonical address. A bad value is refused and the old one stays.
+fn choose_home(state: State, input: &str) -> Step {
+    let input = input.trim();
+    if input.is_empty() {
+        return persist_settings(with_settings(state, |settings| Settings { home: String::new(), ..settings }));
+    }
+    match parse_address(input, &state.home) {
+        Ok(target) => {
+            let home = target.location.address();
+            persist_settings(with_settings(state, |settings| Settings { home, ..settings }))
+        }
+        Err(_) => notice(state, NoticeKind::BadHome),
+    }
+}
+
+/// Opens the home page like a typed address, or the welcome page when none is set.
+fn home(state: State) -> Step {
+    if state.settings.home.is_empty() {
+        let entry = Entry {
+            input: String::new(),
+            target: Some(Target { location: Location::Welcome, fragment: None }),
+            origin: Origin::Trusted,
+        };
+        return navigate_to(state, entry);
+    }
+    let entry = entry_for(&state.settings.home, &state);
+    navigate_to(state, entry)
+}
+
+fn with_settings(state: State, change: impl FnOnce(Settings) -> Settings) -> State {
+    State { settings: change(state.settings.clone()), ..state }
+}
+
 fn persist_settings(state: State) -> Step {
-    let effects = vec![Effect::PersistSettings(state.settings)];
+    let effects = vec![Effect::PersistSettings(state.settings.clone())];
     (state, effects)
 }

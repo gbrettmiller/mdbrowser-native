@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::session::Settings;
 use crate::session::images::ImageLoading;
 use crate::session::visits::{self, Visit};
-use crate::theme::ReadingFont;
+use crate::theme::{Appearance, ReadingFont};
 
 /// Orders saves: issued when an effect is created (in dispatch order), so a
 /// save that finishes late can't overwrite a newer one.
@@ -71,11 +71,18 @@ impl Store {
         Settings {
             font: key("font").and_then(ReadingFont::from_key).unwrap_or_default(),
             images: key("images").and_then(ImageLoading::from_key).unwrap_or_default(),
+            appearance: key("appearance").and_then(Appearance::from_key).unwrap_or_default(),
+            home: key("home").map(str::to_string).unwrap_or_default(),
         }
     }
 
     pub fn save_settings(&self, ticket: Ticket, settings: Settings) -> std::io::Result<()> {
-        let json = serde_json::json!({ "font": settings.font.key(), "images": settings.images.key() });
+        let json = serde_json::json!({
+            "font": settings.font.key(),
+            "images": settings.images.key(),
+            "appearance": settings.appearance.key(),
+            "home": settings.home,
+        });
         self.save(SETTINGS, ticket, &json.to_string())
     }
 }
@@ -129,14 +136,36 @@ mod tests {
         let store = Store::at(dir.path());
         assert_eq!(store.load_settings().images, ImageLoading::Automatic);
         for images in ImageLoading::ALL {
-            let settings = Settings { font: ReadingFont::Inter, images };
-            store.save_settings(store.ticket(), settings).unwrap();
+            let settings = Settings { font: ReadingFont::Inter, images, ..Settings::default() };
+            store.save_settings(store.ticket(), settings.clone()).unwrap();
             assert_eq!(store.load_settings(), settings);
         }
         std::fs::write(dir.path().join("settings.json"), r#"{"font":"inter","images":"sometimes"}"#).unwrap();
-        assert_eq!(store.load_settings(), Settings { font: ReadingFont::Inter, images: ImageLoading::Automatic });
+        assert_eq!(
+            store.load_settings(),
+            Settings { font: ReadingFont::Inter, images: ImageLoading::Automatic, ..Settings::default() }
+        );
         std::fs::write(dir.path().join("settings.json"), r#"{"font":"inter"}"#).unwrap();
         assert_eq!(store.load_settings().images, ImageLoading::Automatic);
+    }
+
+    #[test]
+    fn appearance_and_home_round_trip_and_older_files_get_the_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::at(dir.path());
+        let settings = Settings {
+            appearance: Appearance::Dark,
+            home: "https://example.com/index.md".into(),
+            ..Settings::default()
+        };
+        store.save_settings(store.ticket(), settings.clone()).unwrap();
+        assert_eq!(store.load_settings(), settings);
+        std::fs::write(dir.path().join("settings.json"), r#"{"font":"inter","images":"off"}"#).unwrap();
+        let older = store.load_settings();
+        assert_eq!((older.appearance, older.home.as_str()), (Appearance::System, ""));
+        std::fs::write(dir.path().join("settings.json"), r#"{"appearance":"sepia","home":7}"#).unwrap();
+        let odd = store.load_settings();
+        assert_eq!((odd.appearance, odd.home.as_str()), (Appearance::System, ""));
     }
 
     #[test]

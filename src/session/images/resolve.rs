@@ -39,6 +39,7 @@ pub fn resolve(src: &str, current: &Location, home: &Path) -> Result<Location, R
     match current {
         Location::File(_) => from_file(&reference, current, home),
         Location::Web(page) => from_page(&reference, page),
+        Location::Welcome => from_welcome(&reference),
     }
 }
 
@@ -63,6 +64,16 @@ fn from_file(reference: &str, current: &Location, home: &Path) -> Result<Locatio
             Some((path, _)) => Ok(Location::file(normalise(Path::new(&path)))),
             None => Err(Refusal::Disk), // a network share
         },
+    }
+}
+
+/// The built-in page may show web images by absolute address, and nothing else.
+fn from_welcome(reference: &str) -> Result<Location, Refusal> {
+    match scheme_of(reference).as_deref() {
+        Some(scheme) if WEB_SCHEMES.contains(&scheme) => {
+            Url::parse(reference).map_err(|_| Refusal::Scheme).and_then(web_image)
+        }
+        _ => Err(Refusal::Scheme),
     }
 }
 
@@ -328,6 +339,7 @@ mod tests {
         for src in sources {
             match from_page(src) {
                 Ok(Location::File(path)) => panic!("{src:?} → file {path:?}"),
+                Ok(Location::Welcome) => panic!("{src:?} → welcome"),
                 Ok(Location::Web(url)) => {
                     assert!(!crate::session::network::is_local_network(&url), "{src:?} → {url}");
                     assert!(url.username().is_empty() && url.password().is_none(), "{src:?} → {url}");

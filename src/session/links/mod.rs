@@ -40,6 +40,7 @@ pub fn classify(href: &str, current: &Location) -> Link {
     match current {
         Location::File(_) => from_file(reference, current),
         Location::Web(page) => page::classify(reference, page),
+        Location::Welcome => from_welcome(reference),
     }
 }
 
@@ -47,6 +48,19 @@ pub fn classify(href: &str, current: &Location) -> Link {
 fn external(reference: &str, url: Url) -> Link {
     let spoofable = !url.username().is_empty() || url.password().is_some();
     Link::External(if spoofable { without_credentials(url).to_string() } else { reference.to_string() })
+}
+
+/// The built-in page links to the web and mail by absolute address, and nowhere else.
+fn from_welcome(reference: &str) -> Link {
+    match scheme_of(reference).as_deref() {
+        Some(MAIL_SCHEME) => Link::External(reference.to_string()),
+        Some(scheme) if WEB_SCHEMES.contains(&scheme) => match Url::parse(reference) {
+            Ok(url) if is_markdown_name(url.path()) => Link::Navigate(web_target(url)),
+            Ok(url) => external(reference, url),
+            Err(_) => Link::Unsupported,
+        },
+        _ => Link::Unsupported,
+    }
 }
 
 fn from_file(reference: &str, current: &Location) -> Link {

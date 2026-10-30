@@ -37,10 +37,11 @@ Each phase has its own plan. This is the order, not a commitment to dates.
 2. **Remote browsing**, in two parts:
    - **2a, remote documents** (built): `http(s)` with an `Accept` header that prefers Markdown, redirects, and links between `.md` pages across sites. Raw HTML is stripped (ADR-002); fetching uses ureq (ADR-003).
    - **2b, images** (built): local and remote Markdown images, drawn in the page, with a Web images setting (automatic, on click, off). ADR-004.
-   - **2c, settings and home**: a Settings panel (font, images, home page) and a home page, next.
+   - **2c, settings and home** (built): a Settings panel (font, images, home page, and a light, dark or system palette), a home page and a bundled welcome page.
+   - **2d, Markdown fallbacks**: when a URL serves something other than Markdown, look for a Markdown version before giving up. Content negotiation already happens through `Accept`. Then try the `.md` sibling (`/post` → `/post.md`) and the `Link` header, and offer the site's `llms.txt` as an explicit, labelled action rather than a silent substitute. The order, the address-bar and history rules, and whether to scan `<link rel="alternate" type="text/markdown">` get an ADR first.
 3. **Shared front matter**: act on the community vocabulary, including a byline from `author` and `pubDate`, previous/next navigation from `urlPrev` and `urlNext`, `description`, `image`, `inlineImage` and `metaImage`, an `enclosure` link, and `source` (the post's feed). Unknown keys are ignored.
-4. **Reader controls**: text size, spacing and colours (including a dark palette), beyond the typeface choice.
-5. **Discovery**: `llms.txt` as a site index, RSS 2.0 feeds and OPML.
+4. **Reader controls**: text size, spacing and custom colours, beyond the typeface and light/dark choices.
+5. **Discovery**: `llms.txt` as a site index (beyond the 2d fallback), RSS 2.0 feeds and OPML.
 
 Downloadable apps for Linux, Windows and macOS, so non-technical readers can install without building from source, come after phase 2. The plan is in `vector/plans/release-distribution.md`.
 
@@ -100,6 +101,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 - **Marking plain `http`.** The address bar shows the full URL with its scheme, but nothing labels an `http` page as not secure. Is a label worth adding?
 - **Certificate failures.** A bad certificate shows as `unreachable`, the same as a site that is down. Should it get its own error, so an intercepted connection is visible?
 - **Enclosures.** Link out to the system player, or play audio in the browser?
+- **Fallbacks from non-Markdown pages (phase 2d).** In what order do we look for a Markdown version: `.md` sibling, `Link` header, `<link rel="alternate">`, `llms.txt`? Which URL is shown and kept in history after a fallback, and how does the reader see that the content isn't what the link pointed at? Is `llms.txt` ever shown automatically (perhaps only for a site root), or only offered? Example to test against: `every.to/context-window/…` and the same URL with `.md`.
 - **Which discovery convention comes first?** `llms.txt`, a post's `source` feed, or OPML?
 - **Interop with other Markdown-web browsers.** Should we share a test corpus, for example with Andrew Shell's browser?
 - Live updates over WebSockets: noted in INT-001 and not yet in scope.
@@ -112,6 +114,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 | Phase 1 (local browsing) | Built (2026-10-28) | `features/browse.feature`, `features/reading.feature` |
 | Phase 2a (remote documents) | Built (2026-10-29) | `features/remote.feature`, `vector/plans/phase-2a-remote-documents.md` |
 | Phase 2b (images) | Built (2026-10-29) | `features/images.feature`, `vector/plans/phase-2b-images.md` |
+| Phase 2c (settings and home) | Built (2026-10-29) | `features/settings.feature`, `vector/plans/phase-2c-settings-and-home.md` |
 | Interviews | 1, draft. The markdownWeb readme was treated as a transcript: a published manifesto, not a live session. | `./vector/research/interviews/INT-001.json` |
 | Assumptions | 6, draft | `./vector/research/assumptions/` |
 | Community examples | Not yet in the corpus | [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |

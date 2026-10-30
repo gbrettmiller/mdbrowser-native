@@ -41,21 +41,21 @@ bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, wi
 |-------|----------|------|
 | **Model** | `src/model/` | Markdown source → owned document tree. Pure. Depends only on pulldown-cmark and yaml-rust2 (frontmatter). |
 | **Layout** | `src/layout/` | Tree + theme + width + known image sizes → `Page`; image boxes and their placeholders, hit-testing, carets, selection and copy text, and `anchor` (keeping the reading position across relayouts). Pure apart from reading the shared font database. |
-| **Session** | `src/session/` | Address parsing (files and `http(s)` URLs), link classification, web fetch policy (`Accept`, status, redirects, which responses are readable Markdown, and refusing a public page's way into the local network), images (where each comes from, which load and when, the image limits, and the decoded-image cache), back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
-| **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) and bundled fonts. Data only, with one exception: `fonts::install()` loads the bundled faces into iced's process-wide font system once at startup. |
+| **Session** | `src/session/` | Address parsing (files and `http(s)` URLs, and the built-in `Welcome` location with a blank address, no History entry and its own link and image policy), link classification, web fetch policy (`Accept`, status, redirects, which responses are readable Markdown, and refusing a public page's way into the local network), images (where each comes from, which load and when, the image limits, and the decoded-image cache), back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
+| **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) for the light and dark palettes, the `Appearance` choice (System resolves to a palette given the OS mode), and bundled fonts. Data only, with one exception: `fonts::install()` loads the bundled faces into iced's process-wide font system once at startup. |
 | **Content** | `src/content.rs` | All user-facing strings. |
-| **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `images` reads or fetches an image and decodes it, one decode at a time, within ADR-004's limits. `web` fetches a page or an image through ureq: one fresh request per redirect hop carrying only `Accept`, fixed limits, and no cookies. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net` (only through ureq, in `web`), `std::process` or `std::thread`. |
-| **UI** | `src/ui/` | The iced application: dispatches events to the reducer, runs effects through `services::runner`, and draws state. Holds the document widget (paints a `Page`, turns input into messages), the page cache, the viewport (scroll position, held anchor, applied image generation) and the keyboard shortcut table. Owns no browsing logic. |
+| **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `images` reads or fetches an image and decodes it, one decode at a time, within ADR-004's limits. `web` fetches a page or an image through ureq: one fresh request per redirect hop carrying only `Accept`, fixed limits, and no cookies. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` serves the welcome page bundled in the binary (`assets/welcome.md`) and turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net` (only through ureq, in `web`), `std::process` or `std::thread`. |
+| **UI** | `src/ui/` | The iced application: dispatches events to the reducer, runs effects through `services::runner`, and draws state. Holds the document widget (paints a `Page`, turns input into messages), the History and Settings panels, the chrome theme (`ui::chrome`, iced's theme built from the palette tokens), the OS light/dark mode, the page cache, the viewport (scroll position, held anchor, applied image generation) and the keyboard shortcut table. Owns no browsing logic. |
 
 Every module belongs to exactly one layer. If you're unsure where something goes, and it can be pure, put it in `model`, `layout` or `session`.
 
 ## Import Direction
 
 - `ui` may use every other layer.
-- `services` may use `model`, `session` and `theme` value types (`ReadingFont`), never `ui`.
+- `services` may use `model`, `session` and `theme` value types (`ReadingFont`, `Appearance`), never `ui`.
 - `content` may use `session` and `theme` enums, to key its strings. Only `ui` uses `content`.
 - `layout` may use `model` and `theme`.
-- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` (settings), the `url` crate for addresses, and `iced::advanced::image::Handle` (also exported as `iced::widget::image::Handle`) as a value type for decoded images.
+- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and `theme::ReadingFont` and `theme::Appearance` (settings), the `url` crate for addresses, and `iced::advanced::image::Handle` (also exported as `iced::widget::image::Handle`) as a value type for decoded images.
 - Pure layers (`model`, `layout`, `session`, `theme`) never perform I/O and never use iced's runtime (`Task`, `Element`). Iced *value* types (`Color`, `Font`, `Rectangle`, image `Handle`) are allowed.
 
 ## How to Add a Feature
@@ -88,8 +88,9 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 
 - `src/` — the crate, one directory per layer; `lib.rs` exposes the layers, `main.rs` only starts `ui::app`
 - `assets/fonts/` — bundled typefaces and their licences
+- `assets/welcome.md` — the built-in welcome page, a document served by `services::runner`
 - `features/` — Gherkin acceptance scenarios
 - `corpus/` — sample Markdown documents for golden tests and manual checks
-- `scripts/shoot.sh` — screenshots documents in each font (Hyprland + grim). It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
+- `scripts/shoot.sh` — screenshots documents in each font and appearance (Hyprland + grim); with no document it shoots the welcome page. It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
 - `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`
 - `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check

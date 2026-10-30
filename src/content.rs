@@ -3,7 +3,7 @@
 use crate::session::NoticeKind;
 use crate::session::error::ErrorCode;
 use crate::session::images::{ImageLoading, Note};
-use crate::theme::ReadingFont;
+use crate::theme::{Appearance, ReadingFont};
 
 pub fn error(code: ErrorCode) -> &'static str {
     match code {
@@ -56,15 +56,24 @@ pub fn notice(kind: NoticeKind) -> &'static str {
         NoticeKind::UnsupportedLink => "Can't open this kind of link yet",
         NoticeKind::LocalFromWeb => "Web pages can't open files on your computer.",
         NoticeKind::LocalNetworkFromWeb => "Web pages can't open addresses on your local network.",
+        NoticeKind::BadHome => "That isn't a path or web address of a Markdown file, so the home page is unchanged.",
     }
 }
 
-/// The Web images menu, one entry per mode.
+pub fn appearance(appearance: Appearance) -> &'static str {
+    match appearance {
+        Appearance::System => "System",
+        Appearance::Light => "Light",
+        Appearance::Dark => "Dark",
+    }
+}
+
+/// The Web images setting, one entry per mode.
 pub fn image_loading(mode: ImageLoading) -> &'static str {
     match mode {
-        ImageLoading::Automatic => "Web images: automatic",
-        ImageLoading::OnClick => "Web images: on click",
-        ImageLoading::Off => "Web images: off",
+        ImageLoading::Automatic => "Automatic",
+        ImageLoading::OnClick => "On click",
+        ImageLoading::Off => "Off",
     }
 }
 
@@ -103,7 +112,13 @@ pub const HISTORY_EMPTY: &str = "Nothing here yet. Documents you open are listed
 pub const DISMISS: &str = "Dismiss";
 pub const OPEN_IN_BROWSER: &str = "Open in browser";
 pub const ADDRESS_PLACEHOLDER: &str = "Path or web address of a Markdown file, e.g. ~/notes/index.md";
-pub const WELCOME: &str = "Type the path or web address of a Markdown file above, or pass one on the command line.";
+pub const HOME: &str = "Home";
+pub const SETTINGS: &str = "Settings";
+pub const FONT_LABEL: &str = "Font";
+pub const IMAGES_LABEL: &str = "Web images";
+pub const APPEARANCE_LABEL: &str = "Appearance";
+pub const HOME_PAGE_LABEL: &str = "Home page";
+pub const HOME_PAGE_PLACEHOLDER: &str = "Empty for the welcome page";
 pub const LOADING: &str = "Loading…";
 
 #[cfg(test)]
@@ -129,6 +144,15 @@ mod tests {
     }
 
     #[test]
+    fn the_welcome_page_is_titled_and_names_the_controls_it_describes() {
+        let source = include_str!("../assets/welcome.md");
+        assert_eq!(crate::model::parse(source).title(""), "Welcome");
+        for label in [SETTINGS, HOME_PAGE_LABEL, HOME] {
+            assert!(source.contains(label), "the welcome page should mention {label}");
+        }
+    }
+
+    #[test]
     fn every_error_and_notice_has_its_own_string() {
         distinct_and_non_empty(&ErrorCode::ALL.map(error));
         distinct_and_non_empty(&ErrorCode::ALL.map(ErrorCode::key));
@@ -138,7 +162,7 @@ mod tests {
     #[test]
     fn the_web_images_menu_and_image_notes() {
         let labels = ImageLoading::ALL.map(image_loading);
-        assert_eq!(labels, ["Web images: automatic", "Web images: on click", "Web images: off"]);
+        assert_eq!(labels, ["Automatic", "On click", "Off"]);
         let notes = Note::ALL.map(image_note);
         distinct_and_non_empty(&notes.each_ref().map(String::as_str));
         assert_eq!(image_note(Note::Loading), "Loading image…");

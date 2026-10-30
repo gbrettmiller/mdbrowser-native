@@ -139,20 +139,20 @@ mod tests {
     use super::*;
     use crate::layout::{ImageView, layout};
     use crate::model::parse;
-    use crate::theme::{ReadingFont, fonts, reading};
+    use crate::theme::{Palette, ReadingFont, fonts, reading};
 
     const POST: &str = "![a](a.png)\n\n# Intro\n\nText.\n\n# Later\n\nMore.";
 
     fn page(height: u32) -> Page {
         fonts::install();
         let view = move |_: &str| ImageView::Shown { width: 100, height };
-        layout(&parse(POST).blocks, &reading(ReadingFont::Literata), 600.0, &view)
+        layout(&parse(POST).blocks, &reading(ReadingFont::Literata, Palette::Light), 600.0, &view)
     }
 
     #[test]
     fn a_held_anchor_follows_its_heading_as_images_arrive() {
         let (before, after) = (page(10), page(300));
-        let gutter = reading(ReadingFont::Literata).gutter;
+        let gutter = reading(ReadingFont::Literata, Palette::Light).gutter;
         let mut viewport = Viewport::new(600.0);
         let at = before.scroll_offset_for("later", gutter).unwrap();
         viewport.hold_anchor("later".into(), at);
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn scrolling_away_lets_go_of_the_anchor() {
         let (before, after) = (page(10), page(300));
-        let gutter = reading(ReadingFont::Literata).gutter;
+        let gutter = reading(ReadingFont::Literata, Palette::Light).gutter;
         let mut viewport = Viewport::new(600.0);
         viewport.hold_anchor("later".into(), before.scroll_offset_for("later", gutter).unwrap());
         viewport.scrolled(0.0);

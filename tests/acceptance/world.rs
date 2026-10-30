@@ -222,6 +222,7 @@ impl Browser {
         match &location {
             Location::File(path) => self.reads.push(path.clone()),
             Location::Web(url) => assert!(on_test_server(url), "scenarios never leave the test server: {url}"),
+            Location::Welcome => {}
         }
         self.clock += 1;
         let result = runner::load(location, &Limits { max_bytes: SIZE_LIMIT, ..Limits::default() }, origin);
@@ -232,7 +233,7 @@ impl Browser {
     fn finish_image(&mut self, location: Location, origin: Origin) {
         let held = match &location {
             Location::Web(url) => self.slow_images.iter().any(|prefix| url.path().starts_with(prefix.as_str())),
-            Location::File(_) => false,
+            Location::File(_) | Location::Welcome => false,
         };
         if held {
             self.parked_images.push((location, origin));
@@ -245,6 +246,7 @@ impl Browser {
         match &location {
             Location::File(path) => self.reads.push(path.clone()),
             Location::Web(url) => assert!(on_test_server(url), "scenarios never leave the test server: {url}"),
+            Location::Welcome => {}
         }
         let result = images::load(location.clone(), origin);
         self.send(Event::ImageLoaded { location, result });

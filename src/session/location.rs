@@ -26,6 +26,8 @@ pub fn without_credentials(mut url: Url) -> Url {
 pub enum Location {
     File(PathBuf),
     Web(Url),
+    /// The built-in welcome page. It has a blank address and isn't a file or a URL.
+    Welcome,
 }
 
 /// A location plus the in-page anchor to scroll to, if any.
@@ -48,8 +50,12 @@ impl Location {
     pub fn as_file(&self) -> Option<&Path> {
         match self {
             Location::File(path) => Some(path),
-            Location::Web(_) => None,
+            Location::Web(_) | Location::Welcome => None,
         }
+    }
+
+    pub fn is_welcome(&self) -> bool {
+        matches!(self, Location::Welcome)
     }
 
     pub fn is_web(&self) -> bool {
@@ -59,7 +65,7 @@ impl Location {
     /// A web page's host name; files have none.
     pub fn host(&self) -> Option<&str> {
         match self {
-            Location::File(_) => None,
+            Location::File(_) | Location::Welcome => None,
             Location::Web(url) => url.host_str(),
         }
     }
@@ -69,12 +75,14 @@ impl Location {
         match self {
             Location::File(path) => path.display().to_string(),
             Location::Web(url) => url.to_string(),
+            Location::Welcome => String::new(),
         }
     }
 
     /// Title of last resort: the file name, the URL's last path segment, or its host.
     pub fn label(&self) -> String {
         let name = match self {
+            Location::Welcome => None,
             Location::File(path) => path.file_name().map(|name| name.to_string_lossy().into_owned()),
             Location::Web(url) => url
                 .path_segments()
@@ -110,6 +118,11 @@ mod tests {
         for name in ["a.md?x", "a.txt", "md", ".md", "a.md/", "a.mdx"] {
             assert!(!is_markdown_name(name), "{name}");
         }
+    }
+
+    #[test]
+    fn the_welcome_page_has_no_label_of_its_own() {
+        assert_eq!(Location::Welcome.label(), "");
     }
 
     #[test]

@@ -32,6 +32,7 @@ static DECODING: Mutex<()> = Mutex::new(());
 pub fn load(location: Location, origin: Origin) -> Result<Picture, Problem> {
     let bytes = match location {
         Location::File(path) => read(&path)?,
+        Location::Welcome => return Err(Problem::Unavailable),
         Location::Web(url) => {
             let limits = Limits { max_bytes: MAX_BYTES, ..Limits::default() };
             web::fetch_bytes(&url, Want::Image, &limits, origin).map(|(_, bytes)| bytes).map_err(Problem::from_fetch)?
