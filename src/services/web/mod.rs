@@ -70,7 +70,15 @@ fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Error
         .iter()
         .find_map(|candidate| page(candidate, limits, origin).ok())
         .map(|found| Fetched { fallback_from: Some(url.clone()), ..found })
-        .ok_or(ErrorCode::NotMarkdown)
+        .ok_or_else(|| {
+            if has_llms_txt(asked, limits, origin) { ErrorCode::NotMarkdownWithLlms } else { ErrorCode::NotMarkdown }
+        })
+}
+
+/// Whether the site answers for `/llms.txt` the way a click on it would be read, so
+/// the offer is never made for a page that would only fail.
+fn has_llms_txt(asked: &Url, limits: &Limits, origin: Origin) -> bool {
+    asked.join(web::LLMS_TXT).is_ok_and(|llms| page(&llms, limits, origin).is_ok())
 }
 
 #[cfg(test)]
@@ -257,6 +265,38 @@ mod tests {
         let server = Server::start(|request| if request.path == "/post" { html() } else { Reply::new(404) });
         let result = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted);
         assert_eq!(result, Err(ErrorCode::NotMarkdown));
+    }
+
+    fn with_llms(llms: Reply) -> Server {
+        Server::start(move |request| match request.path.as_str() {
+            "/post" => html(),
+            "/llms.txt" => llms.clone(),
+            _ => Reply::new(404),
+        })
+    }
+
+    #[test]
+    fn a_site_with_an_llms_txt_says_so() {
+        let plain = Reply::new(200).header("Content-Type", "text/plain; charset=utf-8").body("# Site");
+        for llms in [Reply::markdown("# Site"), plain] {
+            let result = fallback(&Url::parse(&with_llms(llms).url("/post")).unwrap(), &limits(), Origin::Trusted);
+            assert_eq!(result, Err(ErrorCode::NotMarkdownWithLlms));
+        }
+    }
+
+    #[test]
+    fn a_missing_or_unreadable_llms_txt_is_not_offered() {
+        for llms in [Reply::new(404), Reply::new(500), html()] {
+            let result = fallback(&Url::parse(&with_llms(llms).url("/post")).unwrap(), &limits(), Origin::Trusted);
+            assert_eq!(result, Err(ErrorCode::NotMarkdown));
+        }
+    }
+
+    #[test]
+    fn llms_txt_is_only_looked_for_when_nothing_else_was_found() {
+        let server = site(html());
+        fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        assert!(server.requests().iter().all(|request| request.path != "/llms.txt"));
     }
 
     #[test]

@@ -21,7 +21,7 @@ Many sites that publish Markdown link to the HTML page (`/post`), not the file (
    1. `Link: <…>; rel="alternate"; type="text/markdown"` on that response. Costs no request to discover.
    2. The `.md` sibling: `/post` → `/post.md`, and `/post/` → `/post.md`, then `/post/index.md`. At most 2 extra requests.
 3. **Not in 2d**: scanning the HTML body for `<link rel="alternate" type="text/markdown">`. It means reading HTML, which VECTOR.md rules out of the rendering path, so it needs its own ADR and is left for later.
-4. **`llms.txt`** is never substituted. When every fallback misses, the "not Markdown" screen offers "Try this site's llms.txt" as an explicit button, which opens `/llms.txt` as a normal navigation (the site root, same scheme and host).
+4. **`llms.txt`** is never substituted. When every fallback misses, the "not Markdown" screen offers "Try this site's llms.txt" as an explicit button, only when the site has one (one extra probe of `/llms.txt`, made only after both fallbacks miss, read under the same type rules a click would use, so `text/plain` is accepted at that path), which opens `/llms.txt` as a normal navigation (the site root, same scheme and host).
 5. **Safety**: a fallback URL must be the same host as the page, or a host `next_hop` would allow, and it is fetched with the original `Origin`, so a public page can't steer into the local network. Same size, time and type limits as any page.
 6. **What the reader sees**: the address bar and History hold the Markdown URL actually shown, since that is the one that reloads. A notice reads "Showing the Markdown version of <original address>" with the existing "Open in browser" action pointed at the original. Back returns to the page before, not to the HTML address.
 
@@ -33,7 +33,7 @@ See ADR-005: `Link` alternates on the same host only; `/post.md` then `/post/ind
 
 1. [x] An HTML page whose response has a `Link` alternate for Markdown opens that Markdown.
 2. [x] An HTML page with a `.md` sibling opens it, in the order above.
-3. [x] With no Markdown version, the error is unchanged, plus the `llms.txt` button.
+3. [x] With no Markdown version, the error is unchanged, plus the `llms.txt` button when the site has an `llms.txt`.
 4. [x] A notice names the original address, and the address bar and History hold the shown URL.
 5. [x] Fallbacks never chain, never leave the host rule, and respect `Origin`.
 6. [x] Local files and non-HTML failures (404, timeouts) never trigger a fallback.

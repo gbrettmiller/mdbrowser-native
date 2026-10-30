@@ -185,18 +185,18 @@ impl State {
         if let Status::Ready(shown) = &self.status {
             return shown.fallback_from.clone();
         }
-        let not_markdown = self.status == Status::Failed(ErrorCode::NotMarkdown);
+        let not_markdown = matches!(self.status, Status::Failed(code) if code.is_not_markdown());
         self.current_location().filter(|location| not_markdown && location.is_web()).map(Location::address)
     }
 
     /// The site's `llms.txt`, offered (never substituted) when a web page has no
-    /// Markdown version. Opening it is an ordinary navigation.
+    /// Markdown version and the fetch found an `llms.txt`. Opening it is an ordinary navigation.
     pub fn llms_offer(&self) -> Option<String> {
-        if self.status != Status::Failed(ErrorCode::NotMarkdown) {
+        if self.status != Status::Failed(ErrorCode::NotMarkdownWithLlms) {
             return None;
         }
         match self.current_location()? {
-            Location::Web(url) => url.join("/llms.txt").ok().map(String::from),
+            Location::Web(url) => url.join(web::LLMS_TXT).ok().map(String::from),
             Location::File(_) | Location::Welcome => None,
         }
     }

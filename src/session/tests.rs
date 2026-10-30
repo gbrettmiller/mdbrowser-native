@@ -176,6 +176,7 @@ fn the_system_browser_is_offered_for_nothing_else() {
     let cases = [
         vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::NotFound)],
         vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdown)],
+        vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdownWithLlms)],
         vec![Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")],
         vec![Event::Enter("https://x.org/a.md".into())],
         vec![Event::Enter("ftp://x.org/a.md".into())],
@@ -539,7 +540,9 @@ fn going_back_to_a_fallback_page_shows_the_markdown_address_without_the_banner()
 
 #[test]
 fn a_page_with_no_markdown_version_offers_the_sites_llms_txt() {
-    let (state, _) = run([Event::Enter("https://x.org/a/b?q=1#top".into()), failed_with(ErrorCode::NotMarkdown)]);
+    let (state, _) =
+        run([Event::Enter("https://x.org/a/b?q=1#top".into()), failed_with(ErrorCode::NotMarkdownWithLlms)]);
+    assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/a/b?q=1"));
     assert_eq!(state.llms_offer().as_deref(), Some("https://x.org/llms.txt"));
     let offer = state.llms_offer().unwrap();
     let (state, _) = step(state, Event::Enter(offer));

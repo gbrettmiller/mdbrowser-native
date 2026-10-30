@@ -30,7 +30,7 @@ Keep the "not Markdown" error and the Open in browser action.
 
 ### Option B: Try alternates in a fixed order, tell the reader
 
-On a successful response whose type isn't Markdown: (1) the `Link: <…>; rel="alternate"; type="text/markdown"` header on that response, same host only; (2) the `.md` sibling (`/post` → `/post.md`; with a trailing slash, `/post.md` then `/post/index.md`). First hit wins, with one level only. The shown URL goes in the address bar and History, and a notice names the original address on every such load. `llms.txt` is offered as a button on the error screen when nothing is found.
+On a successful response whose type isn't Markdown: (1) the `Link: <…>; rel="alternate"; type="text/markdown"` header on that response, same host only; (2) the `.md` sibling (`/post` → `/post.md`; with a trailing slash, `/post.md` then `/post/index.md`). First hit wins, with one level only. The shown URL goes in the address bar and History, and a notice names the original address on every such load. `llms.txt` is offered as a button on the error screen when nothing is found and the site answers for `/llms.txt` (probed once, after the fallbacks miss, under the same checks as any page).
 
 **Pros:**
 - Uses existing conventions, with at most two extra requests, and only after a type mismatch.

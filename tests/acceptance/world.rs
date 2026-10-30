@@ -79,7 +79,6 @@ fn routes() -> HashMap<String, Reply> {
         ("/alt/linked.md", Reply::markdown("# Linked Alternate\n")),
         ("/linked.md", Reply::markdown("# Sibling Loses\n")),
         ("/bare", typed("text/html", b"<h1>Bare</h1>")),
-        ("/llms.txt", Reply::markdown("# Site Index\n")),
     ]
     .into_iter()
     .chain(fixtures::image_routes())

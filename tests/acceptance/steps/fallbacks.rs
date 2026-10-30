@@ -1,9 +1,10 @@
 //! Steps for features/fallbacks.feature.
 
-use cucumber::{then, when};
+use cucumber::{given, then, when};
 
 use mdbrowser::session::{Event, Status};
 
+use crate::http::Reply;
 use crate::world::Browser;
 
 #[then(expr = "the page says it was found instead of the URL of {string}")]
@@ -17,6 +18,11 @@ fn found_instead(w: &mut Browser, path: String) {
 fn not_found_instead(w: &mut Browser) {
     let Status::Ready(shown) = &w.state().status else { panic!("{:?}", w.state().status) };
     assert_eq!(shown.fallback_from, None);
+}
+
+#[given("the site has an llms.txt")]
+fn site_has_llms(w: &mut Browser) {
+    w.routes.lock().expect("routes").insert("/llms.txt".into(), Reply::markdown("# Site Index\n"));
 }
 
 #[then(expr = "the site was not asked for {string}")]

@@ -38,13 +38,23 @@ Feature: Markdown fallbacks
     Then I see the document titled "Article In Markdown"
     And the page does not say it was found instead
 
-  Scenario: With nothing to fall back to, llms.txt is offered, not substituted
+  Scenario: With nothing to fall back to, an llms.txt is offered, not substituted
+    Given the site has an llms.txt
     When I enter the URL of "/bare"
-    Then I see the error "notMarkdown"
-    And the site was not asked for "/llms.txt"
+    Then I see the error "notMarkdownWithLlms"
     When I choose the site's llms.txt
     Then I see the document titled "Site Index"
     And the address shows the URL of "/llms.txt"
+
+  Scenario: With no llms.txt, none is offered
+    When I enter the URL of "/bare"
+    Then I see the error "notMarkdown"
+    And I am not offered the site's llms.txt
+
+  Scenario: llms.txt is only looked for when nothing else was found
+    Given the site has an llms.txt
+    When I enter the URL of "/article"
+    Then the site was not asked for "/llms.txt"
 
   Scenario: Other failures never fall back
     When I enter the URL of "/missing.md"
