@@ -7,11 +7,12 @@ mod fetch;
 use std::time::Duration;
 
 pub use fetch::fetch_bytes;
+use fetch::{Refused, fetch_page_bytes};
 use url::Url;
 
 use super::files::MAX_BYTES;
 use crate::session::error::ErrorCode;
-use crate::session::web::{self, Origin, Want};
+use crate::session::web::{self, Origin};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// For the whole fetch, every redirect included.
@@ -36,13 +37,40 @@ impl Default for Limits {
 pub struct Fetched {
     pub url: Url,
     pub source: String,
+    /// The address asked for, when this was found in its place (ADR-005).
+    pub fallback_from: Option<Url>,
 }
 
-/// A Markdown page, with the failure codes pages have always had (phase 2a).
+/// A Markdown page, with the failure codes pages have always had (phase 2a). When
+/// the server answers with something else, Markdown versions of the same page are
+/// tried (ADR-005); the result says which address was found.
 pub fn fetch(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, ErrorCode> {
-    let (url, bytes) = fetch_bytes(url, Want::Page, limits, origin).map_err(web::FetchError::for_page)?;
-    let source = web::to_text(bytes).map_err(web::FetchError::for_page)?;
-    Ok(Fetched { url, source })
+    fallback(url, limits, origin)
+}
+
+fn page(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Refused> {
+    let (url, bytes) = fetch_page_bytes(url, limits, origin)?;
+    let source = web::to_text(bytes).map_err(Refused::from)?;
+    Ok(Fetched { url, source, fallback_from: None })
+}
+
+/// `url`, or when it isn't Markdown, the first of its `Link` alternate and `.md`
+/// siblings that is. One level only: a candidate's own refusal is never followed,
+/// and any other failure (404, timeout, bad body) never starts a search.
+fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, ErrorCode> {
+    let refused = match page(url, limits, origin) {
+        Ok(found) => return Ok(found),
+        Err(refused) => refused,
+    };
+    if refused.error != web::FetchError::WrongType {
+        return Err(refused.error.for_page());
+    }
+    let asked = refused.url.as_ref().unwrap_or(url);
+    web::candidates(asked, refused.link.as_deref())
+        .iter()
+        .find_map(|candidate| page(candidate, limits, origin).ok())
+        .map(|found| Fetched { fallback_from: Some(url.clone()), ..found })
+        .ok_or(ErrorCode::NotMarkdown)
 }
 
 #[cfg(test)]
@@ -178,10 +206,91 @@ mod tests {
     fn the_response_type_and_path_decide_what_is_markdown() {
         let html = Reply::new(200).header("Content-Type", "text/html").body("<p>hi</p>");
         assert_eq!(source(&serve(html).url("/a.md")), Err(ErrorCode::NotMarkdown));
-        let untyped = serve(Reply::new(200).body("# Hi"));
+        let untyped =
+            Server::start(
+                |request| if request.path == "/a.md" { Reply::new(200).body("# Hi") } else { Reply::new(404) },
+            );
         assert_eq!(source(&untyped.url("/a.md")), Ok("# Hi".into()));
-        assert_eq!(source(&untyped.url("/a")), Err(ErrorCode::NotMarkdown));
+        let only_a =
+            Server::start(|request| if request.path == "/a" { Reply::new(200).body("# Hi") } else { Reply::new(404) });
+        assert_eq!(source(&only_a.url("/a")), Err(ErrorCode::NotMarkdown));
         assert_eq!(source(&serve(Reply::new(204)).url("/empty.md")), Ok(String::new()));
+    }
+
+    fn html() -> Reply {
+        Reply::new(200).header("Content-Type", "text/html").body("<p>hi</p>")
+    }
+
+    /// `/post` is HTML; `/post.md` is Markdown.
+    fn site(page: Reply) -> Server {
+        Server::start(move |request| match request.path.as_str() {
+            "/post.md" => Reply::markdown("# Found"),
+            "/raw/post.md" => Reply::markdown("# Alternate"),
+            "/post" => page.clone(),
+            _ => Reply::new(404),
+        })
+    }
+
+    #[test]
+    fn an_html_page_falls_back_to_its_md_sibling() {
+        let server = site(html());
+        let found = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        assert_eq!((found.url.path(), found.source.as_str()), ("/post.md", "# Found"));
+    }
+
+    #[test]
+    fn a_link_alternate_wins_over_the_sibling() {
+        let linked = html().header("Link", r#"</raw/post.md>; rel="alternate"; type="text/markdown""#);
+        let found = fallback(&Url::parse(&site(linked).url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        assert_eq!((found.url.path(), found.source.as_str()), ("/raw/post.md", "# Alternate"));
+    }
+
+    #[test]
+    fn a_link_to_another_host_is_never_followed() {
+        let elsewhere = html().header("Link", r#"<https://evil.example/p.md>; rel="alternate"; type="text/markdown""#);
+        let found = fallback(&Url::parse(&site(elsewhere).url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        assert_eq!(found.url.path(), "/post.md");
+    }
+
+    #[test]
+    fn nothing_found_keeps_the_original_error() {
+        let server = Server::start(|request| if request.path == "/post" { html() } else { Reply::new(404) });
+        let result = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted);
+        assert_eq!(result, Err(ErrorCode::NotMarkdown));
+    }
+
+    #[test]
+    fn a_fallback_that_is_html_too_does_not_chain() {
+        let server = Server::start(|request| match request.path.as_str() {
+            "/post" => html(),
+            "/post.md" => html().header("Link", r#"</x.md>; rel="alternate"; type="text/markdown""#),
+            "/x.md" => Reply::markdown("# Chained"),
+            _ => Reply::new(404),
+        });
+        let result = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted);
+        assert_eq!(result, Err(ErrorCode::NotMarkdown));
+        assert!(server.requests().iter().all(|request| request.path != "/x.md"));
+    }
+
+    #[test]
+    fn only_a_wrong_type_starts_a_fallback() {
+        for status in [404, 500] {
+            let server = Server::start(move |request| match request.path.as_str() {
+                "/post.md" => Reply::markdown("# Found"),
+                _ => Reply::new(status),
+            });
+            let result = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted);
+            assert!(result.is_err(), "{status}");
+            assert!(server.requests().iter().all(|request| request.path != "/post.md"), "{status}");
+        }
+    }
+
+    #[test]
+    fn markdown_is_returned_as_it_is() {
+        let server = Server::start(|_| Reply::markdown("# Here"));
+        let found = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        assert_eq!((found.url.path(), found.source.as_str()), ("/post", "# Here"));
+        assert_eq!(server.requests().len(), 1);
     }
 
     #[test]

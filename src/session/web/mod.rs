@@ -2,8 +2,10 @@
 //! sends the request and follows these rules.
 
 mod body;
+mod fallback;
 
 pub use body::{body_policy, encoding_policy, image_policy, to_text};
+pub use fallback::{alternate, candidates};
 use url::Url;
 
 use super::error::ErrorCode;

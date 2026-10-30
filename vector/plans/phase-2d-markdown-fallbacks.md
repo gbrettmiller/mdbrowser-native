@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-29
 **Branch**: `feat/phase-2d`, from `main` after phase 2c (#10)
-**Status**: planned; decisions made 2026-10-29 (ADR-005)
+**Status**: built (2026-10-29); decisions in ADR-005
 
 ## Goal
 
@@ -29,15 +29,15 @@ Many sites that publish Markdown link to the HTML page (`/post`), not the file (
 
 See ADR-005: `Link` alternates on the same host only; `/post.md` then `/post/index.md` for a trailing slash; the address bar and History hold the Markdown URL; the notice shows every time.
 
-## Acceptance Criteria (draft)
+## Acceptance Criteria
 
-1. [ ] An HTML page whose response has a `Link` alternate for Markdown opens that Markdown.
-2. [ ] An HTML page with a `.md` sibling opens it, in the order above.
-3. [ ] With no Markdown version, the error is unchanged, plus the `llms.txt` button.
-4. [ ] A notice names the original address, and the address bar and History hold the shown URL.
-5. [ ] Fallbacks never chain, never leave the host rule, and respect `Origin`.
-6. [ ] Local files and non-HTML failures (404, timeouts) never trigger a fallback.
-7. [ ] Strings in `content`, features in `features/`, all gates green.
+1. [x] An HTML page whose response has a `Link` alternate for Markdown opens that Markdown.
+2. [x] An HTML page with a `.md` sibling opens it, in the order above.
+3. [x] With no Markdown version, the error is unchanged, plus the `llms.txt` button.
+4. [x] A notice names the original address, and the address bar and History hold the shown URL.
+5. [x] Fallbacks never chain, never leave the host rule, and respect `Origin`.
+6. [x] Local files and non-HTML failures (404, timeouts) never trigger a fallback.
+7. [x] Strings in `content`, features in `features/`, all gates green.
 
 ## Steps
 

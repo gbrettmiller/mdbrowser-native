@@ -69,6 +69,17 @@ fn routes() -> HashMap<String, Reply> {
         ("/bad-utf8.md", typed("text/markdown", b"# \xff\xfe\n")),
         ("/huge.md", Reply::markdown(&"x".repeat(SIZE_LIMIT as usize + 1))),
         ("/slow.md", Reply::markdown("# Slow\n")),
+        ("/article", typed("text/html", b"<h1>Article</h1>")),
+        ("/article.md", Reply::markdown("# Article In Markdown\n")),
+        (
+            "/linked",
+            typed("text/html", b"<h1>Linked</h1>")
+                .header("Link", "</alt/linked.md>; rel=\"alternate\"; type=\"text/markdown\""),
+        ),
+        ("/alt/linked.md", Reply::markdown("# Linked Alternate\n")),
+        ("/linked.md", Reply::markdown("# Sibling Loses\n")),
+        ("/bare", typed("text/html", b"<h1>Bare</h1>")),
+        ("/llms.txt", Reply::markdown("# Site Index\n")),
     ]
     .into_iter()
     .chain(fixtures::image_routes())

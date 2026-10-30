@@ -118,7 +118,7 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
     let target = state.nav.current().and_then(|entry| entry.target.clone());
     let (Some(target), true) = (target, state.pending == Some(request_id)) else { return none(state) };
     match result {
-        Ok(Loaded { source, location }) => {
+        Ok(Loaded { source, location, fallback_from }) => {
             let document = model::parse(&source);
             let title = document.title(&location.label());
             let visits = if location.is_welcome() {
@@ -126,7 +126,7 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
             } else {
                 visits::record(&state.visits, &location.address(), &title, now)
             };
-            let shown = Arc::new(Shown { document: Arc::new(document), title });
+            let shown = Arc::new(Shown { document: Arc::new(document), title, fallback_from });
             let sources = shown.document.image_sources();
             let (images, loads) = state.images.open_page(&sources, &location, &state.home, state.settings.images);
             let origin = Origin::of(&location);

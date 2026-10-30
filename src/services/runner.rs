@@ -43,12 +43,19 @@ const WELCOME_PAGE: &str = include_str!("../../assets/welcome.md");
 /// Reads a file or fetches a page. Matched exhaustively, so a web location can never reach `files`.
 pub fn load(location: Location, limits: &web::Limits, origin: Origin) -> Result<Loaded, ErrorCode> {
     match location {
-        Location::File(path) => {
-            files::read_markdown(&path).map(|source| Loaded { source, location: Location::File(path) })
+        Location::File(path) => files::read_markdown(&path).map(|source| Loaded {
+            source,
+            location: Location::File(path),
+            fallback_from: None,
+        }),
+        Location::Welcome => {
+            Ok(Loaded { source: WELCOME_PAGE.to_string(), location: Location::Welcome, fallback_from: None })
         }
-        Location::Welcome => Ok(Loaded { source: WELCOME_PAGE.to_string(), location: Location::Welcome }),
-        Location::Web(url) => web::fetch(&url, limits, origin)
-            .map(|fetched| Loaded { source: fetched.source, location: Location::web(fetched.url) }),
+        Location::Web(url) => web::fetch(&url, limits, origin).map(|fetched| Loaded {
+            source: fetched.source,
+            location: Location::web(fetched.url),
+            fallback_from: fetched.fallback_from.map(|url| Location::web(url).address()),
+        }),
     }
 }
 

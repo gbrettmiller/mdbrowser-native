@@ -11,7 +11,19 @@ fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
 }
 
 fn loaded_at(request_id: u64, location: Location, source: &str) -> Event {
-    Event::Loaded { request_id, result: Ok(Loaded { source: source.into(), location }), now: 1 }
+    Event::Loaded { request_id, result: Ok(Loaded { source: source.into(), location, fallback_from: None }), now: 1 }
+}
+
+fn found_instead(request_id: u64, original: &str, url: &str, source: &str) -> Event {
+    let loaded = Loaded { source: source.into(), location: web(url), fallback_from: Some(original.into()) };
+    Event::Loaded { request_id, result: Ok(loaded), now: 1 }
+}
+
+fn shown(state: &State) -> Arc<Shown> {
+    match &state.status {
+        Status::Ready(shown) => shown.clone(),
+        other => panic!("not ready: {other:?}"),
+    }
 }
 
 fn loaded(request_id: u64, path: &str, source: &str) -> Event {
@@ -480,4 +492,71 @@ fn a_failed_image_shows_its_note_and_refused_sources_load_nothing() {
 fn a_local_file_loads_web_images_as_the_readers_own() {
     let (_, effects) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "![w](https://x.org/w.png)")]);
     assert_eq!(image_loads(&effects), [(web("https://x.org/w.png"), Origin::Trusted)]);
+}
+
+#[test]
+fn a_markdown_version_found_instead_becomes_the_address_and_the_history_entry() {
+    let (state, effects) = run([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "# Post"),
+    ]);
+    assert_eq!(state.address(), "https://x.org/post.md");
+    assert_eq!(history(&effects), ["https://x.org/post.md"]);
+    assert_eq!(state.visits.len(), 1);
+    assert_eq!(shown(&state).fallback_from.as_deref(), Some("https://x.org/post"));
+}
+
+#[test]
+fn the_system_browser_opens_the_original_address_of_a_fallback() {
+    let (state, _) = run([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "# Post"),
+    ]);
+    assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/post"));
+    let (_, effects) = step(state, Event::OpenInBrowser);
+    assert_eq!(effects, [Effect::OpenExternal("https://x.org/post".into())]);
+}
+
+#[test]
+fn a_page_that_was_markdown_all_along_carries_no_fallback() {
+    let (state, _) = run([Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")]);
+    assert_eq!(shown(&state).fallback_from, None);
+}
+
+#[test]
+fn going_back_to_a_fallback_page_shows_the_markdown_address_without_the_banner() {
+    let (state, _) = run([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "# Post"),
+        Event::Enter("https://x.org/b.md".into()),
+        fetched(2, "https://x.org/b.md", "# B"),
+        Event::Back,
+        fetched(3, "https://x.org/post.md", "# Post"),
+    ]);
+    assert_eq!(state.address(), "https://x.org/post.md");
+    assert_eq!(shown(&state).fallback_from, None);
+}
+
+#[test]
+fn a_page_with_no_markdown_version_offers_the_sites_llms_txt() {
+    let (state, _) = run([Event::Enter("https://x.org/a/b?q=1#top".into()), failed_with(ErrorCode::NotMarkdown)]);
+    assert_eq!(state.llms_offer().as_deref(), Some("https://x.org/llms.txt"));
+    let offer = state.llms_offer().unwrap();
+    let (state, _) = step(state, Event::Enter(offer));
+    assert_eq!(state.status, Status::Loading);
+    assert_eq!(state.address(), "https://x.org/llms.txt");
+}
+
+#[test]
+fn llms_txt_is_offered_for_nothing_else() {
+    let cases = [
+        vec![Event::Enter("https://x.org/a".into()), failed_with(ErrorCode::NotFound)],
+        vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdown)],
+        vec![Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")],
+        vec![],
+    ];
+    for events in cases {
+        let (state, _) = run(events.clone());
+        assert_eq!(state.llms_offer(), None, "{events:?}");
+    }
 }
