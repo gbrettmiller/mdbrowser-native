@@ -8,13 +8,13 @@ use iced::{Element, Length};
 
 use super::app::Message;
 use super::focus::{self, button, neighbour};
+use super::panels::PANEL_WIDTH;
 use crate::content;
 use crate::session::images::ImageLoading;
 use crate::session::{Event, State, TextStep};
 use crate::theme::colours::hex;
 use crate::theme::{Appearance, Colours, ReadingFont, Spacing, Which, chrome_text};
 
-const WIDTH: f32 = 300.0;
 /// Space beside the controls so the panel's scrollbar doesn't cover them.
 const SCROLLBAR_ROOM: f32 = 16.0;
 
@@ -153,7 +153,7 @@ pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDraft
     .spacing(16)
     .padding(iced::Padding::ZERO.right(SCROLLBAR_ROOM));
     // The panel is taller than a small window once the colour fields show.
-    container(scrollable(fields)).width(Length::Fixed(WIDTH)).height(Length::Fill).padding(12).into()
+    container(scrollable(fields)).width(Length::Fixed(PANEL_WIDTH)).height(Length::Fill).padding(12).into()
 }
 
 #[cfg(test)]

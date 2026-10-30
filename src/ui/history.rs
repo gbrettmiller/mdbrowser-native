@@ -5,11 +5,10 @@ use iced::{Element, Fill, Length};
 
 use super::app::Message;
 use super::focus::pressable;
+use super::panels::PANEL_WIDTH;
 use crate::content;
 use crate::session::{Event, State};
 use crate::theme::{self, chrome_text};
-
-const WIDTH: f32 = 300.0;
 
 pub fn panel(state: &State, palette: theme::Palette) -> Element<'_, Message> {
     let reader = theme::reading(theme::Look { font: state.settings.font, palette, ..theme::Look::default() });
@@ -35,7 +34,7 @@ pub fn panel(state: &State, palette: theme::Palette) -> Element<'_, Message> {
     container(
         column![text(content::HISTORY).size(chrome_text::HEADING), clear, scrollable(entries).height(Fill)].spacing(12),
     )
-    .width(Length::Fixed(WIDTH))
+    .width(Length::Fixed(PANEL_WIDTH))
     .height(Fill)
     .padding(12)
     .into()

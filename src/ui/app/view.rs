@@ -61,8 +61,8 @@ impl App {
             .height(Fill)
             .style(move |_| container::Style { background: Some(background.into()), ..container::Style::default() });
         let panels = row![page]
-            .push(self.history_open.then(|| history::panel(state, self.palette())))
-            .push(self.settings_open.then(|| settings::panel(state, &self.home_draft, &self.colour_drafts)));
+            .push(self.panels.history.then(|| history::panel(state, self.palette())))
+            .push(self.panels.settings.then(|| settings::panel(state, &self.home_draft, &self.colour_drafts)));
         let content: Element<'_, Message> = panels.into();
         let status = self.hover.clone().unwrap_or_default();
         column![toolbar::toolbar(state, &self.draft)]

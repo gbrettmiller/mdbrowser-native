@@ -9,6 +9,7 @@ mod history;
 pub mod images;
 mod keys;
 pub mod pages;
+mod panels;
 mod settings;
 mod toolbar;
 mod viewport;

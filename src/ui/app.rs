@@ -7,10 +7,11 @@ use std::time::Duration;
 
 use iced::keyboard;
 use iced::widget::operation;
-use iced::{Font, Subscription, Task, window};
+use iced::{Font, Size, Subscription, Task, window};
 
 use super::keys::{self, Command, Scroll};
 use super::pages::{Pages, SETTLE};
+use super::panels::{self, Open, Panel};
 use super::settings::ColourDrafts;
 use super::viewport::Viewport;
 use crate::services::store::Store;
@@ -35,6 +36,8 @@ const ANCHOR_RETRY: Duration = Duration::from_millis(16);
 const ANCHOR_ATTEMPTS: u32 = 60;
 /// Window size at launch, and the layout width assumed before the first frame.
 const WINDOW_SIZE: (f32, f32) = (1000.0, 1000.0);
+/// The smallest window: the toolbar fits, and one panel can open beside a page.
+const MIN_WINDOW: (f32, f32) = (480.0, 360.0);
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -46,7 +49,8 @@ pub enum Message {
     Submit,
     Hover(Option<String>),
     Key(keyboard::Event),
-    Resized,
+    /// The window changed size; the width decides how many panels fit beside the page.
+    Resized(Size),
     Relayout,
     ToggleHistory,
     ToggleSettings,
@@ -74,8 +78,9 @@ pub struct App {
     draft: String,
     store: Option<Arc<Store>>,
     hover: Option<String>,
-    history_open: bool,
-    settings_open: bool,
+    panels: Open,
+    /// Window width, from the last resize.
+    window_width: f32,
     /// What the Home page field shows; follows the saved value until the reader types.
     home_draft: String,
     /// What the custom colour fields show; follows the saved colours until the reader types.
@@ -96,8 +101,8 @@ impl App {
             draft: String::new(),
             store,
             hover: None,
-            history_open: false,
-            settings_open: false,
+            panels: Open::default(),
+            window_width: WINDOW_SIZE.0,
             home_draft: settings.home.clone(),
             colour_drafts: ColourDrafts::of(settings.colours()),
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
@@ -186,17 +191,20 @@ impl App {
                 Task::none()
             }
             Message::Key(event) => self.shortcut(event),
-            Message::Resized => self.schedule_relayout(),
+            Message::Resized(size) => {
+                self.window_width = size.width;
+                self.schedule_relayout()
+            }
             Message::Relayout => {
                 self.relayout_scheduled = false;
                 if self.viewport.settling() { self.schedule_relayout() } else { Task::none() }
             }
             Message::ToggleHistory => {
-                self.history_open = !self.history_open;
+                self.panels = panels::toggled(self.panels, Panel::History, self.window_width);
                 Task::none()
             }
             Message::ToggleSettings => {
-                self.settings_open = !self.settings_open;
+                self.panels = panels::toggled(self.panels, Panel::Settings, self.window_width);
                 Task::none()
             }
             Message::HomeDraftChanged(draft) => {
@@ -255,17 +263,17 @@ impl App {
 
     /// Esc: closes the Settings panel, or else History, and puts the keyboard back on the page.
     fn close_panel(&mut self) -> Task<Message> {
-        let Some((history, settings)) = after_escape(self.history_open, self.settings_open) else {
+        let Some((history, settings)) = after_escape(self.panels.history, self.panels.settings) else {
             return Task::none();
         };
-        (self.history_open, self.settings_open) = (history, settings);
+        self.panels = Open { history, settings };
         operation::focus(PAGE_ID)
     }
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
             keyboard::listen().map(Message::Key),
-            window::resize_events().map(|_| Message::Resized),
+            window::resize_events().map(|(_, size)| Message::Resized(size)),
             iced::system::theme_changes().map(Message::SystemMode),
         ])
     }
@@ -278,7 +286,11 @@ pub fn run() -> iced::Result {
         .subscription(App::subscription)
         .default_font(Font::with_name(theme::ReadingFont::Inter.family()))
         .theme(|app: &App| super::chrome::theme(app.palette()))
-        .window_size(WINDOW_SIZE)
+        .window(window::Settings {
+            size: Size::new(WINDOW_SIZE.0, WINDOW_SIZE.1),
+            min_size: Some(Size::new(MIN_WINDOW.0, MIN_WINDOW.1)),
+            ..window::Settings::default()
+        })
         .run()
 }
 
