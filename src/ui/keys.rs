@@ -4,6 +4,42 @@ use iced::keyboard::{Key, Modifiers, key::Named};
 
 use crate::session::{Event, Neighbour, TextStep};
 
+/// A move of the page from the keyboard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scroll {
+    PageUp,
+    PageDown,
+    LineUp,
+    LineDown,
+    Top,
+    Bottom,
+}
+
+/// The scroll `key` asks for. PageUp and PageDown scroll wherever focus is; the other keys
+/// (Space, the arrows, Home and End) only when the page has it, because a text field needs them.
+pub fn scroll(key: Key<&str>, modifiers: Modifiers, page_focused: bool) -> Option<Scroll> {
+    if modifiers.command() || modifiers.alt() {
+        return None;
+    }
+    let scroll = match key {
+        Key::Named(Named::PageUp) if !modifiers.shift() => Scroll::PageUp,
+        Key::Named(Named::PageDown) if !modifiers.shift() => Scroll::PageDown,
+        Key::Named(Named::Space) if page_focused => {
+            if modifiers.shift() {
+                Scroll::PageUp
+            } else {
+                Scroll::PageDown
+            }
+        }
+        Key::Named(Named::ArrowUp) if page_focused && !modifiers.shift() => Scroll::LineUp,
+        Key::Named(Named::ArrowDown) if page_focused && !modifiers.shift() => Scroll::LineDown,
+        Key::Named(Named::Home) if page_focused && !modifiers.shift() => Scroll::Top,
+        Key::Named(Named::End) if page_focused && !modifiers.shift() => Scroll::Bottom,
+        _ => return None,
+    };
+    Some(scroll)
+}
+
 /// What a shortcut asks for.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
@@ -14,11 +50,15 @@ pub enum Command {
     /// Tab and Shift+Tab, when nothing on the page used them: on to the next or previous control.
     FocusNext,
     FocusPrevious,
+    Scroll(Scroll),
 }
 
 /// The command for `key` pressed with `modifiers`, if it is a shortcut.
 pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
     let (primary, shift, alt) = (modifiers.command(), modifiers.shift(), modifiers.alt());
+    if let Some(scroll) = scroll(key.clone(), modifiers, false) {
+        return Some(Command::Scroll(scroll));
+    }
     let command = match key {
         Key::Named(Named::ArrowLeft) if alt => Command::Session(Event::Back),
         Key::Named(Named::ArrowRight) if alt => Command::Session(Event::Forward),
@@ -89,6 +129,44 @@ mod tests {
         assert_eq!(command(tab, Modifiers::ALT), None);
     }
 
+    fn named(key: Named) -> Key<&'static str> {
+        Key::Named(key)
+    }
+
+    #[test]
+    fn page_up_and_page_down_scroll_wherever_focus_is() {
+        for focused in [false, true] {
+            assert_eq!(scroll(named(Named::PageDown), Modifiers::empty(), focused), Some(Scroll::PageDown));
+            assert_eq!(scroll(named(Named::PageUp), Modifiers::empty(), focused), Some(Scroll::PageUp));
+        }
+        assert_eq!(command(named(Named::PageDown), Modifiers::empty()), Some(Command::Scroll(Scroll::PageDown)));
+    }
+
+    #[test]
+    fn the_other_scroll_keys_need_the_page_to_have_focus() {
+        let keys = [
+            (Named::Space, Modifiers::empty(), Scroll::PageDown),
+            (Named::Space, Modifiers::SHIFT, Scroll::PageUp),
+            (Named::ArrowDown, Modifiers::empty(), Scroll::LineDown),
+            (Named::ArrowUp, Modifiers::empty(), Scroll::LineUp),
+            (Named::Home, Modifiers::empty(), Scroll::Top),
+            (Named::End, Modifiers::empty(), Scroll::Bottom),
+        ];
+        for (key, modifiers, expected) in keys {
+            assert_eq!(scroll(named(key), modifiers, true), Some(expected), "{key:?}");
+            assert_eq!(scroll(named(key), modifiers, false), None, "{key:?} types into a field");
+            assert_eq!(command(named(key), modifiers), None, "{key:?} is not an app shortcut");
+        }
+    }
+
+    #[test]
+    fn scrolling_leaves_chords_with_a_modifier_alone() {
+        assert_eq!(scroll(named(Named::PageDown), primary(), true), None);
+        assert_eq!(scroll(named(Named::ArrowDown), Modifiers::ALT, true), None);
+        assert_eq!(scroll(named(Named::Home), Modifiers::ALT, true), None, "Alt+Home is the home page");
+        assert_eq!(command(named(Named::Home), Modifiers::ALT), Some(Command::Session(Event::Home)));
+    }
+
     #[test]
     fn plain_keys_and_missing_modifiers_do_nothing() {
         assert_eq!(command(Key::Character("i"), primary()), None, "Shift is needed");
@@ -98,6 +176,10 @@ mod tests {
             assert_eq!(command(Key::Character(key), Modifiers::empty()), None, "{key} types into the address bar");
         }
         assert_eq!(command(Key::Named(Named::ArrowLeft), Modifiers::empty()), None);
-        assert_eq!(command(Key::Named(Named::Home), Modifiers::empty()), None, "Home scrolls; it needs Alt");
+        assert_eq!(
+            command(Key::Named(Named::Home), Modifiers::empty()),
+            None,
+            "Home scrolls the page; it needs Alt for the home page"
+        );
     }
 }

@@ -13,6 +13,7 @@ use iced::advanced::{Clipboard, Shell, clipboard};
 use iced::keyboard::{self, Key, key::Named};
 use iced::{Border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 
+use super::keys::{self, Scroll};
 use crate::layout::{Caret, Direction, Page, Reach, Stop, Target, reach};
 use crate::theme;
 
@@ -39,6 +40,8 @@ pub struct Handlers<'a, Message> {
     pub hover: Box<dyn Fn(Option<String>) -> Message + 'a>,
     /// Focus moved to a stop at these heights of the page (top, bottom): bring it into view.
     pub reveal: Box<dyn Fn(f32, f32) -> Message + 'a>,
+    /// A key asked to scroll the page.
+    pub scroll: Box<dyn Fn(Scroll) -> Message + 'a>,
 }
 
 impl<'a, Message> Document<'a, Message> {
@@ -341,6 +344,16 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
                     None => return,
                 }
                 shell.capture_event();
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
+                if state.focused
+                    && !shell.is_event_captured()
+                    && keys::scroll(key.as_ref(), *modifiers, true).is_some() =>
+            {
+                if let Some(scroll) = keys::scroll(key.as_ref(), *modifiers, true) {
+                    shell.publish((self.on.scroll)(scroll));
+                    shell.capture_event();
+                }
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key: Key::Character(c), modifiers, .. })
                 if modifiers.command() && !shell.is_event_captured() =>

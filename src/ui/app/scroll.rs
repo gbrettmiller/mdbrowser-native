@@ -13,6 +13,7 @@ use crate::services::background;
 use crate::session::{Event, Shown};
 use crate::theme;
 use crate::ui::images;
+use crate::ui::keys::Scroll;
 use crate::ui::pages::SETTLE;
 
 impl App {
@@ -73,6 +74,15 @@ impl App {
     /// Scrolls the focused stop, spanning `top` to `bottom` of the page, into view.
     pub(super) fn reveal(&mut self, top: f32, bottom: f32) -> Task<Message> {
         scroll_task(self.viewport.reveal(top, bottom))
+    }
+
+    /// Scrolls the page by a key: a screen, a line, or to an end.
+    pub(super) fn key_scroll(&mut self, by: Scroll) -> Task<Message> {
+        let Some(shown) = self.shown() else { return Task::none() };
+        let (page, _) = self.page(&shown.document, self.viewport.width());
+        let reader = theme::reading(self.look());
+        let line = reader.body_size * reader.line_ratio;
+        scroll_task(self.viewport.key_scroll(by, page.height, line))
     }
 
     /// New documents start at the top; a pending anchor is resolved once the

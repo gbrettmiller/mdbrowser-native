@@ -9,7 +9,7 @@ use iced::keyboard;
 use iced::widget::operation;
 use iced::{Font, Subscription, Task, window};
 
-use super::keys::{self, Command};
+use super::keys::{self, Command, Scroll};
 use super::pages::{Pages, SETTLE};
 use super::settings::ColourDrafts;
 use super::viewport::Viewport;
@@ -64,6 +64,8 @@ pub enum Message {
     Scrolled(f32),
     /// Focus moved to a stop spanning these heights of the page: scroll it into view.
     Reveal(f32, f32),
+    /// A key asked to scroll the page.
+    Scroll(Scroll),
 }
 
 pub struct App {
@@ -217,6 +219,7 @@ impl App {
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
             Message::ImagesArrived => self.images_arrived(),
             Message::Reveal(top, bottom) => self.reveal(top, bottom),
+            Message::Scroll(by) => self.key_scroll(by),
             Message::Scrolled(y) => {
                 self.viewport.scrolled(y);
                 Task::none()
@@ -240,6 +243,7 @@ impl App {
             Some(Command::FocusAddress) => {
                 Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
             }
+            Some(Command::Scroll(by)) => self.key_scroll(by),
             Some(Command::FocusNext) => operation::focus_next(),
             Some(Command::FocusPrevious) => operation::focus_previous(),
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),

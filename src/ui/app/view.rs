@@ -35,6 +35,7 @@ impl App {
                 load_image: Box::new(|src| Message::Session(Event::LoadImage(src))),
                 hover: Box::new(Message::Hover),
                 reveal: Box::new(Message::Reveal),
+                scroll: Box::new(Message::Scroll),
             };
             let document = Document::new(Arc::as_ptr(&shown.document) as usize, page, pictures, reader, on).id(PAGE_ID);
             scrollable(document)
