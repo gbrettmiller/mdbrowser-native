@@ -38,6 +38,10 @@ pub fn step(state: State, event: Event) -> Step {
             Some(url) => (state, vec![Effect::OpenExternal(url)]),
             None => none(state),
         },
+        Event::OpenLlmsTxt => match state.llms_offer() {
+            Some(url) => open_offer(state, &url),
+            None => none(state),
+        },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
         Event::ChooseFont(font) => persist_settings(with_settings(state, |settings| Settings { font, ..settings })),
         Event::ChooseAppearance(appearance) => {
@@ -76,6 +80,14 @@ fn entry_for(input: &str, state: &State) -> Entry {
         Ok(target) => Entry { input: target.location.address(), target: Some(target), origin: Origin::Trusted },
         Err(_) => Entry { input: input.to_string(), target: None, origin: Origin::Trusted },
     }
+}
+
+/// Opens an address the session offered, under the rules of the page it was offered on.
+fn open_offer(state: State, url: &str) -> Step {
+    let Ok(target) = parse_address(url, &state.home) else { return none(state) };
+    let origin = state.nav.current().map_or(Origin::Trusted, |entry| entry.origin);
+    let entry = Entry { input: target.location.address(), target: Some(target), origin };
+    navigate_to(state, entry)
 }
 
 fn navigate_to(state: State, entry: Entry) -> Step {
@@ -118,7 +130,7 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
     let target = state.nav.current().and_then(|entry| entry.target.clone());
     let (Some(target), true) = (target, state.pending == Some(request_id)) else { return none(state) };
     match result {
-        Ok(Loaded { source, location }) => {
+        Ok(Loaded { source, location, fallback_from }) => {
             let document = model::parse(&source);
             let title = document.title(&location.label());
             let visits = if location.is_welcome() {
@@ -126,7 +138,7 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
             } else {
                 visits::record(&state.visits, &location.address(), &title, now)
             };
-            let shown = Arc::new(Shown { document: Arc::new(document), title });
+            let shown = Arc::new(Shown { document: Arc::new(document), title, fallback_from });
             let sources = shown.document.image_sources();
             let (images, loads) = state.images.open_page(&sources, &location, &state.home, state.settings.images);
             let origin = Origin::of(&location);

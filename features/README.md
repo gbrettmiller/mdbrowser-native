@@ -7,6 +7,7 @@ Gherkin specs for user-visible behaviour, ported from the predecessor `mdbrowser
 - `browse.feature` — addresses, links, back/forward, reload, errors and History (ported from `mdbrowser`)
 - `reading.feature` — choosing the reading font
 - `settings.feature` — appearance (System, Light, Dark), the home page and the Home button, and the built-in welcome page
+- `fallbacks.feature` — a page that isn't Markdown: its Link alternate or `.md` sibling is shown, the reader is told, and `llms.txt` is offered, never substituted
 - `remote.feature` — pages over `http(s)`: what counts as Markdown, redirects, fetch failures, links across sites, and Open in browser
 - `images.feature` — images from files and the web: formats, what can't be shown, the Web images setting, clicks, linked images, four loads at a time, and the cache
 

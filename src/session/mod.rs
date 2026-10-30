@@ -39,6 +39,8 @@ pub struct Settings {
 pub struct Loaded {
     pub source: String,
     pub location: Location,
+    /// The address asked for, when this Markdown was found in its place (ADR-005).
+    pub fallback_from: Option<String>,
 }
 
 /// A document ready to show.
@@ -46,6 +48,8 @@ pub struct Loaded {
 pub struct Shown {
     pub document: Arc<Document>,
     pub title: String,
+    /// The address the reader asked for, when this Markdown was found in its place.
+    pub fallback_from: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -93,6 +97,9 @@ pub enum Event {
     OpenerFailed,
     /// Hand the current page to the system browser (see `State::browser_offer`).
     OpenInBrowser,
+    /// Open the site's `llms.txt` offered on the error (see `State::llms_offer`), as the
+    /// failed page's origin would.
+    OpenLlmsTxt,
     OpenHistory(String),
     ClearHistory,
     ChooseFont(ReadingFont),
@@ -174,11 +181,27 @@ impl State {
         self.nav.current()?.target.as_ref().map(|target| &target.location)
     }
 
-    /// The address the system browser may open instead: only a web page that
-    /// turned out not to be Markdown. Local files are never handed over.
+    /// The address the system browser may open instead: a web page that turned
+    /// out not to be Markdown, or the original address of one whose Markdown
+    /// version is shown. Local files are never handed over.
     pub fn browser_offer(&self) -> Option<String> {
-        let not_markdown = self.status == Status::Failed(ErrorCode::NotMarkdown);
+        if let Status::Ready(shown) = &self.status {
+            return shown.fallback_from.clone();
+        }
+        let not_markdown = matches!(self.status, Status::Failed(code) if code.is_not_markdown());
         self.current_location().filter(|location| not_markdown && location.is_web()).map(Location::address)
+    }
+
+    /// The site's `llms.txt`, offered (never substituted) when a web page has no
+    /// Markdown version and the fetch found an `llms.txt`. Opening it is an ordinary navigation.
+    pub fn llms_offer(&self) -> Option<String> {
+        if self.status != Status::Failed(ErrorCode::NotMarkdownWithLlms) {
+            return None;
+        }
+        match self.current_location()? {
+            Location::Web(url) => url.join(web::LLMS_TXT).ok().map(String::from),
+            Location::File(_) | Location::Welcome => None,
+        }
     }
 }
 

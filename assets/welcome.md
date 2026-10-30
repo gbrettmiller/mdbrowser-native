@@ -4,7 +4,7 @@ mdbrowser reads Markdown. Type the path or web address of a Markdown file in the
 
 ## Somewhere to start
 
-- [The Web of Markdown proposal](https://github.com/scripting/markdownWeb/blob/main/readme.md) explains the idea and links to examples.
+- [The Web of Markdown proposal](https://raw.githubusercontent.com/scripting/markdownWeb/main/readme.md) explains the idea and links to examples.
 - [Dave Winer's scripting.com archive](https://raw.githubusercontent.com/scripting/markdownWeb/main/examples/readme.md) is a long run of posts in Markdown.
 
 ## Make a page your home

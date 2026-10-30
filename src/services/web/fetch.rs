@@ -24,7 +24,28 @@ pub fn fetch_bytes(url: &Url, want: Want, limits: &Limits, origin: Origin) -> Re
     fetch_via(url, want, limits, origin, Arc::new(DefaultResolver::default()))
 }
 
-/// `fetch_bytes`, resolving names with `resolver` (tests swap in their own).
+/// A refused response, with what a fallback needs from it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refused {
+    pub error: FetchError,
+    /// Where the refusal came from, after redirects, when a response was read.
+    pub url: Option<Url>,
+    /// Its `Link` header, kept only for a wrong type.
+    pub link: Option<String>,
+}
+
+impl From<FetchError> for Refused {
+    fn from(error: FetchError) -> Self {
+        Refused { error, url: None, link: None }
+    }
+}
+
+/// `fetch_bytes` for a page, keeping the `Link` header of a response of the wrong type.
+pub fn fetch_page_bytes(url: &Url, limits: &Limits, origin: Origin) -> Result<(Url, Vec<u8>), Refused> {
+    fetch_response(url, Want::Page, limits, origin, Arc::new(DefaultResolver::default()))
+}
+
+/// `fetch_response`, with only the reason for a refusal.
 fn fetch_via(
     url: &Url,
     want: Want,
@@ -32,6 +53,17 @@ fn fetch_via(
     origin: Origin,
     resolver: Arc<dyn Resolver>,
 ) -> Result<(Url, Vec<u8>), FetchError> {
+    fetch_response(url, want, limits, origin, resolver).map_err(|refused| refused.error)
+}
+
+/// The fetch loop, resolving names with `resolver` (tests swap in their own).
+fn fetch_response(
+    url: &Url,
+    want: Want,
+    limits: &Limits,
+    origin: Origin,
+    resolver: Arc<dyn Resolver>,
+) -> Result<(Url, Vec<u8>), Refused> {
     // A deadline too far off to represent means none.
     let deadline = Instant::now().checked_add(limits.overall);
     let asked = url.clone();
@@ -52,7 +84,13 @@ fn fetch_via(
         match web::classify_status(response.status().as_u16())? {
             StatusClass::Body => {
                 let content_type = header(&response, "content-type");
-                want.check_type(content_type, &url)?;
+                want.check_type(content_type, &url).map_err(|error| Refused {
+                    error,
+                    url: Some(url.clone()),
+                    link: (error == FetchError::WrongType)
+                        .then(|| header(&response, "link").map(String::from))
+                        .flatten(),
+                })?;
                 web::encoding_policy(header(&response, "content-encoding"))?;
                 let bytes = read_capped(response.body_mut(), limits.max_bytes)?;
                 return Ok((url, bytes));
@@ -60,7 +98,7 @@ fn fetch_via(
             StatusClass::Redirect => url = web::next_hop(&url, header(&response, "location"), hop)?,
         }
     }
-    Err(FetchError::BadRedirect) // unreachable: next_hop refuses the hop past the limit
+    Err(FetchError::BadRedirect.into()) // unreachable: next_hop refuses the hop past the limit
 }
 
 /// One hop's settings; each hop gets a fresh agent, so no connection, cookie or

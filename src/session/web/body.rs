@@ -6,10 +6,17 @@ use super::FetchError;
 use crate::session::location::is_markdown_name;
 
 const MARKDOWN_TYPES: [&str; 2] = ["text/markdown", "text/x-markdown"];
+/// Where a site keeps its index for language models.
+pub const LLMS_TXT: &str = "/llms.txt";
 /// No type (`""`) or plain text: they say nothing about the format, so the path decides.
 const PLAIN_TYPES: [&str; 2] = ["", "text/plain"];
 /// Charsets that decode as UTF-8 (`utf8` is a common misspelling).
 const READABLE_CHARSETS: [&str; 3] = ["utf-8", "utf8", "us-ascii"];
+
+/// The site index, which is Markdown though it is named `.txt`.
+fn is_llms_txt(url: &Url) -> bool {
+    url.path() == LLMS_TXT
+}
 
 /// Whether a successful response at `final_url` is a Markdown document we can read,
 /// judged by its headers alone. The caller must still decode the bytes strictly.
@@ -17,7 +24,7 @@ pub fn body_policy(content_type: Option<&str>, final_url: &Url) -> Result<(), Fe
     let mut parts = content_type.unwrap_or_default().split(';');
     let media = parts.next().unwrap_or_default().trim().to_ascii_lowercase();
     let markdown = MARKDOWN_TYPES.contains(&media.as_str())
-        || (PLAIN_TYPES.contains(&media.as_str()) && is_markdown_name(final_url.path()));
+        || (PLAIN_TYPES.contains(&media.as_str()) && (is_markdown_name(final_url.path()) || is_llms_txt(final_url)));
     if !markdown {
         return Err(FetchError::WrongType);
     }
@@ -82,9 +89,18 @@ mod tests {
         assert_eq!(body(Some("text/plain ; charset=UTF-8"), "https://example.com/a.md"), Ok(()));
         assert_eq!(body(Some("text/plain"), "https://example.com/a.md?v=1"), Ok(()));
         assert_eq!(body(Some("text/plain"), "https://example.com/notes.markdown"), Ok(()));
+        assert_eq!(body(Some("text/plain"), "https://example.com/llms.txt"), Ok(()));
+        assert_eq!(body(Some("text/plain"), "https://example.com/llms.txt?x=1"), Ok(()));
         assert_eq!(body(None, "https://example.com/A.MD"), Ok(()));
         assert_eq!(body(Some(""), "https://example.com/a.md"), Ok(()));
-        for at in ["https://example.com/a.txt", "https://example.com/a.md/", "https://example.com/readme"] {
+        for at in [
+            "https://example.com/a.txt",
+            "https://example.com/a.md/",
+            "https://example.com/readme",
+            "https://example.com/docs/llms.txt",
+            "https://example.com/llms.txt/",
+            "https://example.com/LLMS.TXT",
+        ] {
             assert_eq!(body(Some("text/plain; charset=utf-8"), at), Err(FetchError::WrongType), "{at}");
         }
         assert_eq!(body(None, "https://example.com/"), Err(FetchError::WrongType));

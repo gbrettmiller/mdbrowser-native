@@ -11,6 +11,7 @@ pub fn error(code: ErrorCode) -> &'static str {
         ErrorCode::NotAbsolute => "Use a full path starting with / or ~/, or a web address starting with https://.",
         ErrorCode::UnsupportedScheme => "Only files and http or https addresses can be opened.",
         ErrorCode::NotMarkdown => "That isn't a Markdown file.",
+        ErrorCode::NotMarkdownWithLlms => "That isn't a Markdown file, but its site has an llms.txt.",
         ErrorCode::NotFound => "There's no file at this address.",
         ErrorCode::Unreadable => "This file couldn't be read as text.",
         ErrorCode::ServerError => "The site had a problem sending this page.",
@@ -26,6 +27,10 @@ pub fn web_error(code: ErrorCode) -> Option<(&'static str, &'static str)> {
     match code {
         ErrorCode::Empty | ErrorCode::NotAbsolute | ErrorCode::UnsupportedScheme => None,
         ErrorCode::NotMarkdown => Some(("This page isn't Markdown.", "You can open it in your web browser instead.")),
+        ErrorCode::NotMarkdownWithLlms => Some((
+            "This page isn't Markdown, but the site has an llms.txt.",
+            "You can read that, or open this page in your web browser.",
+        )),
         ErrorCode::NotFound => Some(("There's no page at this address.", "Check it for typos.")),
         ErrorCode::Unreadable => Some(("This page couldn't be read as text.", "It may be too large or not in UTF-8.")),
         ErrorCode::ServerError => Some((error(code), "Try again later.")),
@@ -120,6 +125,12 @@ pub const APPEARANCE_LABEL: &str = "Appearance";
 pub const HOME_PAGE_LABEL: &str = "Home page";
 pub const HOME_PAGE_PLACEHOLDER: &str = "Empty for the welcome page";
 pub const LOADING: &str = "Loading…";
+pub const TRY_LLMS_TXT: &str = "Try this site's llms.txt";
+
+/// The banner over a page whose Markdown version was found instead of `original`.
+pub fn found_instead(original: &str) -> String {
+    format!("This site doesn't serve Markdown at {original}. Showing the Markdown version instead.")
+}
 
 #[cfg(test)]
 mod tests {
@@ -128,8 +139,9 @@ mod tests {
     use super::*;
 
     /// Every error a fetch can end in; the rest are about the typed address.
-    const WEB_ERRORS: [ErrorCode; 7] = [
+    const WEB_ERRORS: [ErrorCode; 8] = [
         ErrorCode::NotMarkdown,
+        ErrorCode::NotMarkdownWithLlms,
         ErrorCode::NotFound,
         ErrorCode::Unreadable,
         ErrorCode::ServerError,
@@ -190,6 +202,13 @@ mod tests {
         }
         let messages: Vec<_> = WEB_ERRORS.iter().filter_map(|code| web_error(*code)).map(|(m, _)| m).collect();
         distinct_and_non_empty(&messages);
+    }
+
+    #[test]
+    fn the_fallback_banner_names_the_original_address() {
+        let banner = found_instead("https://x.org/post");
+        assert!(banner.contains("https://x.org/post"));
+        distinct_and_non_empty(&[&banner, TRY_LLMS_TXT, OPEN_IN_BROWSER]);
     }
 
     #[test]

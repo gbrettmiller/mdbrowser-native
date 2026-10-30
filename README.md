@@ -4,7 +4,7 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 2c, local files and remote Markdown over `http(s)`, with images, a Settings panel (font, Web images, light, dark or system appearance, home page) and a built-in welcome page. Markdown fallbacks (2d), front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 2d, local files and remote Markdown over `http(s)`, with images, a Settings panel (font, Web images, light, dark or system appearance, home page) a built-in welcome page, a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), and an offer of the site's `llms.txt`. Front matter navigation and more reader controls are next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## What it does today
 
