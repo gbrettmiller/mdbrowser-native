@@ -39,7 +39,7 @@ Each phase has its own plan. This is the order, not a commitment to dates.
    - **2b, images** (built): local and remote Markdown images, drawn in the page, with a Web images setting (automatic, on click, off). ADR-004.
    - **2c, settings and home** (built): a Settings panel (font, images, home page, and a light, dark or system palette), a home page and a bundled welcome page.
    - **2d, Markdown fallbacks** (built): when a page isn't Markdown, try its `Link` alternate (same host), then the `.md` sibling (`/post` → `/post.md`), and tell the reader which address was shown. `llms.txt` is an explicit button, never a silent substitute. ADR-005; plan in `vector/plans/phase-2d-markdown-fallbacks.md`. Scanning HTML for `<link rel="alternate">` is left out.
-3. **Shared front matter**: act on the community vocabulary, including a byline from `author` and `pubDate`, previous/next navigation from `urlPrev` and `urlNext`, `description`, `image`, `inlineImage` and `metaImage`, an `enclosure` link, and `source` (the post's feed). Unknown keys are ignored.
+3. **Shared front matter** (built): a byline from `author`, `pubDate` and the `source` site name, previous/next navigation from `urlPrev` and `urlNext` (links and Ctrl+[ / Ctrl+]), `description`, and an `enclosure` link that opens in the system. `image`, `inlineImage` and `metaImage` are parsed and draw nothing beyond the body's images. Unknown keys are ignored. ADR-006; plan in `vector/plans/phase-3-shared-front-matter.md`.
 4. **Reader controls**: text size, spacing and custom colours, beyond the typeface and light/dark choices.
 5. **Discovery**: `llms.txt` as a site index (beyond the 2d fallback), RSS 2.0 feeds and OPML.
 
@@ -77,7 +77,7 @@ Downloadable apps for Linux, Windows and macOS, so non-technical readers can ins
 First public release:
 - [x] Browses local files and `http(s)` Markdown, including relative links between `.md` pages on different sites. (Phase 2a, 2026-10-29.)
 - [ ] Renders the markdownWeb examples 0–8 and the scripting.com archive with no crashes, no HTML interpreted, and images shown.
-- [ ] Shows title, author and date from front matter, and follows `urlPrev` and `urlNext`.
+- [x] Shows title, author and date from front matter, and follows `urlPrev` and `urlNext`. (Phase 3, 2026-10-30.)
 - [ ] The reader can set typeface, text size, spacing and a light or dark palette, and the choices persist.
 - [ ] Opening a typical post takes under 250 ms on a local file. Scrolling and resizing don't stutter.
 - [ ] Builds and passes CI on Linux. macOS and Windows build in CI.
@@ -95,12 +95,12 @@ Detail and test methods are in `vector/research/assumptions/`.
 
 ## Open Questions
 - ~~HTML in documents: strip it or show it literally?~~ Resolved by ADR-002 (2026-10-29): strip tags, comments and declarations, and keep the text between them, matching markdownWeb.
-- **Image semantics.** What exactly do `image`, `inlineImage` and `metaImage` mean, and where should each appear? They are undocumented, so ask in markdownWeb issue #1.
+- **Image semantics.** What exactly do `image`, `inlineImage` and `metaImage` mean, and where should each appear? They are undocumented, so ask in markdownWeb issue #1. Until it is answered they are parsed and draw nothing beyond the body's own images (ADR-006): in the corpus `image` and `inlineImage` repeat a body image, and `metaImage` is in no body.
 - ~~Remote images: load, click-to-load, or block?~~ Resolved in phase 2b (2026-10-29): load automatically by default, with "on click" and "off" in the Web images menu.
 - **Leading images and tall images.** scripting.com floats a paragraph's leading image to the right; mdbrowser stacks it above the text, so posts read differently from the source site. This is the open item against the ship criterion "renders the scripting.com archive". A very tall image can also fill the window above a post's first line. Float layout, a maximum image height, or both?
 - **Marking plain `http`.** The address bar shows the full URL with its scheme, but nothing labels an `http` page as not secure. Is a label worth adding?
 - **Certificate failures.** A bad certificate shows as `unreachable`, the same as a site that is down. Should it get its own error, so an intercepted connection is visible?
-- **Enclosures.** Link out to the system player, or play audio in the browser?
+- ~~Enclosures: link out or play?~~ Resolved by ADR-006 (2026-10-30): a link line that opens in the system. Playing in the browser would need its own ADR.
 - ~~Fallbacks from non-Markdown pages (phase 2d).~~ Resolved by ADR-005 (2026-10-29): `Link` alternate, then the `.md` sibling; the address bar and History hold the shown URL; `llms.txt` is only offered. Still open: scanning `<link rel="alternate">` in HTML (needs its own ADR). Example to test against: `every.to/context-window/…` and the same URL with `.md`.
 - **Which discovery convention comes first?** `llms.txt`, a post's `source` feed, or OPML?
 - **Interop with other Markdown-web browsers.** Should we share a test corpus, for example with Andrew Shell's browser?
@@ -116,6 +116,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 | Phase 2b (images) | Built (2026-10-29) | `features/images.feature`, `vector/plans/phase-2b-images.md` |
 | Phase 2c (settings and home) | Built (2026-10-29) | `features/settings.feature`, `vector/plans/phase-2c-settings-and-home.md` |
 | Phase 2d (Markdown fallbacks) | Built (2026-10-29) | `features/fallbacks.feature`, `vector/plans/phase-2d-markdown-fallbacks.md` |
+| Phase 3 (shared front matter) | Built (2026-10-30), screenshots to check | `features/frontmatter.feature`, `vector/plans/phase-3-shared-front-matter.md` |
 | Interviews | 1, draft. The markdownWeb readme was treated as a transcript: a published manifesto, not a live session. | `./vector/research/interviews/INT-001.json` |
 | Assumptions | 6, draft | `./vector/research/assumptions/` |
 | Community examples | Not yet in the corpus | [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |

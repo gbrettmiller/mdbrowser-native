@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-30
 **Branch**: `feat/phase-3`, from `main` after phase 2d (#11)
-**Status**: decisions made (2026-10-30), ADR-006; not started
+**Status**: built (2026-10-30), decisions in ADR-006. Screenshots on every font and both palettes are still to read.
 
 ## Goal
 
@@ -38,7 +38,7 @@ Surveyed in `corpus/markdownweb/` (examples 0–8 and three extras):
 
 1. **Parse into a struct, once.** `model::frontmatter::parse(yaml) -> FrontMatter` with `title`, `author`, `pub_date`, `description`, `source`, `url_prev`, `url_next`, `enclosure`. A pure function; every field is optional; wrong-typed values (a list where a string belongs) are dropped, never an error. `Document` carries a `FrontMatter` instead of `frontmatter_title`.
 2. **Byline**: under the title/first heading, one muted line: `author · date`, plus the site name from `source.title` when present. Absent fields drop out; nothing shows if none are present. Date is shown in the reader's locale-neutral form (`31 March 2024`); a `pubDate` that doesn't parse is shown as written.
-3. **Previous / next**: a row at the foot of the page, `← Previous` and `Next →`, each a normal link navigation (Back returns to the post, History records the target). Targets resolve against the page address, so they work across files and across `http(s)`. A missing target shows the usual not-found screen. Also keyboard shortcuts (proposal: Alt+Left/Right are Back/Forward already, so use `[` and `]`).
+3. **Previous / next**: a row at the foot of the page, `← Previous` and `Next →`, each a normal link navigation (Back returns to the post, History records the target). Targets resolve against the page address, so they work across files and across `http(s)`. A missing target shows the usual not-found screen. Also keyboard shortcuts: Ctrl+[ and Ctrl+] (Cmd on macOS). Bare `[` and `]` would type into the address bar.
 4. **Description**: shown as a muted lead paragraph under the byline. If the body already begins with the same text, show it once.
 5. **Enclosure**: a link line, `Listen: <file name> (<type>, <size>)`, that hands off to the system via `services::opener`. No in-app playback (VECTOR open question "Enclosures" resolved as link-out; see decisions).
 6. **Images**: the body is the source of truth. `image` and `inlineImage` add nothing, since the corpus repeats the body image. `metaImage` is not drawn. Recorded as an assumption pending markdownWeb issue #1; the fields are parsed so a later decision costs no migration.
@@ -56,15 +56,15 @@ Reader controls (phase 4), `llms.txt` index, RSS and OPML (phase 5), `urlvideo` 
 
 ## Acceptance Criteria
 
-1. [ ] A post with `author` and `pubDate` shows a byline; with neither, nothing is added.
-2. [ ] `pubDate` in RFC 822 form is shown readably; an unparseable value is shown as written.
-3. [ ] `urlNext` and `urlPrev` links appear when present, resolve relative to the page (including `../`), work for files and `http(s)`, and a missing target gives the usual error.
-4. [ ] The newest post (`urlPrev` only) and a post with neither show only the links that exist.
-5. [ ] `description` shows once; the `enclosure` line opens the system handler for http(s) only.
-6. [ ] Wrong-typed, empty or malformed values are dropped without affecting the rest of the page, and unknown keys are ignored.
-7. [ ] `image`, `inlineImage` and `metaImage` never add an image beyond the body's.
+1. [x] A post with `author` and `pubDate` shows a byline; with neither, nothing is added.
+2. [x] `pubDate` in RFC 822 form is shown readably; an unparseable value is shown as written.
+3. [x] `urlNext` and `urlPrev` links appear when present, resolve relative to the page (including `../`), work for files and `http(s)`, and a missing target gives the usual error.
+4. [x] The newest post (`urlPrev` only) and a post with neither show only the links that exist.
+5. [x] `description` shows once; the `enclosure` line opens the system handler for http(s) only.
+6. [x] Wrong-typed, empty or malformed values are dropped without affecting the rest of the page, and unknown keys are ignored.
+7. [x] `image`, `inlineImage` and `metaImage` never add an image beyond the body's.
 8. [ ] Examples 0–8 and the three extras render with no crash; screenshots on every font and both palettes are read and checked.
-9. [ ] Strings in `content`, values in `theme`, scenarios in `features/frontmatter.feature`, all gates green.
+9. [x] Strings in `content`, values in `theme`, scenarios in `features/frontmatter.feature`, all gates green.
 
 ## Steps
 

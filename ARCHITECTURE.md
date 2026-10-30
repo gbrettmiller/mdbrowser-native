@@ -1,12 +1,12 @@
 # Architecture
 
-**Last Updated:** 2026-10-29
+**Last Updated:** 2026-10-30
 
 This file is the technical specification: layers, stack, conventions, structure and import rules. For project intent and direction, see VECTOR.md. Read VECTOR.md first, then this file, before writing code. `/invest-architecture` audits the codebase against what is declared here.
 
 ## Stack
 
-Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003; images: ADR-004.
+Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003; images: ADR-004; front matter: ADR-006.
 
 | Concern | Crate |
 |---|---|
@@ -39,9 +39,9 @@ bytes ──model::parse──▶ Document (tree) ──layout::layout(theme, wi
 
 | Layer | Location | Rule |
 |-------|----------|------|
-| **Model** | `src/model/` | Markdown source → owned document tree. Pure. Depends only on pulldown-cmark and yaml-rust2 (frontmatter). |
+| **Model** | `src/model/` | Markdown source → owned document tree, and the shared front matter (ADR-006) read into `FrontMatter`. `frame` turns that front matter into the blocks around the body (byline, description, enclosure line, previous/next row), and `date` says RFC 822 dates in words. Pure. Depends only on pulldown-cmark and yaml-rust2 (frontmatter). |
 | **Layout** | `src/layout/` | Tree + theme + width + known image sizes → `Page`; image boxes and their placeholders, hit-testing, carets, selection and copy text, and `anchor` (keeping the reading position across relayouts). Pure apart from reading the shared font database. |
-| **Session** | `src/session/` | Address parsing (files and `http(s)` URLs, and the built-in `Welcome` location with a blank address, no History entry and its own link and image policy), link classification, web fetch policy (`Accept`, status, redirects, which responses are readable Markdown, and refusing a public page's way into the local network), images (where each comes from, which load and when, the image limits, and the decoded-image cache), back/forward, History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
+| **Session** | `src/session/` | Address parsing (files and `http(s)` URLs, and the built-in `Welcome` location with a blank address, no History entry and its own link and image policy), link classification, web fetch policy (`Accept`, status, redirects, which responses are readable Markdown, and refusing a public page's way into the local network), images (where each comes from, which load and when, the image limits, and the decoded-image cache), back/forward, previous/next post (`Neighbour`, from the document's `urlPrev` and `urlNext`), History, and the reducer `step(state, event) → (state, effects)`. Pure. Effects are data. |
 | **Theme** | `src/theme/` | The reader stylesheet: tokens (colour, type scale, spacing) for the light and dark palettes, the `Appearance` choice (System resolves to a palette given the OS mode), and bundled fonts. Data only, with one exception: `fonts::install()` loads the bundled faces into iced's process-wide font system once at startup. |
 | **Content** | `src/content.rs` | All user-facing strings. |
 | **Services** | `src/services/` | All I/O. `files` reads regular files under 16 MiB. `images` reads or fetches an image and decodes it, one decode at a time, within ADR-004's limits. `web` fetches a page or an image through ureq: one fresh request per redirect hop carrying only `Accept`, fixed limits, and no cookies. `opener` hands only http, https and mailto to the system, without a shell. `store` saves History and settings in ticket order. `runner` serves the welcome page bundled in the binary (`assets/welcome.md`) and turns effects into iced tasks that report back as events. `background` runs blocking work and timers on their own threads. The only layer that touches `std::fs`, `std::net` (only through ureq, in `web`), `std::process` or `std::thread`. |
