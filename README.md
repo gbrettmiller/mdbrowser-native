@@ -4,7 +4,7 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 4, local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page, a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), and an offer of the site's `llms.txt`. Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 5 (keyboard access), local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page, a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), and an offer of the site's `llms.txt`. Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## What it does today
 
@@ -62,6 +62,14 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Load this page's images | Ctrl+Shift+I | Cmd+Shift+I |
 | Larger / smaller / default text size | Ctrl+= / Ctrl+- / Ctrl+0 | Cmd+= / Cmd+- / Cmd+0 |
 | Select all / copy | Ctrl+A / Ctrl+C | Cmd+A / Cmd+C |
+| Move to the next / previous link, button or field | Tab / Shift+Tab | Tab / Shift+Tab |
+| Follow the focused link, press the focused button | Enter (Space also presses a button) | Enter (Space also presses a button) |
+| Change a focused choice in Settings (font, images, appearance, spacing) | Up / Down | Up / Down |
+| Scroll a page at a time | PageDown / PageUp, or Space / Shift+Space when the page has focus | the same |
+| Scroll a line, or to the top or bottom | Up / Down, Home / End, when the page has focus | the same |
+| Close a panel and return to the page | Esc | Esc |
+
+Opening a page puts the keyboard on it, so the scroll keys work at once. While you type in a text field, only PageUp and PageDown scroll the page; Tab or Esc takes you out of the field. A ring in the link colour shows where focus is. The window can't be made smaller than 620 by 360, and if History and Settings are both open and there isn't room for the page beside them, opening one closes the other. Screen readers are not supported yet: iced has no accessibility tree.
 
 ### Where your data lives
 

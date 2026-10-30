@@ -6,6 +6,7 @@ pub mod anchor;
 mod flow;
 mod image;
 mod select;
+mod stops;
 mod text;
 
 #[cfg(test)]
@@ -18,6 +19,7 @@ use iced::advanced::graphics::text::font_system;
 use iced::{Color, Font, Point, Rectangle};
 
 pub use image::{ImageNote, ImageView, no_images};
+pub use stops::{Direction, Reach, Stop, Target, reach};
 
 use crate::model::Block;
 use crate::theme::Theme;

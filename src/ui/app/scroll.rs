@@ -7,12 +7,13 @@ use std::time::Instant;
 use iced::Task;
 use iced::widget::operation::{self, AbsoluteOffset, RelativeOffset};
 
-use super::{ANCHOR_ATTEMPTS, ANCHOR_RETRY, App, Message, SCROLL_ID};
+use super::{ANCHOR_ATTEMPTS, ANCHOR_RETRY, App, Message, PAGE_ID, SCROLL_ID};
 use crate::model::Document as Doc;
 use crate::services::background;
 use crate::session::{Event, Shown};
 use crate::theme;
 use crate::ui::images;
+use crate::ui::keys::Scroll;
 use crate::ui::pages::SETTLE;
 
 impl App {
@@ -70,6 +71,24 @@ impl App {
         scroll_task(self.viewport.relaid(&before, &after, theme::reading(self.look()).gutter))
     }
 
+    /// Scrolls the focused stop, spanning `top` to `bottom` of the page, into view.
+    pub(super) fn reveal(&mut self, top: f32, bottom: f32) -> Task<Message> {
+        scroll_task(self.viewport.reveal(top, bottom))
+    }
+
+    /// The distance between lines of text at the reader's size and spacing.
+    pub(super) fn line(&self) -> f32 {
+        let reader = theme::reading(self.look());
+        reader.body_size * reader.line_ratio
+    }
+
+    /// Scrolls the page by a key: a screen, a line, or to an end.
+    pub(super) fn key_scroll(&mut self, by: Scroll) -> Task<Message> {
+        let Some(shown) = self.shown() else { return Task::none() };
+        let (page, _) = self.page(&shown.document, self.viewport.width());
+        scroll_task(self.viewport.key_scroll(by, page.height, self.line()))
+    }
+
     /// New documents start at the top; a pending anchor is resolved once the
     /// view has laid the page out at its real width.
     pub(super) fn scroll_after(
@@ -82,7 +101,12 @@ impl App {
         if is_new {
             self.viewport.new_page(self.session().images.generation());
         }
-        let to_top = if is_new { operation::snap_to(SCROLL_ID, RelativeOffset::START) } else { Task::none() };
+        let to_top = if is_new {
+            // A page you open is the page you read: the scroll keys work at once.
+            Task::batch([operation::snap_to(SCROLL_ID, RelativeOffset::START), operation::focus(PAGE_ID)])
+        } else {
+            Task::none()
+        };
         // Start one resolution per new anchor; other dispatches leave a running one alone.
         match self.session().fragment.clone() {
             Some(fragment) if is_new || Some(&fragment) != fragment_before.as_ref() => {

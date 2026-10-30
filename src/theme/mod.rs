@@ -1,5 +1,6 @@
 //! The reader's stylesheet. Documents carry no presentation; all of it lives here.
 
+pub mod chrome_text;
 pub mod colours;
 pub mod fonts;
 pub mod scale;
@@ -125,6 +126,13 @@ pub struct Theme {
     pub code_background: Color,
     pub rule: Color,
     pub selection: Color,
+}
+
+impl Theme {
+    /// The focus ring: the link colour, which every palette already keeps readable on the page.
+    pub const fn ring(&self) -> Color {
+        self.link
+    }
 }
 
 const fn rgb(r: u8, g: u8, b: u8) -> Color {

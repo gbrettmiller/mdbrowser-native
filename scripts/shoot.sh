@@ -7,6 +7,9 @@
 # Appearance keys: system, light, dark. With no document, shoots the welcome page.
 # -s: text sizes in pixels (12 to 32, even). -p: compact, comfortable, spacious.
 # -c: custom page,text,link colours as hex; shoots the Custom appearance (ignores -a).
+# -k: keys to press before the shot, in order: tab, stab (Shift+Tab), settings, history, esc.
+#     "tab" puts the focus ring on the first link; "settings tab" focuses a control in the panel.
+# -w: float the window at WxH first (620x360 is the smallest the app allows).
 set -euo pipefail
 
 fonts="literata"
@@ -14,14 +17,18 @@ looks="light"
 sizes="18"
 spacings="comfortable"
 custom=""
+keys=""
+size_of=""
 out="target/shots"
-while getopts "f:a:s:p:c:o:" opt; do
+while getopts "f:a:s:p:c:k:w:o:" opt; do
   case $opt in
     f) fonts=$OPTARG ;;
     a) looks=$OPTARG ;;
     s) sizes=$OPTARG ;;
     p) spacings=$OPTARG ;;
     c) custom=$OPTARG ;;
+    k) keys=$OPTARG ;;
+    w) size_of=$OPTARG ;;
     o) out=$OPTARG ;;
     *) exit 2 ;;
   esac
@@ -31,6 +38,10 @@ shift $((OPTIND - 1))
 die() { echo "shoot.sh: $1" >&2; exit 2; }
 for size in $sizes; do
   [[ $size =~ ^[0-9]+$ ]] && ((size >= 12 && size <= 32 && size % 2 == 0)) || die "bad text size '$size' (12 to 32, even)"
+done
+[[ -z $size_of || $size_of =~ ^[0-9]+x[0-9]+$ ]] || die "bad -w '$size_of' (want WxH)"
+for key in $keys; do
+  case $key in tab | stab | settings | history | esc) ;; *) die "bad key '$key'" ;; esac
 done
 for spacing in $spacings; do
   case $spacing in compact | comfortable | spacious) ;; *) die "bad spacing '$spacing'" ;; esac
@@ -51,6 +62,16 @@ window_geometry() {
 import json, sys
 c = [w for w in json.load(sys.stdin) if w['pid'] == $1]
 print(f\"{c[0]['at'][0]},{c[0]['at'][1]} {c[0]['size'][0]}x{c[0]['size'][1]}\" if c else '')"
+}
+
+press() {
+  case $1 in
+    tab) wtype -k Tab ;;
+    stab) wtype -M shift -k Tab -m shift ;;
+    settings) wtype -M ctrl , -m ctrl ;;
+    history) wtype -M ctrl h -m ctrl ;;
+    esc) wtype -k Escape ;;
+  esac
 }
 
 pause() { timeout "$1" tail -f /dev/null || true; }
@@ -78,6 +99,8 @@ for font in $fonts; do
     "$font" "$look" "$size" "$spacing" "$colours" >"$data/settings.json"
   for doc in "$@"; do
     name="$(basename "${doc:-welcome}" .md)-$font-$look-$size-$spacing"
+    [ -n "$keys" ] && name="$name-${keys// /-}"
+    [ -n "$size_of" ] && name="$name-$size_of"
     MDBROWSER_DATA_DIR=$data "$bin" ${doc:+"$doc"} >"$out/$name.log" 2>&1 &
     pid=$!
     geometry=""
@@ -87,6 +110,16 @@ for font in $fonts; do
       pause 0.25
     done
     pause 1.5
+    if [ -n "$size_of" ]; then
+      hyprctl dispatch "hl.dsp.window.float({ action = \"enable\", window = \"pid:$pid\" })" >/dev/null
+      hyprctl dispatch "hl.dsp.window.resize({ x = ${size_of%x*}, y = ${size_of#*x}, window = \"pid:$pid\" })" >/dev/null
+      pause 2.5
+      geometry=$(window_geometry $pid)
+    fi
+    for key in $keys; do
+      press "$key"
+      pause 0.6
+    done
     timeout 10 grim -g "$geometry" "$out/$name.png" || echo "shoot.sh: capture failed for $name" >&2
     kill $pid
     wait $pid 2>/dev/null || true

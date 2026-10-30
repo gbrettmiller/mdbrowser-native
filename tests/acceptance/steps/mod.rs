@@ -4,6 +4,7 @@
 mod fallbacks;
 mod frontmatter;
 mod images;
+mod keyboard;
 mod local;
 mod reader;
 mod remote;

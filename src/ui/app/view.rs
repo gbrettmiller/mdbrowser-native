@@ -1,16 +1,16 @@
-//! The window's contents: toolbar, notices, the page or a message, the History
-//! panel, and the status line.
+//! The window's contents: toolbar, notices, the page or a message, the side
+//! panels, and the status line.
 
 use std::sync::Arc;
 
 use iced::widget::{column, container, responsive, row, scrollable, text};
 use iced::{Element, Fill};
 
-use super::{App, Message, SCROLL_ID, SCROLLBAR};
+use super::{App, Message, PAGE_ID, SCROLL_ID, SCROLLBAR};
 use crate::content;
 use crate::session::location::Location;
 use crate::session::{Event, Shown, Status};
-use crate::theme;
+use crate::theme::{self, chrome_text};
 use crate::ui::document::{Document, Handlers};
 use crate::ui::{body, history, images, settings, toolbar};
 
@@ -26,6 +26,7 @@ impl App {
         let reader = theme::reading(self.look());
         responsive(move |size| {
             let width = size.width - SCROLLBAR;
+            self.viewport.sized(size.height);
             let (page, settling) = self.page(&shown.document, width);
             self.viewport.laid_out(&shown.document, width, settling);
             let pictures = images::pictures(&page, &self.session().images);
@@ -33,8 +34,10 @@ impl App {
                 follow: Box::new(|href| Message::Session(Event::Follow(href))),
                 load_image: Box::new(|src| Message::Session(Event::LoadImage(src))),
                 hover: Box::new(Message::Hover),
+                reveal: Box::new(Message::Reveal),
+                scroll: Box::new(Message::Scroll),
             };
-            let document = Document::new(page, pictures, reader, on);
+            let document = Document::new(Arc::as_ptr(&shown.document) as usize, page, pictures, reader, on).id(PAGE_ID);
             scrollable(document)
                 .id(SCROLL_ID)
                 .on_scroll(|viewport| Message::Scrolled(viewport.absolute_offset().y))
@@ -58,8 +61,8 @@ impl App {
             .height(Fill)
             .style(move |_| container::Style { background: Some(background.into()), ..container::Style::default() });
         let panels = row![page]
-            .push(self.history_open.then(|| history::panel(state, self.palette())))
-            .push(self.settings_open.then(|| settings::panel(state, &self.home_draft, &self.colour_drafts)));
+            .push(self.panels.history.then(|| history::panel(state, self.palette())))
+            .push(self.panels.settings.then(|| settings::panel(state, &self.home_draft, &self.colour_drafts)));
         let content: Element<'_, Message> = panels.into();
         let status = self.hover.clone().unwrap_or_default();
         column![toolbar::toolbar(state, &self.draft)]
@@ -67,7 +70,7 @@ impl App {
             .push(body::fallback_banner(&state.status))
             .push(body::notices(&state.notices))
             .push(content)
-            .push(container(text(status).size(12)).padding([2, 8]))
+            .push(container(text(status).size(chrome_text::NOTE)).padding([2, 8]))
             .into()
     }
 }

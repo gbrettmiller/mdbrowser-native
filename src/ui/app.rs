@@ -7,10 +7,13 @@ use std::time::Duration;
 
 use iced::keyboard;
 use iced::widget::operation;
-use iced::{Font, Subscription, Task, window};
+use iced::{Font, Size, Subscription, Task, window};
 
-use super::keys::{self, Command};
+use super::document;
+use super::focus;
+use super::keys::{self, Command, Scroll};
 use super::pages::{Pages, SETTLE};
+use super::panels::{self, Open, Panel};
 use super::settings::ColourDrafts;
 use super::viewport::Viewport;
 use crate::services::store::Store;
@@ -23,6 +26,8 @@ mod view;
 
 pub const ADDRESS_ID: &str = "address";
 const SCROLL_ID: &str = "document";
+/// The page itself, as a stop in the focus order.
+const PAGE_ID: &str = "page";
 const SCROLLBAR: f32 = 12.0;
 /// Layouts slower than this wait for a resize to settle.
 const EXPENSIVE_LAYOUT: Duration = Duration::from_millis(32);
@@ -33,6 +38,9 @@ const ANCHOR_RETRY: Duration = Duration::from_millis(16);
 const ANCHOR_ATTEMPTS: u32 = 60;
 /// Window size at launch, and the layout width assumed before the first frame.
 const WINDOW_SIZE: (f32, f32) = (1000.0, 1000.0);
+/// The smallest window: the toolbar fits, and one panel can open beside a page of its
+/// minimum width.
+pub const MIN_WINDOW: (f32, f32) = (panels::PANEL_WIDTH + panels::MIN_PAGE, 360.0);
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -44,7 +52,8 @@ pub enum Message {
     Submit,
     Hover(Option<String>),
     Key(keyboard::Event),
-    Resized,
+    /// The window changed size; the width decides how many panels fit beside the page.
+    Resized(Size),
     Relayout,
     ToggleHistory,
     ToggleSettings,
@@ -60,6 +69,10 @@ pub enum Message {
     ImagesArrived,
     /// The document was scrolled to this offset.
     Scrolled(f32),
+    /// Focus moved to a stop spanning these heights of the page: scroll it into view.
+    Reveal(f32, f32),
+    /// A key asked to scroll the page.
+    Scroll(Scroll),
 }
 
 pub struct App {
@@ -68,8 +81,9 @@ pub struct App {
     draft: String,
     store: Option<Arc<Store>>,
     hover: Option<String>,
-    history_open: bool,
-    settings_open: bool,
+    panels: Open,
+    /// Window width, from the last resize.
+    window_width: f32,
     /// What the Home page field shows; follows the saved value until the reader types.
     home_draft: String,
     /// What the custom colour fields show; follows the saved colours until the reader types.
@@ -90,12 +104,12 @@ impl App {
             draft: String::new(),
             store,
             hover: None,
-            history_open: false,
-            settings_open: false,
+            panels: Open::default(),
+            window_width: WINDOW_SIZE.0,
             home_draft: settings.home.clone(),
             colour_drafts: ColourDrafts::of(settings.colours()),
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
-            viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR),
+            viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR, WINDOW_SIZE.1),
             relayout_scheduled: false,
         };
         let restore = app.dispatch(Event::Restore { visits, settings });
@@ -180,19 +194,16 @@ impl App {
                 Task::none()
             }
             Message::Key(event) => self.shortcut(event),
-            Message::Resized => self.schedule_relayout(),
+            Message::Resized(size) => {
+                self.window_width = size.width;
+                self.schedule_relayout()
+            }
             Message::Relayout => {
                 self.relayout_scheduled = false;
                 if self.viewport.settling() { self.schedule_relayout() } else { Task::none() }
             }
-            Message::ToggleHistory => {
-                self.history_open = !self.history_open;
-                Task::none()
-            }
-            Message::ToggleSettings => {
-                self.settings_open = !self.settings_open;
-                Task::none()
-            }
+            Message::ToggleHistory => self.toggle(Panel::History),
+            Message::ToggleSettings => self.toggle(Panel::Settings),
             Message::HomeDraftChanged(draft) => {
                 self.home_draft = draft;
                 Task::none()
@@ -212,6 +223,8 @@ impl App {
             })),
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
             Message::ImagesArrived => self.images_arrived(),
+            Message::Reveal(top, bottom) => self.reveal(top, bottom),
+            Message::Scroll(by) => self.key_scroll(by),
             Message::Scrolled(y) => {
                 self.viewport.scrolled(y);
                 Task::none()
@@ -235,16 +248,54 @@ impl App {
             Some(Command::FocusAddress) => {
                 Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
             }
+            Some(Command::Scroll(by)) => self.shortcut_scroll(by),
+            Some(Command::ClosePanel) => self.close_panel(),
+            Some(Command::FocusNext) => operation::focus_next().chain(focus::reveal_focused(PAGE_ID)),
+            Some(Command::FocusPrevious) => {
+                operation::focus_previous().chain(self.enter_page_from_behind()).chain(focus::reveal_focused(PAGE_ID))
+            }
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),
             Some(Command::ToggleSettings) => self.update(Message::ToggleSettings),
             None => Task::none(),
         }
     }
 
+    /// Shift+Tab can land on the page from behind: then it goes to the last link, and shows it.
+    fn enter_page_from_behind(&self) -> Task<Message> {
+        iced::advanced::widget::operate(document::enter_from_behind(PAGE_ID))
+            .map(|(top, bottom)| Message::Reveal(top, bottom))
+    }
+
+    /// PageUp and PageDown from a shortcut: they scroll the panel the keyboard is in, or else the page.
+    fn shortcut_scroll(&mut self, by: Scroll) -> Task<Message> {
+        let down = match by {
+            Scroll::PageDown => true,
+            Scroll::PageUp => false,
+            _ => return self.key_scroll(by),
+        };
+        focus::scroll_focused_panel(PAGE_ID, down, self.line())
+            .then(move |scrolled| if scrolled { Task::none() } else { Task::done(Message::Scroll(by)) })
+    }
+
+    /// Opens or closes a panel. A control inside one that closes can't keep the keyboard, so
+    /// the page takes it.
+    fn toggle(&mut self, panel: Panel) -> Task<Message> {
+        let before = self.panels;
+        self.panels = panels::toggled(before, panel, self.window_width);
+        if before.lost_a_panel(self.panels) { operation::focus(PAGE_ID) } else { Task::none() }
+    }
+
+    /// Esc: closes the Settings panel, or else History, and puts the keyboard back on the page.
+    /// With none open it still does, so Esc after typing in the address bar returns to the page.
+    fn close_panel(&mut self) -> Task<Message> {
+        self.panels = self.panels.after_escape();
+        operation::focus(PAGE_ID)
+    }
+
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
             keyboard::listen().map(Message::Key),
-            window::resize_events().map(|_| Message::Resized),
+            window::resize_events().map(|(_, size)| Message::Resized(size)),
             iced::system::theme_changes().map(Message::SystemMode),
         ])
     }
@@ -257,7 +308,11 @@ pub fn run() -> iced::Result {
         .subscription(App::subscription)
         .default_font(Font::with_name(theme::ReadingFont::Inter.family()))
         .theme(|app: &App| super::chrome::theme(app.palette()))
-        .window_size(WINDOW_SIZE)
+        .window(window::Settings {
+            size: Size::new(WINDOW_SIZE.0, WINDOW_SIZE.1),
+            min_size: Some(Size::new(MIN_WINDOW.0, MIN_WINDOW.1)),
+            ..window::Settings::default()
+        })
         .run()
 }
 
