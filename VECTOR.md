@@ -116,7 +116,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 | Phase 2b (images) | Built (2026-10-29) | `features/images.feature`, `vector/plans/phase-2b-images.md` |
 | Phase 2c (settings and home) | Built (2026-10-29) | `features/settings.feature`, `vector/plans/phase-2c-settings-and-home.md` |
 | Phase 2d (Markdown fallbacks) | Built (2026-10-29) | `features/fallbacks.feature`, `vector/plans/phase-2d-markdown-fallbacks.md` |
-| Phase 3 (shared front matter) | Built (2026-10-30), screenshots to check | `features/frontmatter.feature`, `vector/plans/phase-3-shared-front-matter.md` |
+| Phase 3 (shared front matter) | Built (2026-10-30) | `features/frontmatter.feature`, `vector/plans/phase-3-shared-front-matter.md` |
 | Interviews | 1, draft. The markdownWeb readme was treated as a transcript: a published manifesto, not a live session. | `./vector/research/interviews/INT-001.json` |
 | Assumptions | 6, draft | `./vector/research/assumptions/` |
 | Community examples | In the corpus (examples 0–8 and three extras), indexed by `corpus/examples.md` | `./corpus/markdownweb/`, [scripting/markdownWeb examples](https://github.com/scripting/markdownWeb/blob/main/examples/readme.md) |

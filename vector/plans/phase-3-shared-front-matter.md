@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-30
 **Branch**: `feat/phase-3`, from `main` after phase 2d (#11)
-**Status**: built (2026-10-30), decisions in ADR-006. Screenshots on every font and both palettes are still to read.
+**Status**: built and checked (2026-10-30), decisions in ADR-006. Screenshots read on four fonts and both palettes.
 
 ## Goal
 
@@ -63,7 +63,7 @@ Reader controls (phase 4), `llms.txt` index, RSS and OPML (phase 5), `urlvideo` 
 5. [x] `description` shows once; the `enclosure` line opens the system handler for http(s) only.
 6. [x] Wrong-typed, empty or malformed values are dropped without affecting the rest of the page, and unknown keys are ignored.
 7. [x] `image`, `inlineImage` and `metaImage` never add an image beyond the body's.
-8. [ ] Examples 0–8 and the three extras render with no crash; screenshots on every font and both palettes are read and checked.
+8. [x] Examples 0–8 and the three extras render with no crash; screenshots on every font and both palettes are read and checked.
 9. [x] Strings in `content`, values in `theme`, scenarios in `features/frontmatter.feature`, all gates green.
 
 ## Steps
