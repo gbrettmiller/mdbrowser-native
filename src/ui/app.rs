@@ -11,11 +11,12 @@ use iced::{Font, Subscription, Task, window};
 
 use super::keys::{self, Command};
 use super::pages::{Pages, SETTLE};
+use super::settings::ColourDrafts;
 use super::viewport::Viewport;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
 use crate::session::{self, Event, Shown, State, Status};
-use crate::theme::{self, Palette, fonts};
+use crate::theme::{self, Palette, Which, fonts};
 
 mod scroll;
 mod view;
@@ -49,6 +50,8 @@ pub enum Message {
     ToggleSettings,
     HomeDraftChanged(String),
     SubmitHome,
+    ColourDraftChanged(Which, String),
+    SubmitColour(Which),
     /// The OS reported its light or dark mode.
     SystemMode(iced::theme::Mode),
     /// Try to scroll to this pending anchor; the count bounds the retries.
@@ -69,7 +72,8 @@ pub struct App {
     settings_open: bool,
     /// What the Home page field shows; follows the saved value until the reader types.
     home_draft: String,
-    /// The OS palette, when it reports one; System appearance follows it.
+    /// What the custom colour fields show; follows the saved colours until the reader types.
+    colour_drafts: ColourDrafts,
     pages: RefCell<Pages>,
     viewport: Viewport,
     relayout_scheduled: bool,
@@ -89,6 +93,7 @@ impl App {
             history_open: false,
             settings_open: false,
             home_draft: settings.home.clone(),
+            colour_drafts: ColourDrafts::of(settings.colours()),
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
             viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR),
             relayout_scheduled: false,
@@ -134,6 +139,7 @@ impl App {
         let fragment_before = self.session().fragment.clone();
         let previous_address = self.session().address();
         let home_before = self.session().settings.home.clone();
+        let colours_before = self.session().settings.colours();
         let look_before = self.look();
         let page_before = self.shown().map(|shown| self.page(&shown.document, self.viewport.width()).0);
         let (state, effects) = session::step(self.session.take().expect("session"), event);
@@ -143,6 +149,9 @@ impl App {
         }
         if self.session().settings.home != home_before {
             self.home_draft = self.session().settings.home.clone();
+        }
+        if self.session().settings.colours() != colours_before {
+            self.colour_drafts = ColourDrafts::of(self.session().settings.colours());
         }
         let store = self.store.clone();
         let effects: Vec<_> =
@@ -183,6 +192,13 @@ impl App {
             Message::HomeDraftChanged(draft) => {
                 self.home_draft = draft;
                 Task::none()
+            }
+            Message::ColourDraftChanged(which, typed) => {
+                self.colour_drafts = self.colour_drafts.clone().typed(which, typed);
+                Task::none()
+            }
+            Message::SubmitColour(which) => {
+                self.dispatch(Event::ChooseCustomColour(which, self.colour_drafts.get(which).to_string()))
             }
             Message::SubmitHome => self.dispatch(Event::ChooseHome(self.home_draft.clone())),
             Message::SystemMode(mode) => self.dispatch(Event::SystemPalette(match mode {

@@ -5,6 +5,7 @@ mod fallbacks;
 mod frontmatter;
 mod images;
 mod local;
+mod reader;
 mod remote;
 mod settings;
 

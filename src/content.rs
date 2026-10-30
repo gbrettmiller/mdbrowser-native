@@ -3,7 +3,7 @@
 use crate::session::NoticeKind;
 use crate::session::error::ErrorCode;
 use crate::session::images::{ImageLoading, Note};
-use crate::theme::{Appearance, ReadingFont, Spacing, TextSize};
+use crate::theme::{Appearance, ReadingFont, Spacing, TextSize, Which};
 
 pub fn error(code: ErrorCode) -> &'static str {
     match code {
@@ -89,6 +89,15 @@ pub fn spacing(spacing: Spacing) -> &'static str {
     }
 }
 
+/// The label of one of the reader's three colours.
+pub fn colour_name(which: Which) -> &'static str {
+    match which {
+        Which::Page => "Page",
+        Which::Text => "Text",
+        Which::Link => "Link",
+    }
+}
+
 /// The text size as the panel shows it: whole pixels.
 pub fn text_size(size: TextSize) -> String {
     size.px().to_string()
@@ -146,6 +155,9 @@ pub const APPEARANCE_LABEL: &str = "Appearance";
 pub const TEXT_SIZE_LABEL: &str = "Text size";
 pub const SMALLER_TEXT: &str = "A−";
 pub const LARGER_TEXT: &str = "A+";
+pub const COLOURS_LABEL: &str = "Custom colours";
+/// What a colour field accepts, as its placeholder says.
+pub const COLOUR_PLACEHOLDER: &str = "#rgb or #rrggbb";
 pub const SPACING_LABEL: &str = "Spacing";
 pub const RESET_READER_CONTROLS: &str = "Reset size and spacing";
 pub const HOME_PAGE_LABEL: &str = "Home page";
@@ -187,6 +199,8 @@ mod tests {
     #[test]
     fn the_reader_controls_are_labelled() {
         distinct_and_non_empty(&Spacing::ALL.map(spacing));
+        distinct_and_non_empty(&Which::ALL.map(colour_name));
+        assert!(COLOUR_PLACEHOLDER.contains("#rgb") && COLOUR_PLACEHOLDER.contains("#rrggbb"));
         distinct_and_non_empty(&[TEXT_SIZE_LABEL, SPACING_LABEL, SMALLER_TEXT, LARGER_TEXT, RESET_READER_CONTROLS]);
         assert_eq!(text_size(TextSize::default()), "18");
     }
