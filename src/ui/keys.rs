@@ -11,6 +11,9 @@ pub enum Command {
     FocusAddress,
     ToggleHistory,
     ToggleSettings,
+    /// Tab and Shift+Tab, when nothing on the page used them: on to the next or previous control.
+    FocusNext,
+    FocusPrevious,
 }
 
 /// The command for `key` pressed with `modifiers`, if it is a shortcut.
@@ -19,6 +22,13 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
     let command = match key {
         Key::Named(Named::ArrowLeft) if alt => Command::Session(Event::Back),
         Key::Named(Named::ArrowRight) if alt => Command::Session(Event::Forward),
+        Key::Named(Named::Tab) if !primary && !alt => {
+            if shift {
+                Command::FocusPrevious
+            } else {
+                Command::FocusNext
+            }
+        }
         Key::Named(Named::F5) => Command::Session(Event::Reload),
         Key::Character("r") if primary => Command::Session(Event::Reload),
         Key::Character("l") if primary => Command::FocusAddress,
@@ -68,6 +78,15 @@ mod tests {
         let neighbour = |which| Some(Command::Session(Event::Neighbour(which)));
         assert_eq!(command(Key::Character("["), primary()), neighbour(Neighbour::Previous));
         assert_eq!(command(Key::Character("]"), primary()), neighbour(Neighbour::Next));
+    }
+
+    #[test]
+    fn tab_moves_focus_on_and_shift_tab_back_but_not_with_other_modifiers() {
+        let tab = Key::Named(Named::Tab);
+        assert_eq!(command(tab.clone(), Modifiers::empty()), Some(Command::FocusNext));
+        assert_eq!(command(tab.clone(), Modifiers::SHIFT), Some(Command::FocusPrevious));
+        assert_eq!(command(tab.clone(), primary()), None);
+        assert_eq!(command(tab, Modifiers::ALT), None);
     }
 
     #[test]

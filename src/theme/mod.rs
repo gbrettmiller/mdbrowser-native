@@ -127,6 +127,13 @@ pub struct Theme {
     pub selection: Color,
 }
 
+impl Theme {
+    /// The focus ring: the link colour, which every palette already keeps readable on the page.
+    pub const fn ring(&self) -> Color {
+        self.link
+    }
+}
+
 const fn rgb(r: u8, g: u8, b: u8) -> Color {
     Color::from_rgb8(r, g, b)
 }

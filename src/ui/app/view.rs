@@ -6,7 +6,7 @@ use std::sync::Arc;
 use iced::widget::{column, container, responsive, row, scrollable, text};
 use iced::{Element, Fill};
 
-use super::{App, Message, SCROLL_ID, SCROLLBAR};
+use super::{App, Message, PAGE_ID, SCROLL_ID, SCROLLBAR};
 use crate::content;
 use crate::session::location::Location;
 use crate::session::{Event, Shown, Status};
@@ -34,7 +34,7 @@ impl App {
                 load_image: Box::new(|src| Message::Session(Event::LoadImage(src))),
                 hover: Box::new(Message::Hover),
             };
-            let document = Document::new(page, pictures, reader, on);
+            let document = Document::new(Arc::as_ptr(&shown.document) as usize, page, pictures, reader, on).id(PAGE_ID);
             scrollable(document)
                 .id(SCROLL_ID)
                 .on_scroll(|viewport| Message::Scrolled(viewport.absolute_offset().y))

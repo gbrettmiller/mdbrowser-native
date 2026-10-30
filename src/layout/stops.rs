@@ -36,12 +36,13 @@ pub enum Reach {
     Leave,
 }
 
-/// Where `direction` takes focus from `current` (none: not on a stop yet) on a page of `count` stops.
+/// Where `direction` takes focus from `current` on a page of `count` stops. `None` is the page
+/// itself, focused with no stop yet: Tab enters the first stop, Shift+Tab leaves.
 pub fn reach(count: usize, current: Option<usize>, direction: Direction) -> Reach {
     let stop = match (direction, current) {
         (Direction::Forward, None) => Some(0),
         (Direction::Forward, Some(i)) => i.checked_add(1),
-        (Direction::Back, None) => count.checked_sub(1),
+        (Direction::Back, None) => None,
         // A stop past the end (the page changed under focus) steps back from the last one.
         (Direction::Back, Some(i)) => i.min(count).checked_sub(1),
     };
@@ -178,7 +179,7 @@ mod tests {
         assert_eq!(reach(3, None, Forward), Reach::Stop(0));
         assert_eq!(reach(3, Some(0), Forward), Reach::Stop(1));
         assert_eq!(reach(3, Some(1), Back), Reach::Stop(0));
-        assert_eq!(reach(3, None, Back), Reach::Stop(2), "Shift+Tab into the page lands on the last link");
+        assert_eq!(reach(3, None, Back), Reach::Leave, "Shift+Tab from the page itself leaves it");
     }
 
     #[test]

@@ -23,6 +23,8 @@ mod view;
 
 pub const ADDRESS_ID: &str = "address";
 const SCROLL_ID: &str = "document";
+/// The page itself, as a stop in the focus order.
+const PAGE_ID: &str = "page";
 const SCROLLBAR: f32 = 12.0;
 /// Layouts slower than this wait for a resize to settle.
 const EXPENSIVE_LAYOUT: Duration = Duration::from_millis(32);
@@ -235,6 +237,8 @@ impl App {
             Some(Command::FocusAddress) => {
                 Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
             }
+            Some(Command::FocusNext) => operation::focus_next(),
+            Some(Command::FocusPrevious) => operation::focus_previous(),
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),
             Some(Command::ToggleSettings) => self.update(Message::ToggleSettings),
             None => Task::none(),

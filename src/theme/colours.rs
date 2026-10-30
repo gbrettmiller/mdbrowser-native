@@ -276,6 +276,27 @@ mod tests {
     }
 
     #[test]
+    fn the_focus_ring_stands_out_from_the_page_by_at_least_3_to_1_in_every_palette() {
+        const NON_TEXT: f32 = 3.0;
+        let ring_on_page = |theme: &Theme| contrast(theme.ring(), theme.background);
+        for palette in [Palette::Light, Palette::Dark] {
+            let theme = tokens(palette);
+            assert!(ring_on_page(&theme) >= NON_TEXT, "{palette:?}: {}", ring_on_page(&theme));
+        }
+        for page in SPREAD {
+            for text in SPREAD {
+                for link in SPREAD {
+                    let typed = Colours { page, text, link };
+                    if check(typed).is_ok() {
+                        let theme = derive(typed);
+                        assert!(ring_on_page(&theme) >= NON_TEXT, "{typed:?}: {}", ring_on_page(&theme));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn every_derived_pair_meets_aa_whenever_the_typed_ones_do() {
         let mut readable = 0;
         for page in SPREAD {

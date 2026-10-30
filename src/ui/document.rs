@@ -7,15 +7,23 @@ use iced::advanced::graphics::text::{Raw, Renderer as _};
 use iced::advanced::image::{Handle, Image, Renderer as _};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer::{self, Quad, Renderer as _};
-use iced::advanced::widget::{self, Widget, tree};
+use iced::advanced::widget::operation::{self, Focusable};
+use iced::advanced::widget::{self, Id, Widget, tree};
 use iced::advanced::{Clipboard, Shell, clipboard};
-use iced::keyboard::{self, Key};
-use iced::{Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
+use iced::keyboard::{self, Key, key::Named};
+use iced::{Border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 
-use crate::layout::{Caret, Page};
+use crate::layout::{Caret, Direction, Page, Reach, Stop, reach};
 use crate::theme;
 
+/// How far the focus ring sits outside a link, and how thick it is.
+const RING_GAP: f32 = 2.0;
+const RING_WIDTH: f32 = 2.0;
+
 pub struct Document<'a, Message> {
+    id: Option<Id>,
+    /// Which document the page is of: a new page of the same one (a new width, new images) keeps focus.
+    document: usize,
     page: Arc<Page>,
     /// Shown images: their page-space boxes and the pixels to draw there.
     pictures: Vec<(Rectangle, Handle)>,
@@ -33,12 +41,19 @@ pub struct Handlers<'a, Message> {
 
 impl<'a, Message> Document<'a, Message> {
     pub fn new(
+        document: usize,
         page: Arc<Page>,
         pictures: Vec<(Rectangle, Handle)>,
         theme: theme::Theme,
         on: Handlers<'a, Message>,
     ) -> Self {
-        Document { page, pictures, theme, on }
+        Document { id: None, document, page, pictures, theme, on }
+    }
+
+    /// Names the page so it can be focused by id.
+    pub fn id(mut self, id: impl Into<Id>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 }
 
@@ -46,6 +61,13 @@ impl<'a, Message> Document<'a, Message> {
 struct State {
     /// Which page the selection belongs to; a new page clears it.
     page: usize,
+    document: usize,
+    /// The page has the keyboard. With no `stop`, it is the page itself that is focused.
+    focused: bool,
+    /// The focused link or image note, by position in `stops`.
+    stop: Option<usize>,
+    /// The page's stops, found once per page.
+    stops: Vec<Stop>,
     anchor: Option<Caret>,
     head: Option<Caret>,
     dragging: bool,
@@ -56,6 +78,56 @@ struct State {
 
 fn page_id(page: &Arc<Page>) -> usize {
     Arc::as_ptr(page) as usize
+}
+
+impl State {
+    /// The state for `page` of `document`. Focus carries over from `previous` when it is the
+    /// same document, kept on the same stop if the page still has it; the selection does not.
+    fn on(page: &Arc<Page>, document: usize, previous: Option<&State>) -> State {
+        let stops = page.stops();
+        let kept = previous.filter(|before| before.document == document && before.focused);
+        State {
+            page: page_id(page),
+            document,
+            focused: kept.is_some(),
+            stop: kept.and_then(|before| before.stop).filter(|&stop| stop < stops.len()),
+            stops,
+            ..State::default()
+        }
+    }
+
+    /// Tab (or Shift+Tab) on the page: true when it moved to a stop, so the key is used up;
+    /// false when focus should leave the page.
+    fn tab(&mut self, direction: Direction) -> bool {
+        match reach(self.stops.len(), self.stop, direction) {
+            Reach::Stop(stop) => {
+                self.stop = Some(stop);
+                true
+            }
+            Reach::Leave => false,
+        }
+    }
+
+    /// The rectangles to ring: those of the focused stop.
+    fn ring(&self) -> &[Rectangle] {
+        self.stop.and_then(|stop| self.stops.get(stop)).map_or(&[], |stop| &stop.rects)
+    }
+}
+
+impl Focusable for State {
+    fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    fn focus(&mut self) {
+        self.focused = true;
+        self.stop = None;
+    }
+
+    fn unfocus(&mut self) {
+        self.focused = false;
+        self.stop = None;
+    }
 }
 
 /// Items whose page-space bounds intersect the viewport (given in page space).
@@ -152,7 +224,18 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(State { page: page_id(&self.page), ..State::default() })
+        tree::State::new(State::on(&self.page, self.document, None))
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut widget::Tree,
+        layout: Layout<'_>,
+        _renderer: &Renderer,
+        operation: &mut dyn operation::Operation,
+    ) {
+        let state = tree.state.downcast_mut::<State>();
+        operation.focusable(self.id.as_ref(), layout.bounds(), state);
     }
 
     fn draw(
@@ -176,6 +259,18 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
         if state.page == page_id(&self.page) {
             for rect in visible(&state.highlight, |rect| *rect, in_page) {
                 renderer.fill_quad(Quad { bounds: *rect + offset, ..Quad::default() }, self.theme.selection);
+            }
+        }
+        if state.focused && state.page == page_id(&self.page) {
+            let border = Border { color: self.theme.ring(), width: RING_WIDTH, radius: RING_GAP.into() };
+            for rect in visible(state.ring(), |rect| *rect, in_page) {
+                let outer = Rectangle {
+                    x: rect.x - RING_GAP,
+                    y: rect.y - RING_GAP,
+                    width: rect.width + 2.0 * RING_GAP,
+                    height: rect.height + 2.0 * RING_GAP,
+                };
+                renderer.fill_quad(Quad { bounds: outer + offset, border, ..Quad::default() }, Color::TRANSPARENT);
             }
         }
         for (bounds, handle) in visible(&self.pictures, |(bounds, _)| *bounds, in_page) {
@@ -204,7 +299,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
     ) {
         let state = tree.state.downcast_mut::<State>();
         if state.page != page_id(&self.page) {
-            *state = State { page: page_id(&self.page), ..State::default() };
+            *state = State::on(&self.page, self.document, Some(state));
         }
         let bounds = layout.bounds();
         match event {
@@ -216,6 +311,15 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => state.dragging = false,
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 self.moved(state, (*position, cursor), bounds, shell);
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed { key: Key::Named(Named::Tab), modifiers, .. })
+                if state.focused && !modifiers.command() && !modifiers.alt() && !shell.is_event_captured() =>
+            {
+                let direction = if modifiers.shift() { Direction::Back } else { Direction::Forward };
+                if state.tab(direction) {
+                    shell.request_redraw();
+                    shell.capture_event();
+                }
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key: Key::Character(c), modifiers, .. })
                 if modifiers.command() && !shell.is_event_captured() =>
@@ -253,6 +357,105 @@ impl<'a, Message: 'a> From<Document<'a, Message>> for Element<'a, Message> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::layout::tests::page_at;
+    use crate::theme::ReadingFont;
+
+    fn page(source: &str) -> Arc<Page> {
+        Arc::new(page_at(source, ReadingFont::Literata, 400.0))
+    }
+
+    const THREE_LINKS: &str = "[a](a.md) and [b](b.md)\n\n[c](c.md)";
+
+    fn focused(page: &Arc<Page>) -> State {
+        let mut state = State::on(page, 1, None);
+        state.focus();
+        state
+    }
+
+    #[test]
+    fn tab_steps_through_the_links_then_lets_go() {
+        let mut state = focused(&page(THREE_LINKS));
+        assert_eq!(state.stop, None, "the page itself first");
+        let seen: Vec<_> = (0..3)
+            .map(|_| {
+                assert!(state.tab(Direction::Forward));
+                state.stop
+            })
+            .collect();
+        assert_eq!(seen, [Some(0), Some(1), Some(2)]);
+        assert!(!state.tab(Direction::Forward), "past the last link focus leaves");
+    }
+
+    #[test]
+    fn shift_tab_steps_back_and_leaves_before_the_first_link() {
+        let mut state = focused(&page(THREE_LINKS));
+        state.stop = Some(2);
+        assert!(state.tab(Direction::Back));
+        assert_eq!(state.stop, Some(1));
+        state.stop = Some(0);
+        assert!(!state.tab(Direction::Back));
+    }
+
+    #[test]
+    fn a_page_without_links_lets_tab_go_at_once() {
+        let mut state = focused(&page("Just words."));
+        assert!(!state.tab(Direction::Forward));
+        assert!(!state.tab(Direction::Back));
+    }
+
+    #[test]
+    fn the_ring_is_the_focused_links_lines_and_nothing_when_on_the_page_itself() {
+        let long = page(&format!("[{}](a.md) and [b](b.md)", "word ".repeat(40)));
+        let mut state = focused(&long);
+        assert!(state.ring().is_empty());
+        state.tab(Direction::Forward);
+        assert!(state.ring().len() > 2, "every line of the wrapped link");
+        state.tab(Direction::Forward);
+        assert_eq!(state.ring().len(), 1);
+    }
+
+    #[test]
+    fn unfocusing_drops_the_stop() {
+        let mut state = focused(&page(THREE_LINKS));
+        state.tab(Direction::Forward);
+        state.unfocus();
+        assert!((state.is_focused(), state.stop) == (false, None));
+    }
+
+    #[test]
+    fn the_same_document_at_a_new_width_keeps_focus_on_the_same_link() {
+        let mut before = focused(&page(THREE_LINKS));
+        before.tab(Direction::Forward);
+        before.tab(Direction::Forward);
+        let narrower = Arc::new(page_at(THREE_LINKS, ReadingFont::Literata, 200.0));
+        let after = State::on(&narrower, 1, Some(&before));
+        assert_eq!((after.focused, after.stop), (true, Some(1)));
+    }
+
+    #[test]
+    fn a_different_document_starts_without_focus() {
+        let mut before = focused(&page(THREE_LINKS));
+        before.tab(Direction::Forward);
+        let after = State::on(&page(THREE_LINKS), 2, Some(&before));
+        assert_eq!((after.focused, after.stop), (false, None));
+    }
+
+    #[test]
+    fn a_stop_the_new_page_no_longer_has_is_dropped_but_the_page_keeps_focus() {
+        let mut before = focused(&page(THREE_LINKS));
+        before.stop = Some(2);
+        let after = State::on(&page("[only](a.md)"), 1, Some(&before));
+        assert_eq!((after.focused, after.stop), (true, None));
+    }
+
+    #[test]
+    fn selection_does_not_carry_over_to_a_new_page() {
+        let mut before = focused(&page(THREE_LINKS));
+        before.anchor = Some(Caret { fragment: 0, byte: 0 });
+        let after = State::on(&page(THREE_LINKS), 1, Some(&before));
+        assert_eq!(after.anchor, None);
+    }
 
     #[test]
     fn culls_to_the_viewport() {
