@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use iced::widget::{button, column, container, pick_list, row, text, text_input};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
 use iced::{Element, Length};
 
 use super::app::Message;
@@ -14,6 +14,8 @@ use crate::theme::colours::hex;
 use crate::theme::{Appearance, Colours, ReadingFont, Spacing, Which};
 
 const WIDTH: f32 = 300.0;
+/// Space beside the controls so the panel's scrollbar doesn't cover them.
+const SCROLLBAR_ROOM: f32 = 16.0;
 
 /// A choice as its pick list shows it.
 #[derive(Clone, Copy)]
@@ -117,37 +119,34 @@ pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDraft
             .on_submit(Message::SubmitHome),
     ]
     .spacing(4);
-    container(
-        column![
-            text(content::SETTINGS).size(18),
-            choice(content::FONT_LABEL, &ReadingFont::ALL, settings.font, content::font_name, Event::ChooseFont),
-            choice(
-                content::IMAGES_LABEL,
-                &ImageLoading::ALL,
-                settings.images,
-                content::image_loading,
-                Event::ChooseImageLoading
-            ),
-            choice(
-                content::APPEARANCE_LABEL,
-                &Appearance::ALL,
-                settings.appearance,
-                content::appearance,
-                Event::ChooseAppearance
-            ),
-            text_size(state),
-            choice(content::SPACING_LABEL, &Spacing::ALL, settings.spacing, content::spacing, Event::ChooseSpacing),
-            button(text(content::RESET_READER_CONTROLS).size(14))
-                .on_press(Message::Session(Event::ResetReaderControls)),
-            home,
-        ]
-        .push((settings.appearance == Appearance::Custom).then(|| colour_fields(colours)))
-        .spacing(16),
-    )
-    .width(Length::Fixed(WIDTH))
-    .height(Length::Fill)
-    .padding(12)
-    .into()
+    let fields = column![
+        text(content::SETTINGS).size(18),
+        choice(content::FONT_LABEL, &ReadingFont::ALL, settings.font, content::font_name, Event::ChooseFont),
+        choice(
+            content::IMAGES_LABEL,
+            &ImageLoading::ALL,
+            settings.images,
+            content::image_loading,
+            Event::ChooseImageLoading
+        ),
+        choice(
+            content::APPEARANCE_LABEL,
+            &Appearance::ALL,
+            settings.appearance,
+            content::appearance,
+            Event::ChooseAppearance
+        ),
+    ]
+    // Right under the Appearance choice that reveals them.
+    .push((settings.appearance == Appearance::Custom).then(|| colour_fields(colours)))
+    .push(text_size(state))
+    .push(choice(content::SPACING_LABEL, &Spacing::ALL, settings.spacing, content::spacing, Event::ChooseSpacing))
+    .push(button(text(content::RESET_READER_CONTROLS).size(14)).on_press(Message::Session(Event::ResetReaderControls)))
+    .push(home)
+    .spacing(16)
+    .padding(iced::Padding::ZERO.right(SCROLLBAR_ROOM));
+    // The panel is taller than a small window once the colour fields show.
+    container(scrollable(fields)).width(Length::Fixed(WIDTH)).height(Length::Fill).padding(12).into()
 }
 
 #[cfg(test)]
