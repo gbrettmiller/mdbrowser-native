@@ -1,5 +1,6 @@
 //! The reader's stylesheet. Documents carry no presentation; all of it lives here.
 
+pub mod colours;
 pub mod fonts;
 pub mod scale;
 
@@ -53,10 +54,12 @@ pub enum Appearance {
     System,
     Light,
     Dark,
+    /// The reader's own page, text and link colours.
+    Custom,
 }
 
 impl Appearance {
-    pub const ALL: [Appearance; 3] = [Self::System, Self::Light, Self::Dark];
+    pub const ALL: [Appearance; 4] = [Self::System, Self::Light, Self::Dark, Self::Custom];
 
     /// Stable identifier for settings files.
     pub const fn key(self) -> &'static str {
@@ -64,6 +67,7 @@ impl Appearance {
             Self::System => "system",
             Self::Light => "light",
             Self::Dark => "dark",
+            Self::Custom => "custom",
         }
     }
 
@@ -76,6 +80,8 @@ impl Appearance {
         match (self, system) {
             (Self::Light, _) => Palette::Light,
             (Self::Dark, _) => Palette::Dark,
+            // Until the palette carries the reader's colours (next step), Custom reads as light.
+            (Self::Custom, _) => Palette::Light,
             (Self::System, Some(palette)) => palette,
             (Self::System, None) => Palette::Light,
         }
@@ -239,6 +245,7 @@ mod tests {
         for appearance in Appearance::ALL {
             assert_eq!(Appearance::from_key(appearance.key()), Some(appearance));
         }
+        assert_eq!(Appearance::from_key("custom"), Some(Appearance::Custom));
         assert_eq!(Appearance::from_key("sepia"), None);
         assert_eq!(Appearance::default(), Appearance::System);
     }
@@ -277,14 +284,6 @@ mod tests {
         );
     }
 
-    /// WCAG 2.x relative luminance contrast.
-    fn contrast(a: Color, b: Color) -> f32 {
-        let channel = |c: f32| if c <= 0.03928 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) };
-        let luminance = |c: Color| 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
-        let (hi, lo) = (luminance(a).max(luminance(b)), luminance(a).min(luminance(b)));
-        (hi + 0.05) / (lo + 0.05)
-    }
-
     #[test]
     fn text_meets_wcag_aa_in_both_palettes() {
         for palette in [Palette::Light, Palette::Dark] {
@@ -297,7 +296,11 @@ mod tests {
                 ("link on code", t.link, t.code_background),
                 ("muted on code", t.muted, t.code_background),
             ] {
-                assert!(contrast(ink, ground) >= 4.5, "{palette:?} {name}: {}", contrast(ink, ground));
+                assert!(
+                    colours::contrast(ink, ground) >= colours::AA,
+                    "{palette:?} {name}: {}",
+                    colours::contrast(ink, ground)
+                );
             }
         }
     }

@@ -70,6 +70,7 @@ pub fn appearance(appearance: Appearance) -> &'static str {
         Appearance::System => "System",
         Appearance::Light => "Light",
         Appearance::Dark => "Dark",
+        Appearance::Custom => "Custom",
     }
 }
 
