@@ -90,7 +90,7 @@ fn laid_page(w: &Browser) -> Page {
     theme::fonts::install();
     layout::layout(
         &shown.document.blocks,
-        &theme::reading(w.state().settings.font, theme::Palette::Light),
+        &theme::reading(theme::Look { font: w.state().settings.font, ..theme::Look::default() }),
         WIDTH,
         &view,
     )
@@ -161,7 +161,7 @@ fn image_fills_column(w: &mut Browser, alt: String) {
     let src = source_of(w, &alt);
     let page = laid_page(w);
     let laid = page.images.iter().find(|laid| laid.src == src).expect("a laid-out image");
-    let reader = theme::reading(w.state().settings.font, theme::Palette::Light);
+    let reader = theme::reading(theme::Look { font: w.state().settings.font, ..theme::Look::default() });
     let column = reader.column_width(WIDTH).floor();
     assert_eq!(laid.bounds.width, column);
     let View::Shown { width: own_width, height: own_height } = w.state().images.view(&src) else {

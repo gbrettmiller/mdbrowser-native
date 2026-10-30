@@ -46,7 +46,7 @@ fn images_as_placeholders() {
 fn every_corpus_image_becomes_a_block_and_lays_out() {
     use crate::layout::{ImageNote, ImageView, layout};
     use crate::model::parse;
-    use crate::theme::{Palette, reading};
+    use crate::theme::{Look, reading};
     let mut files = vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus")];
     let mut checked = 0;
     while let Some(path) = files.pop() {
@@ -65,10 +65,10 @@ fn every_corpus_image_becomes_a_block_and_lays_out() {
             note: Some(ImageNote { text: "Loading image…".into(), clickable: false }),
         };
         for view in [&shown as &dyn Fn(&str) -> ImageView, &placeholder] {
-            let page = layout(&document.blocks, &reading(ReadingFont::Literata, Palette::Light), WIDTH, view);
+            let page = layout(&document.blocks, &reading(Look::default()), WIDTH, view);
             assert!(page.height > 0.0, "{path:?}");
         }
-        let page = layout(&document.blocks, &reading(ReadingFont::Literata, Palette::Light), WIDTH, &shown);
+        let page = layout(&document.blocks, &reading(Look::default()), WIDTH, &shown);
         assert_eq!(page.images.len(), images, "{path:?}");
         checked += 1;
     }
@@ -104,12 +104,31 @@ fn spec_timing() {
 }
 
 fn framed_page(source: &str) -> Page {
+    framed_page_looking(source, crate::theme::Look::default())
+}
+
+fn framed_page_looking(source: &str, look: crate::theme::Look) -> Page {
     use crate::layout::{layout, no_images};
     use crate::model::{Labels, assemble, parse};
-    use crate::theme::{Palette, reading};
+    use crate::theme::reading;
     let labels = Labels { listen: "Listen:", previous: "← Previous", next: "Next →" };
     let document = parse(source);
-    layout(&assemble(&document, &labels), &reading(ReadingFont::Literata, Palette::Light), WIDTH, &no_images)
+    layout(&assemble(&document, &labels), &reading(look), WIDTH, &no_images)
+}
+
+/// The byline and the previous/next row follow the reader's text size like the body does.
+#[test]
+fn front_matter_follows_the_text_size() {
+    use crate::theme::{Look, TextSize};
+    let source = include_str!("../../corpus/markdownweb/2024/03/05/200550.md");
+    let size_of = |page: &Page, text: &str| {
+        page.fragments.iter().find(|f| f.text.contains(text)).unwrap_or_else(|| panic!("no {text:?}")).size
+    };
+    let at = |size: TextSize| framed_page_looking(source, Look { size, ..Look::default() });
+    let (small, large) = (at(TextSize::default().smaller()), at(TextSize::default().larger()));
+    for text in ["Dave Winer", "Next →"] {
+        assert!(size_of(&small, text) < size_of(&large, text), "{text}");
+    }
 }
 
 /// Example 1 of the markdownWeb examples: a byline under no heading, and a previous/next row.

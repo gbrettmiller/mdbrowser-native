@@ -1,4 +1,4 @@
-//! Caches the laid-out page for (document, font, palette, width, image generation). While
+//! Caches the laid-out page for (document, look, width, image generation). While
 //! the window is being resized, expensive documents keep their previous layout
 //! until the width settles, so dragging stays smooth. The image generation is the
 //! one the app last applied: arriving images are coalesced and laid out from
@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use crate::content;
 use crate::layout::{self, ImageView, Page};
 use crate::model::{Document, Labels, assemble};
-use crate::theme::{self, Palette, ReadingFont};
+use crate::theme::{self, Look};
 
 /// How long the width must stay put before an expensive document is re-laid out.
 pub const SETTLE: Duration = Duration::from_millis(150);
@@ -18,8 +18,7 @@ pub const SETTLE: Duration = Duration::from_millis(150);
 struct Laid {
     /// Held so its address can't be reused by a later document while cached.
     document: Arc<Document>,
-    font: ReadingFont,
-    palette: Palette,
+    look: Look,
     width: f32,
     generation: u64,
     page: Arc<Page>,
@@ -44,24 +43,19 @@ impl Pages {
     pub fn get(
         &mut self,
         document: &Arc<Document>,
-        look: (ReadingFont, Palette),
+        look: Look,
         width: f32,
         images: (&dyn Fn(&str) -> ImageView, u64),
         now: Instant,
     ) -> (Arc<Page>, bool) {
         let (view, generation) = images;
-        let (font, palette) = look;
         let same_width = |a: f32, b: f32| (a - b).abs() < 0.5;
         if !self.requested.is_some_and(|(requested, _)| same_width(requested, width)) {
             self.requested = Some((width, now));
         }
         let since_resize = self.requested.map_or(Duration::ZERO, |(_, at)| now.saturating_duration_since(at));
-        let same = |laid: &&Laid| {
-            Arc::ptr_eq(&laid.document, document)
-                && laid.font == font
-                && laid.palette == palette
-                && laid.generation == generation
-        };
+        let same =
+            |laid: &&Laid| Arc::ptr_eq(&laid.document, document) && laid.look == look && laid.generation == generation;
         if let Some(laid) = self.laid.as_ref().filter(same) {
             if same_width(laid.width, width) {
                 return (laid.page.clone(), false);
@@ -73,10 +67,9 @@ impl Pages {
         let started = Instant::now();
         let labels = Labels { listen: content::LISTEN, previous: content::PREVIOUS, next: content::NEXT };
         let blocks = assemble(document, &labels);
-        let page = Arc::new(layout::layout(&blocks, &theme::reading(font, palette), width, view));
+        let page = Arc::new(layout::layout(&blocks, &theme::reading(look), width, view));
         let cost = started.elapsed();
-        self.laid =
-            Some(Laid { document: document.clone(), font, palette, width, generation, page: page.clone(), cost });
+        self.laid = Some(Laid { document: document.clone(), look, width, generation, page: page.clone(), cost });
         (page, false)
     }
 }
@@ -85,7 +78,11 @@ impl Pages {
 mod tests {
     use super::*;
     use crate::model::parse;
-    use crate::theme::fonts;
+    use crate::theme::{Colours, Palette, ReadingFont, Spacing, TextSize, fonts};
+
+    fn looking(font: ReadingFont, palette: Palette) -> Look {
+        Look { font, palette, ..Look::default() }
+    }
 
     fn document() -> Arc<Document> {
         fonts::install();
@@ -93,7 +90,7 @@ mod tests {
     }
 
     fn get(pages: &mut Pages, doc: &Arc<Document>, width: f32, generation: u64, now: Instant) -> (Arc<Page>, bool) {
-        pages.get(doc, (ReadingFont::Literata, Palette::Light), width, (&layout::no_images, generation), now)
+        pages.get(doc, Look::default(), width, (&layout::no_images, generation), now)
     }
 
     #[test]
@@ -121,9 +118,10 @@ mod tests {
         let (doc, now) = (document(), Instant::now());
         let mut pages = Pages::new(Duration::MAX);
         let (first, _) = get(&mut pages, &doc, 500.0, 0, now);
-        let (inter, _) = pages.get(&doc, (ReadingFont::Inter, Palette::Light), 500.0, (&layout::no_images, 0), now);
+        let (inter, _) =
+            pages.get(&doc, looking(ReadingFont::Inter, Palette::Light), 500.0, (&layout::no_images, 0), now);
         let (other, _) =
-            pages.get(&document(), (ReadingFont::Inter, Palette::Light), 500.0, (&layout::no_images, 0), now);
+            pages.get(&document(), looking(ReadingFont::Inter, Palette::Light), 500.0, (&layout::no_images, 0), now);
         assert!(!Arc::ptr_eq(&first, &inter) && !Arc::ptr_eq(&inter, &other));
     }
 
@@ -132,9 +130,39 @@ mod tests {
         let (doc, now) = (document(), Instant::now());
         let mut pages = Pages::new(Duration::MAX);
         let (light, _) = get(&mut pages, &doc, 500.0, 0, now);
-        let look = (ReadingFont::Literata, Palette::Dark);
+        let look = looking(ReadingFont::Literata, Palette::Dark);
         let (dark, settling) = pages.get(&doc, look, 500.0, (&layout::no_images, 0), now);
         assert!(!Arc::ptr_eq(&light, &dark) && !settling);
+    }
+
+    #[test]
+    fn a_new_size_or_spacing_lays_out_again_and_the_same_look_reuses() {
+        let (doc, now) = (document(), Instant::now());
+        let mut pages = Pages::new(Duration::MAX);
+        let at = |pages: &mut Pages, look| pages.get(&doc, look, 500.0, (&layout::no_images, 0), now);
+        let (first, _) = at(&mut pages, Look::default());
+        let larger = Look { size: TextSize::default().larger(), ..Look::default() };
+        let (big, settling) = at(&mut pages, larger);
+        assert!(!Arc::ptr_eq(&first, &big) && !settling);
+        let (same, _) = at(&mut pages, larger);
+        assert!(Arc::ptr_eq(&big, &same));
+        let spacious = Look { spacing: Spacing::Spacious, ..larger };
+        let (loose, settling) = at(&mut pages, spacious);
+        assert!(!Arc::ptr_eq(&big, &loose) && !settling);
+    }
+
+    #[test]
+    fn a_changed_custom_colour_lays_out_again_and_the_same_colours_reuse() {
+        let (doc, now) = (document(), Instant::now());
+        let mut pages = Pages::new(Duration::MAX);
+        let at = |pages: &mut Pages, own| {
+            pages.get(&doc, looking(ReadingFont::Literata, Palette::Custom(own)), 500.0, (&layout::no_images, 0), now).0
+        };
+        let sepia = Colours { page: [0xfd, 0xf6, 0xe3], ..Colours::default() };
+        let (first, same) = (at(&mut pages, sepia), at(&mut pages, sepia));
+        assert!(Arc::ptr_eq(&first, &same));
+        let changed = at(&mut pages, Colours { link: [0x0b, 0x5f, 0xa5], ..sepia });
+        assert!(!Arc::ptr_eq(&first, &changed));
     }
 
     /// The reader keeps their place across a palette change because only colours move.
@@ -147,7 +175,7 @@ mod tests {
         ));
         let mut pages = Pages::new(Duration::MAX);
         let (light, _) = get(&mut pages, &doc, 400.0, 0, Instant::now());
-        let look = (ReadingFont::Literata, Palette::Dark);
+        let look = looking(ReadingFont::Literata, Palette::Dark);
         let (dark, _) = pages.get(&doc, look, 400.0, (&layout::no_images, 0), Instant::now());
         assert_eq!((light.height, &light.anchors), (dark.height, &dark.anchors));
         let boxes = |page: &Page| page.fragments.iter().map(|f| (f.bounds, f.text.clone())).collect::<Vec<_>>();

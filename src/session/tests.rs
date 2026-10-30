@@ -4,7 +4,7 @@ use super::*;
 use crate::session::address::native;
 use crate::session::images::{ImageLoading, Note, Problem, View};
 use crate::session::web::Origin;
-use crate::theme::Appearance;
+use crate::theme::{Appearance, Colours, Palette, Spacing, TextSize, Which};
 
 fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
     events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))
@@ -220,6 +220,80 @@ fn choosing_an_appearance_persists_it_and_keeps_the_other_settings() {
     assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings)]));
 }
 
+fn text_size_after(events: impl IntoIterator<Item = Event>) -> (u8, Vec<Effect>) {
+    let (state, effects) = run(events);
+    (state.settings.text_size.px(), effects)
+}
+
+fn steps(by: TextStep, times: usize) -> impl Iterator<Item = Event> {
+    (0..times).map(move |_| Event::StepTextSize(by))
+}
+
+#[test]
+fn stepping_the_text_size_persists_it_one_step_at_a_time() {
+    let (state, effects) = run([Event::StepTextSize(TextStep::Larger)]);
+    assert_eq!(state.settings.text_size.px(), 20);
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+    let (px, _) = text_size_after([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Smaller)]);
+    assert_eq!(px, TextSize::default().px());
+}
+
+#[test]
+fn the_text_size_stops_at_both_ends_and_still_persists_what_it_holds() {
+    let (px, effects) = text_size_after(steps(TextStep::Smaller, 40));
+    assert_eq!(px, 12);
+    assert!(matches!(effects.as_slice(), [Effect::PersistSettings(settings)] if settings.text_size.px() == 12));
+    let (px, effects) = text_size_after(steps(TextStep::Larger, 40));
+    assert_eq!(px, 32);
+    assert!(matches!(effects.as_slice(), [Effect::PersistSettings(settings)] if settings.text_size.px() == 32));
+}
+
+#[test]
+fn resetting_the_text_size_persists_the_default() {
+    let (state, effects) = run([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Reset)]);
+    assert_eq!(state.settings.text_size, TextSize::default());
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+}
+
+#[test]
+fn restoring_saved_settings_brings_back_size_spacing_and_custom_colours() {
+    let saved = Settings {
+        text_size: TextSize::default().larger(),
+        spacing: Spacing::Spacious,
+        appearance: Appearance::Custom,
+        custom: Some(SEPIA),
+        ..Settings::default()
+    };
+    let (state, effects) = run([Event::Restore { visits: Vec::new(), settings: saved.clone() }]);
+    assert_eq!((state.settings, effects), (saved, vec![]));
+}
+
+#[test]
+fn choosing_a_spacing_persists_it_and_keeps_the_other_settings() {
+    let (state, effects) = run([Event::ChooseFont(ReadingFont::Inter), Event::ChooseSpacing(Spacing::Spacious)]);
+    let settings = Settings { font: ReadingFont::Inter, spacing: Spacing::Spacious, ..Settings::default() };
+    assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings)]));
+}
+
+#[test]
+fn resetting_the_reader_controls_restores_size_and_spacing_only() {
+    let (state, effects) = run([
+        Event::ChooseFont(ReadingFont::Inter),
+        Event::ChooseAppearance(Appearance::Dark),
+        Event::ChooseHome(native("/d/start.md")),
+        Event::StepTextSize(TextStep::Larger),
+        Event::ChooseSpacing(Spacing::Compact),
+        Event::ResetReaderControls,
+    ]);
+    assert_eq!(state.settings.text_size, TextSize::default());
+    assert_eq!(state.settings.spacing, Spacing::Comfortable);
+    assert_eq!(
+        (state.settings.font, state.settings.appearance, state.settings.home.as_str()),
+        (ReadingFont::Inter, Appearance::Dark, native("/d/start.md").as_str())
+    );
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+}
+
 #[test]
 fn a_home_page_is_stored_as_its_canonical_address() {
     let (state, effects) = run([Event::ChooseHome(" HTTPS://Example.COM/index.md ".into())]);
@@ -242,6 +316,93 @@ fn an_invalid_home_page_is_refused_and_the_old_one_stays() {
     assert_eq!(state.settings.home, native("/d/a.md"));
     assert_eq!(state.notices, [Notice { id: 1, kind: NoticeKind::BadHome }]);
     assert_eq!(effects, vec![]);
+}
+
+const SEPIA: Colours = Colours { page: [0xfd, 0xf6, 0xe3], text: [0x33, 0x33, 0x33], link: [0x0b, 0x5f, 0xa5] };
+
+fn colour(which: Which, typed: &str) -> Event {
+    Event::ChooseCustomColour(which, typed.into())
+}
+
+#[test]
+fn choosing_custom_the_first_time_starts_from_the_palette_in_use() {
+    let (state, _) = run([Event::ChooseAppearance(Appearance::Dark), Event::ChooseAppearance(Appearance::Custom)]);
+    assert_eq!(state.settings.custom, Some(Colours::of(Palette::Dark)));
+    let (state, _) = run([Event::ChooseAppearance(Appearance::Custom)]);
+    assert_eq!(state.settings.custom, Some(Colours::of(Palette::Light)));
+    let (state, _) = run([Event::SystemPalette(Some(Palette::Dark)), Event::ChooseAppearance(Appearance::Custom)]);
+    assert_eq!(state.settings.custom, Some(Colours::of(Palette::Dark)), "System follows the OS");
+}
+
+#[test]
+fn custom_colours_are_kept_when_another_appearance_is_chosen_and_custom_again() {
+    let (state, _) = run([
+        Event::ChooseAppearance(Appearance::Custom),
+        colour(Which::Page, "#fdf6e3"),
+        Event::ChooseAppearance(Appearance::Dark),
+        Event::ChooseAppearance(Appearance::Custom),
+    ]);
+    assert_eq!(state.settings.custom.map(|own| own.page), Some([0xfd, 0xf6, 0xe3]));
+    assert_eq!(state.palette(), Palette::Custom(state.settings.custom.unwrap()));
+}
+
+#[test]
+fn a_valid_colour_is_applied_and_persisted_keeping_the_other_two() {
+    let (state, effects) = run([Event::ChooseAppearance(Appearance::Custom), colour(Which::Text, "#333")]);
+    let expected = Colours { text: [0x33, 0x33, 0x33], ..Colours::of(Palette::Light) };
+    assert_eq!(state.settings.custom, Some(expected));
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+    assert!(state.notices.is_empty());
+}
+
+#[test]
+fn a_value_that_is_not_a_colour_is_refused_with_a_notice_and_nothing_changes() {
+    for typed in ["red", "#12", "#ggg", ""] {
+        let (before, _) = run([Event::ChooseAppearance(Appearance::Custom)]);
+        let (state, effects) = run([Event::ChooseAppearance(Appearance::Custom), colour(Which::Text, typed)]);
+        assert_eq!(state.settings, before.settings, "{typed:?}");
+        assert_eq!(state.notices, [Notice { id: 1, kind: NoticeKind::BadColour }], "{typed:?}");
+        assert_eq!(effects, vec![], "{typed:?}");
+    }
+}
+
+#[test]
+fn a_set_that_cannot_be_read_is_refused_saying_what_failed() {
+    let (state, effects) = run([
+        Event::ChooseAppearance(Appearance::Custom),
+        colour(Which::Page, "#ffffff"),
+        colour(Which::Text, "#eeeeee"),
+    ]);
+    assert_eq!(state.notices, [Notice { id: 1, kind: NoticeKind::UnreadableText }]);
+    assert_eq!(state.settings.custom.map(|own| (own.page, own.text)), Some(([0xff; 3], Colours::default().text)));
+    assert_eq!(effects, vec![]);
+    let (state, _) = run([
+        Event::ChooseAppearance(Appearance::Custom),
+        colour(Which::Page, "#ffffff"),
+        colour(Which::Link, "#ffff00"),
+    ]);
+    assert_eq!(state.notices, [Notice { id: 1, kind: NoticeKind::UnreadableLink }]);
+}
+
+#[test]
+fn the_page_colour_can_make_the_text_unreadable_and_is_refused_too() {
+    let (state, _) = run([Event::ChooseAppearance(Appearance::Custom), colour(Which::Page, "#222222")]);
+    assert_eq!(state.notices.len(), 1);
+    assert_eq!(state.settings.custom.map(|own| own.page), Some(Colours::default().page));
+}
+
+#[test]
+fn colours_are_set_even_before_custom_was_chosen_and_start_from_the_palette_in_use() {
+    let (state, _) = run([Event::ChooseAppearance(Appearance::Dark), colour(Which::Link, "#8ab4f8")]);
+    assert_eq!(state.settings.custom, Some(Colours { link: [0x8a, 0xb4, 0xf8], ..Colours::of(Palette::Dark) }));
+    assert_eq!(state.settings.appearance, Appearance::Dark, "setting a colour doesn't switch appearance");
+}
+
+#[test]
+fn the_reset_leaves_the_custom_colours_alone() {
+    let (state, _) =
+        run([Event::ChooseAppearance(Appearance::Custom), colour(Which::Page, "#fdf6e3"), Event::ResetReaderControls]);
+    assert_eq!(state.settings.custom.map(|own| own.page), Some(SEPIA.page));
 }
 
 #[test]

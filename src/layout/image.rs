@@ -110,13 +110,13 @@ mod tests {
     use super::super::{Caret, Page, layout};
     use super::*;
     use crate::model::parse;
-    use crate::theme::{Palette, ReadingFont, fonts, reading};
+    use crate::theme::{Look, fonts, reading};
 
     const WIDTH: f32 = 400.0;
 
     fn page_with(source: &str, view: impl Fn(&str) -> ImageView) -> Page {
         fonts::install();
-        layout(&parse(source).blocks, &reading(ReadingFont::Literata, Palette::Light), WIDTH, &view)
+        layout(&parse(source).blocks, &reading(Look::default()), WIDTH, &view)
     }
 
     fn shown(width: u32, height: u32) -> impl Fn(&str) -> ImageView {
@@ -124,7 +124,7 @@ mod tests {
     }
 
     fn column() -> f32 {
-        reading(ReadingFont::Literata, Palette::Light).column_width(WIDTH)
+        reading(Look::default()).column_width(WIDTH)
     }
 
     fn size(page: &Page) -> (f32, f32) {

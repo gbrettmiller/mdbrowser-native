@@ -124,6 +124,8 @@ pub struct Browser {
     /// The real store, kept in the temporary home.
     pub store: Store,
     clock: u64,
+    /// The reader's colours before the last one was set, for "is what it was".
+    pub colours_before: Option<mdbrowser::theme::Colours>,
 }
 
 impl Browser {
@@ -165,6 +167,7 @@ impl Browser {
             routes,
             store,
             clock: 0,
+            colours_before: None,
         }
     }
 

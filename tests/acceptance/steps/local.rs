@@ -327,7 +327,7 @@ fn set_in(w: &mut Browser, name: String) {
     fonts::install();
     let page = layout::layout(
         &shown.document.blocks,
-        &theme::reading(w.state().settings.font, theme::Palette::Light),
+        &theme::reading(theme::Look { font: w.state().settings.font, ..theme::Look::default() }),
         720.0,
         &layout::no_images,
     );

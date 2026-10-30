@@ -23,7 +23,7 @@ impl App {
     }
 
     fn document_view(&self, shown: Arc<Shown>) -> Element<'_, Message> {
-        let reader = theme::reading(self.session().settings.font, self.palette());
+        let reader = theme::reading(self.look());
         responsive(move |size| {
             let width = size.width - SCROLLBAR;
             let (page, settling) = self.page(&shown.document, width);
@@ -45,7 +45,7 @@ impl App {
 
     pub(super) fn view(&self) -> Element<'_, Message> {
         let state = self.session();
-        let reader = theme::reading(state.settings.font, self.palette());
+        let reader = theme::reading(self.look());
         let main: Element<'_, Message> = match &state.status {
             Status::Idle => body::message(""),
             Status::Loading => body::message(content::loading(state.current_location().and_then(Location::host))),
@@ -59,7 +59,7 @@ impl App {
             .style(move |_| container::Style { background: Some(background.into()), ..container::Style::default() });
         let panels = row![page]
             .push(self.history_open.then(|| history::panel(state, self.palette())))
-            .push(self.settings_open.then(|| settings::panel(state, &self.home_draft)));
+            .push(self.settings_open.then(|| settings::panel(state, &self.home_draft, &self.colour_drafts)));
         let content: Element<'_, Message> = panels.into();
         let status = self.hover.clone().unwrap_or_default();
         column![toolbar::toolbar(state, &self.draft)]

@@ -11,11 +11,12 @@ use iced::{Font, Subscription, Task, window};
 
 use super::keys::{self, Command};
 use super::pages::{Pages, SETTLE};
+use super::settings::ColourDrafts;
 use super::viewport::Viewport;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
 use crate::session::{self, Event, Shown, State, Status};
-use crate::theme::{self, Palette, fonts};
+use crate::theme::{self, Palette, Which, fonts};
 
 mod scroll;
 mod view;
@@ -49,6 +50,8 @@ pub enum Message {
     ToggleSettings,
     HomeDraftChanged(String),
     SubmitHome,
+    ColourDraftChanged(Which, String),
+    SubmitColour(Which),
     /// The OS reported its light or dark mode.
     SystemMode(iced::theme::Mode),
     /// Try to scroll to this pending anchor; the count bounds the retries.
@@ -69,8 +72,8 @@ pub struct App {
     settings_open: bool,
     /// What the Home page field shows; follows the saved value until the reader types.
     home_draft: String,
-    /// The OS palette, when it reports one; System appearance follows it.
-    system_palette: Option<Palette>,
+    /// What the custom colour fields show; follows the saved colours until the reader types.
+    colour_drafts: ColourDrafts,
     pages: RefCell<Pages>,
     viewport: Viewport,
     relayout_scheduled: bool,
@@ -90,7 +93,7 @@ impl App {
             history_open: false,
             settings_open: false,
             home_draft: settings.home.clone(),
-            system_palette: None,
+            colour_drafts: ColourDrafts::of(settings.colours()),
             pages: RefCell::new(Pages::new(EXPENSIVE_LAYOUT)),
             viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR),
             relayout_scheduled: false,
@@ -116,7 +119,18 @@ impl App {
 
     /// The palette in use: the reader's choice, or the OS's for System.
     pub(super) fn palette(&self) -> Palette {
-        self.session().settings.appearance.palette(self.system_palette)
+        self.session().palette()
+    }
+
+    /// How pages look: the reader's font, size and spacing, in the palette in use.
+    pub(super) fn look(&self) -> theme::Look {
+        let settings = &self.session().settings;
+        theme::Look {
+            font: settings.font,
+            palette: self.palette(),
+            size: settings.text_size,
+            spacing: settings.spacing,
+        }
     }
 
     /// Steps the reducer, runs its effects, and keeps the view in step with it.
@@ -125,6 +139,13 @@ impl App {
         let fragment_before = self.session().fragment.clone();
         let previous_address = self.session().address();
         let home_before = self.session().settings.home.clone();
+        let colours_before = self.session().settings.colours();
+        let look_before = self.look();
+        let page_before = if may_change_look(&event) {
+            self.shown().map(|shown| self.page(&shown.document, self.viewport.width()).0)
+        } else {
+            None
+        };
         let (state, effects) = session::step(self.session.take().expect("session"), event);
         self.session = Some(state);
         if self.session().address() != previous_address {
@@ -133,12 +154,16 @@ impl App {
         if self.session().settings.home != home_before {
             self.home_draft = self.session().settings.home.clone();
         }
+        if self.session().settings.colours() != colours_before {
+            self.colour_drafts = ColourDrafts::of(self.session().settings.colours());
+        }
         let store = self.store.clone();
         let effects: Vec<_> =
             effects.into_iter().map(|effect| runner::run(effect, store.clone()).map(Message::Effect)).collect();
         let scroll = self.scroll_after(before, fragment_before);
         let images = self.schedule_images();
-        Task::batch(effects.into_iter().chain([scroll, images]))
+        let kept = self.keep_place(look_before, page_before);
+        Task::batch(effects.into_iter().chain([scroll, images, kept]))
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -172,15 +197,19 @@ impl App {
                 self.home_draft = draft;
                 Task::none()
             }
-            Message::SubmitHome => self.dispatch(Event::ChooseHome(self.home_draft.clone())),
-            Message::SystemMode(mode) => {
-                self.system_palette = match mode {
-                    iced::theme::Mode::None => None,
-                    iced::theme::Mode::Light => Some(Palette::Light),
-                    iced::theme::Mode::Dark => Some(Palette::Dark),
-                };
+            Message::ColourDraftChanged(which, typed) => {
+                self.colour_drafts = self.colour_drafts.clone().typed(which, typed);
                 Task::none()
             }
+            Message::SubmitColour(which) => {
+                self.dispatch(Event::ChooseCustomColour(which, self.colour_drafts.get(which).to_string()))
+            }
+            Message::SubmitHome => self.dispatch(Event::ChooseHome(self.home_draft.clone())),
+            Message::SystemMode(mode) => self.dispatch(Event::SystemPalette(match mode {
+                iced::theme::Mode::None => None,
+                iced::theme::Mode::Light => Some(Palette::Light),
+                iced::theme::Mode::Dark => Some(Palette::Dark),
+            })),
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
             Message::ImagesArrived => self.images_arrived(),
             Message::Scrolled(y) => {
@@ -230,4 +259,20 @@ pub fn run() -> iced::Result {
         .theme(|app: &App| super::chrome::theme(app.palette()))
         .window_size(WINDOW_SIZE)
         .run()
+}
+
+/// Whether an event can change how pages look, which is when the page as it was is needed
+/// to keep the reader's place.
+const fn may_change_look(event: &Event) -> bool {
+    matches!(
+        event,
+        Event::ChooseFont(_)
+            | Event::ChooseAppearance(_)
+            | Event::ChooseCustomColour(..)
+            | Event::SystemPalette(_)
+            | Event::StepTextSize(_)
+            | Event::ChooseSpacing(_)
+            | Event::ResetReaderControls
+            | Event::Restore { .. }
+    )
 }

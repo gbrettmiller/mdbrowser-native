@@ -3,7 +3,7 @@
 use crate::session::NoticeKind;
 use crate::session::error::ErrorCode;
 use crate::session::images::{ImageLoading, Note};
-use crate::theme::{Appearance, ReadingFont};
+use crate::theme::{Appearance, ReadingFont, Spacing, TextSize, Which};
 
 pub fn error(code: ErrorCode) -> &'static str {
     match code {
@@ -62,6 +62,13 @@ pub fn notice(kind: NoticeKind) -> &'static str {
         NoticeKind::LocalFromWeb => "Web pages can't open files on your computer.",
         NoticeKind::LocalNetworkFromWeb => "Web pages can't open addresses on your local network.",
         NoticeKind::BadHome => "That isn't a path or web address of a Markdown file, so the home page is unchanged.",
+        NoticeKind::BadColour => "That isn't a colour. Use a hex value such as #222 or #fdf6e3.",
+        NoticeKind::UnreadableText => {
+            "That text colour is too close to the page colour to read comfortably, so the colours are unchanged."
+        }
+        NoticeKind::UnreadableLink => {
+            "That link colour is too close to the page colour to read comfortably, so the colours are unchanged."
+        }
     }
 }
 
@@ -70,7 +77,30 @@ pub fn appearance(appearance: Appearance) -> &'static str {
         Appearance::System => "System",
         Appearance::Light => "Light",
         Appearance::Dark => "Dark",
+        Appearance::Custom => "Custom",
     }
+}
+
+pub fn spacing(spacing: Spacing) -> &'static str {
+    match spacing {
+        Spacing::Compact => "Compact",
+        Spacing::Comfortable => "Comfortable",
+        Spacing::Spacious => "Spacious",
+    }
+}
+
+/// The label of one of the reader's three colours.
+pub fn colour_name(which: Which) -> &'static str {
+    match which {
+        Which::Page => "Page",
+        Which::Text => "Text",
+        Which::Link => "Link",
+    }
+}
+
+/// The text size as the panel shows it: whole pixels.
+pub fn text_size(size: TextSize) -> String {
+    size.px().to_string()
 }
 
 /// The Web images setting, one entry per mode.
@@ -122,6 +152,14 @@ pub const SETTINGS: &str = "Settings";
 pub const FONT_LABEL: &str = "Font";
 pub const IMAGES_LABEL: &str = "Web images";
 pub const APPEARANCE_LABEL: &str = "Appearance";
+pub const TEXT_SIZE_LABEL: &str = "Text size";
+pub const SMALLER_TEXT: &str = "A−";
+pub const LARGER_TEXT: &str = "A+";
+pub const COLOURS_LABEL: &str = "Custom colours";
+/// What a colour field accepts, as its placeholder says.
+pub const COLOUR_PLACEHOLDER: &str = "#rgb or #rrggbb";
+pub const SPACING_LABEL: &str = "Spacing";
+pub const RESET_READER_CONTROLS: &str = "Reset size and spacing";
 pub const HOME_PAGE_LABEL: &str = "Home page";
 pub const HOME_PAGE_PLACEHOLDER: &str = "Empty for the welcome page";
 pub const LOADING: &str = "Loading…";
@@ -159,6 +197,15 @@ mod tests {
     }
 
     #[test]
+    fn the_reader_controls_are_labelled() {
+        distinct_and_non_empty(&Spacing::ALL.map(spacing));
+        distinct_and_non_empty(&Which::ALL.map(colour_name));
+        assert!(COLOUR_PLACEHOLDER.contains("#rgb") && COLOUR_PLACEHOLDER.contains("#rrggbb"));
+        distinct_and_non_empty(&[TEXT_SIZE_LABEL, SPACING_LABEL, SMALLER_TEXT, LARGER_TEXT, RESET_READER_CONTROLS]);
+        assert_eq!(text_size(TextSize::default()), "18");
+    }
+
+    #[test]
     fn the_welcome_page_is_titled_and_names_the_controls_it_describes() {
         let source = include_str!("../assets/welcome.md");
         assert_eq!(crate::model::parse(source).title(""), "Welcome");
@@ -172,6 +219,13 @@ mod tests {
         distinct_and_non_empty(&ErrorCode::ALL.map(error));
         distinct_and_non_empty(&ErrorCode::ALL.map(ErrorCode::key));
         distinct_and_non_empty(&NoticeKind::ALL.map(notice));
+    }
+
+    #[test]
+    fn the_colour_notices_say_what_to_type_and_what_failed() {
+        assert!(notice(NoticeKind::BadColour).contains("#222") && notice(NoticeKind::BadColour).contains("hex"));
+        assert!(notice(NoticeKind::UnreadableText).contains("text colour is too close to the page colour"));
+        assert!(notice(NoticeKind::UnreadableLink).contains("link colour is too close to the page colour"));
     }
 
     #[test]

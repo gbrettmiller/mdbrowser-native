@@ -22,13 +22,14 @@ Task-list checkboxes are drawn as shapes rather than typed glyphs, because none 
 
 | Token | Value | Notes |
 |---|---|---|
-| Body | 18 px, line height 1.6 | |
+| Body | 18 px by default, line height 1.6 | Text size is the reader's: 12 to 32 px in steps of 2 (Settings, or Ctrl+= , Ctrl+- and Ctrl+0; Cmd on macOS). Headings, code and image notes are multiples of it |
 | Code | Mono at 0.88× body | Code blocks wrap by glyph |
-| Measure | 720 px max, 32 px gutter | Text column centred in the window |
+| Measure | 40 em (720 px at 18), gutter 32 px at 18 | Text column centred in the window. The measure, gutter and indent scale with the text size, so characters per line stay about the same. Code and cell padding, the 6 px gap after a heading and the 3 px quote bar stay fixed |
 | Headings | 1.9 / 1.5 / 1.25 / 1.1 / 1.0 / 0.9 × body, bold | Rule under H1 and H2 |
-| Block gap | 16 px; list items 4 px; indent 28 px | A sublist hugs its item |
+| Spacing | Compact: line height 1.45, block gap 12 px, item gap 2 px. **Comfortable (default): 1.6, 16 px, 4 px.** Spacious: 1.8, 22 px, 8 px | One choice sets all three. Indent is 28 px at 18 and scales with size. A sublist hugs its item |
 | Palette (light) | background `#fbfaf7`, ink `#222`, muted `#6b6b6b`, link `#1f5fbf`, code background `#efede8`, rule `#d8d5ce`, selection link at 22% | Chosen in Settings: System (follows the OS, light if it reports nothing), Light or Dark |
 | Palette (dark) | background `#1b1b1a`, ink `#e4e2dc`, muted `#a19f98`, link `#7faff0`, code ink `#d6d4ce`, code background `#262624`, rule `#3a3936`, selection link at 30% | Ink, muted and link meet WCAG AA (4.5:1) on the page and code backgrounds; a unit test checks it |
+| Palette (custom) | The reader types page, text and link as `#rgb` or `#rrggbb`. Code ink is the text colour. Muted is the text faded toward the page (up to 35%), the code background is the page nudged toward the text (up to 6%), and each backs off until it meets 4.5:1. Rule is the page 15% toward the text. Selection is the link at 22% on a light page and 30% on a dark one | A set whose text or links are below 4.5:1 on the page is refused with a message and the old colours stay, because the Settings panel wears the palette too. Choosing Custom the first time starts from the palette in use. The colours are kept when another appearance is chosen. A unit test checks every derived pair across a spread of inputs |
 
 The bundled fonts add about 5.3 MB to the binary (`du -sh assets/fonts`, 2026-10-28).
 
