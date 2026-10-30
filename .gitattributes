@@ -1,0 +1,10 @@
+# One set of bytes on every platform: Windows would otherwise check text out with CRLF,
+# which the corpus, the golden snapshots and the tests don't expect.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ttf binary
+*.otf binary
