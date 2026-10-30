@@ -136,8 +136,9 @@ fn every_markdownweb_post_shows_its_front_matter() {
         let page = framed_page(&source);
         let text: String = page.fragments.iter().map(|f| f.text.as_str()).collect::<Vec<_>>().join("\n");
         assert!(page.height > 0.0 && text.contains("Dave Winer"), "{path:?}");
-        assert!(source.contains("urlPrev") == text.contains("← Previous"), "{path:?}");
-        assert!(source.contains("urlNext") == text.contains("Next →"), "{path:?}");
+        let front = crate::model::parse(&source).front;
+        assert_eq!(front.url_prev.is_some(), text.contains("← Previous"), "{path:?}");
+        assert_eq!(front.url_next.is_some(), text.contains("Next →"), "{path:?}");
         checked += 1;
     }
     assert!(checked >= 9, "checked {checked} files");

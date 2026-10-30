@@ -50,29 +50,48 @@ pub fn frame(document: &Document) -> Frame {
 
 /// The post already says it: one of its first two blocks is the same text.
 fn opens_with(document: &Document, text: &str) -> bool {
+    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
     document
         .blocks
         .iter()
         .take(2)
-        .any(|block| matches!(block, Block::Paragraph(spans) if text_of(spans).trim() == text))
+        .any(|block| matches!(block, Block::Paragraph(spans) if words(&text_of(spans)) == text))
 }
 
 fn enclosure_label(url: &str, mime: Option<&str>, length: Option<u64>) -> String {
     let address = url.split(['?', '#']).next().unwrap_or(url);
     let address = address.split_once("://").map_or(address, |(_, rest)| rest);
     let (host, path) = address.split_once('/').unwrap_or((address, ""));
-    let name = path.rsplit('/').find(|segment| !segment.is_empty()).unwrap_or(host);
+    let host = host.rsplit('@').next().unwrap_or(host);
+    let name = path.rsplit('/').find(|segment| !segment.is_empty()).map_or_else(|| host.to_string(), percent_decoded);
     let details = [mime.map(str::to_string), length.map(size)].into_iter().flatten().collect::<Vec<_>>().join(", ");
-    if details.is_empty() { name.to_string() } else { format!("{name} ({details})") }
+    if details.is_empty() { name } else { format!("{name} ({details})") }
+}
+
+/// `My%20Show.m4a` as `My Show.m4a`. A sequence that isn't valid UTF-8 stays as written.
+fn percent_decoded(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = bytes.get(i + 1..i + 3).and_then(|pair| std::str::from_utf8(pair).ok());
+        match (bytes[i], hex.and_then(|hex| u8::from_str_radix(hex, 16).ok())) {
+            (b'%', Some(byte)) => {
+                out.push(byte);
+                i += 3;
+            }
+            (byte, _) => {
+                out.push(byte);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(out).unwrap_or_else(|_| text.to_string())
 }
 
 fn size(bytes: u64) -> String {
-    const MEGABYTE: u64 = 1024 * 1024;
-    if bytes >= MEGABYTE {
-        format!("{:.1} MB", bytes as f64 / MEGABYTE as f64)
-    } else {
-        format!("{} KB", bytes.div_ceil(1024))
-    }
+    let kilobytes = bytes.div_ceil(1024);
+    if kilobytes >= 1000 { format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0)) } else { format!("{kilobytes} KB") }
 }
 
 /// The document's blocks with its front matter around them: the byline, description and
@@ -151,6 +170,7 @@ mod tests {
         assert_eq!(frame(&post("description: A summary", "Text")).description.as_deref(), Some("A summary"));
         assert_eq!(frame(&post("description: Text", "Text")).description, None);
         assert_eq!(frame(&post("description: Text", "# Title\n\n  Text  ")).description, None);
+        assert_eq!(frame(&post("description: >\n  Some words\n  here", "**Some**   words\nhere")).description, None);
         assert_eq!(frame(&post("description: Text", "# Title\n\nOther")).description.as_deref(), Some("Text"));
     }
 
@@ -162,6 +182,13 @@ mod tests {
             Some(("http://e.com/a/show.m4a".into(), "show.m4a (audio/mpeg, 6.1 MB)".into()))
         );
         assert_eq!(line("enclosure: http://e.com/show.m4a").map(|e| e.1), Some("show.m4a".into()));
+        assert_eq!(line("enclosure: http://e.com/My%20Show.m4a").map(|e| e.1), Some("My Show.m4a".into()));
+        assert_eq!(line("enclosure: http://u:pw@e.com:8080").map(|e| e.1), Some("e.com:8080".into()));
+        assert_eq!(
+            line("enclosure: http://e.com/a.mp3\nenclosureLength: 1048000").map(|e| e.1),
+            Some("a.mp3 (1.0 MB)".into())
+        );
+        assert_eq!(line("enclosure: http://e.com/a.mp3\nenclosureLength: 0").map(|e| e.1), Some("a.mp3 (0 KB)".into()));
         assert_eq!(
             line("enclosure: http://e.com/s.mp3?x=1#t\nenclosureType: audio/mpeg").map(|e| e.1),
             Some("s.mp3 (audio/mpeg)".into())

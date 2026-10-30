@@ -75,10 +75,10 @@ pub fn parse(yaml: &str) -> FrontMatter {
     }
 }
 
-/// A non-blank scalar, trimmed. Lists, maps and nulls are not text.
+/// A non-blank scalar on one line, with single spaces. Lists, maps and nulls are not text.
 fn text(value: &Yaml) -> Option<String> {
     let text = match value {
-        Yaml::String(text) => text.trim().to_string(),
+        Yaml::String(text) => text.split_whitespace().collect::<Vec<_>>().join(" "),
         Yaml::Integer(number) => number.to_string(),
         Yaml::Real(number) => number.clone(),
         _ => return None,
@@ -192,6 +192,13 @@ mod tests {
         let front = parse("enclosure: http://x/a.mp3\nenclosureLength: lots\nenclosureType: ''");
         assert_eq!(front.enclosure, Some(Enclosure { url: "http://x/a.mp3".into(), mime: None, length: None }));
         assert_eq!(parse("enclosure: http://x/a\nenclosureLength: 12").enclosure.unwrap().length, Some(12));
+    }
+
+    #[test]
+    fn text_is_one_line_with_single_spaces() {
+        let front = parse("author: \"Dave\\n  Winer\"\ndescription: |\n  First line\n  second\ttab\n");
+        assert_eq!(front.author.as_deref(), Some("Dave Winer"));
+        assert_eq!(front.description.as_deref(), Some("First line second tab"));
     }
 
     #[test]

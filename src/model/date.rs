@@ -20,11 +20,20 @@ const MONTHS: [&str; 12] = [
 /// and ignored: the date is the one the writer wrote, in the writer's own zone.
 pub fn readable(text: &str) -> Option<String> {
     let mut parts = text.split_whitespace().peekable();
-    parts.next_if(|part| part.ends_with(','));
+    parts
+        .next_if(|part| part.ends_with(',') || part.starts_with(|c: char| c.is_ascii_alphabetic()) && is_weekday(part));
     let day: u32 = parts.next()?.parse().ok()?;
     let month = month_index(parts.next()?)?;
     let year = year(parts.next()?)?;
     (1..=days_in(month, year)).contains(&day).then(|| format!("{day} {} {year}", MONTHS[month]))
+}
+
+/// `Sun`, `Sunday` and so on, with or without the comma.
+fn is_weekday(word: &str) -> bool {
+    let word = word.to_ascii_lowercase();
+    ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        .iter()
+        .any(|day| word == *day || (word.len() == 3 && day.starts_with(&word)))
 }
 
 fn month_index(name: &str) -> Option<usize> {
@@ -74,6 +83,12 @@ mod tests {
         assert_eq!(readable("  Sun,   1 Jan 2023 EST "), Some("1 January 2023".into()));
         assert_eq!(readable("1 jan 2023 09:00"), Some("1 January 2023".into()));
         assert_eq!(readable("1 December 2023"), Some("1 December 2023".into()));
+    }
+
+    #[test]
+    fn the_weekday_needs_no_comma() {
+        assert_eq!(readable("Sun 31 Mar 2024"), Some("31 March 2024".into()));
+        assert_eq!(readable("Sunday, 31 Mar 2024"), Some("31 March 2024".into()));
     }
 
     #[test]
