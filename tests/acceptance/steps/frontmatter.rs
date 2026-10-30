@@ -5,7 +5,7 @@ use cucumber::{then, when};
 
 use mdbrowser::content;
 use mdbrowser::model::{Block, Document, Frame, Labels, assemble, frame};
-use mdbrowser::session::{Event, Status};
+use mdbrowser::session::{Event, Neighbour, Status};
 
 use crate::world::Browser;
 
@@ -75,14 +75,14 @@ fn offers(w: &Browser, previous: bool, next: bool) {
 
 #[when("I choose Previous")]
 fn choose_previous(w: &mut Browser) {
-    let href = framed(w).previous.expect("a Previous link");
-    w.send(Event::Follow(href));
+    assert!(framed(w).previous.is_some());
+    w.send(Event::Neighbour(Neighbour::Previous));
 }
 
 #[when("I choose Next")]
 fn choose_next(w: &mut Browser) {
-    let href = framed(w).next.expect("a Next link");
-    w.send(Event::Follow(href));
+    assert!(framed(w).next.is_some());
+    w.send(Event::Neighbour(Neighbour::Next));
 }
 
 #[then(expr = "the enclosure line reads {string}")]

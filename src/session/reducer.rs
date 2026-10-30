@@ -26,6 +26,10 @@ pub fn step(state: State, event: Event) -> Step {
             navigate_to(state, entry)
         }
         Event::Follow(href) => follow(state, &href),
+        Event::Neighbour(which) => match state.neighbour(which) {
+            Some(href) => follow(state, &href),
+            None => none(state),
+        },
         Event::Back => move_by(state, Navigation::back),
         Event::Forward => move_by(state, Navigation::forward),
         Event::Reload => match state.nav.current().cloned() {
