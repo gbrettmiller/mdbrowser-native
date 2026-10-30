@@ -58,6 +58,15 @@ pub enum Which {
 
 impl Which {
     pub const ALL: [Which; 3] = [Self::Page, Self::Text, Self::Link];
+
+    /// Where this colour sits in `ALL`.
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Page => 0,
+            Self::Text => 1,
+            Self::Link => 2,
+        }
+    }
 }
 
 /// Why a set of colours is refused: the text, or the links, can't be read on the page.
@@ -183,10 +192,6 @@ mod tests {
         [0xff, 0xff, 0x00],
     ];
 
-    fn colour([r, g, b]: [u8; 3]) -> Color {
-        Color::from_rgb8(r, g, b)
-    }
-
     #[test]
     fn hex_is_accepted_in_both_lengths_and_either_case() {
         assert_eq!(parse_hex("#fdf6e3"), Some([0xfd, 0xf6, 0xe3]));
@@ -230,11 +235,22 @@ mod tests {
         assert!((contrast(colour([255, 255, 255]), colour([255, 255, 255])) - 1.0).abs() < 0.001);
     }
 
+    /// Known ratios on white, from the WCAG definition: #767676 is the lightest grey that
+    /// passes, #777777 just misses.
+    #[test]
+    fn the_aa_line_falls_between_the_two_greys_that_straddle_it() {
+        let white = [255, 255, 255];
+        assert!((contrast(colour([0x76; 3]), colour(white)) - 4.54).abs() < 0.01);
+        assert!((contrast(colour([0x77; 3]), colour(white)) - 4.48).abs() < 0.01);
+        let set = |grey: u8| Colours { page: white, text: [0, 0, 0], link: [grey; 3] };
+        assert_eq!(check(set(0x76)), Ok(set(0x76)));
+        assert_eq!(check(set(0x77)), Err(Unreadable::Link));
+    }
+
     #[test]
     fn the_built_in_palettes_are_readable_colours_of_their_own() {
-        for palette in [super::super::Palette::Light, super::super::Palette::Dark] {
-            let theme = super::super::tokens(palette);
-            let typed = Colours { page: rgb8(theme.background), text: rgb8(theme.ink), link: rgb8(theme.link) };
+        for palette in [Palette::Light, Palette::Dark] {
+            let typed = Colours::of(palette);
             assert_eq!(check(typed), Ok(typed), "{palette:?}");
         }
     }
@@ -285,6 +301,7 @@ mod tests {
                 }
             }
         }
+        // Floor chosen well under what the ten-colour spread yields, so the property isn't vacuous.
         assert!(readable > 50, "the spread should include plenty of readable sets, got {readable}");
     }
 
@@ -307,7 +324,7 @@ mod tests {
     #[test]
     fn the_derivation_changes_only_colours() {
         let typed = Colours { page: [0xfd, 0xf6, 0xe3], text: [0x33, 0x33, 0x33], link: [0x0b, 0x5f, 0xa5] };
-        let base = super::super::tokens(super::super::Palette::Light);
+        let base = tokens(Palette::Light);
         let derived = derive(typed);
         assert_eq!(
             Theme {

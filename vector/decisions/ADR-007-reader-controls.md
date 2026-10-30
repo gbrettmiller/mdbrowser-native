@@ -57,7 +57,7 @@ Keep the fixed size, spacing and palettes.
 
 - **Size:** whole pixels, 12 to 32 in steps of 2, default 18. The measure (40 em, 720 px at 18), gutter and indent scale with it, so characters per line stay about the same. A stored value outside the scale is ignored (the default), as with every other unknown setting.
 - **Spacing:** line height 1.45 / 1.6 / 1.8, block gap 12 / 16 / 22 px, item gap 2 / 4 / 8 px. Spacing scales only these.
-- **Colours:** muted, code background and rule are mixes of the typed page and text colours, code ink is the text colour, and selection is the link colour at 22% on light pages and 30% on dark (as now). A set is refused if text or link on page, or the derived muted text on page or code, is below 4.5:1. A stored custom set that fails on load falls back to light.
+- **Colours:** muted, code background and rule are mixes of the typed page and text colours, code ink is the text colour, and selection is the link colour at 22% on light pages and 30% on dark (as now). A set is refused if text or link on the page is below 4.5:1. Muted text and the code background are derived to meet 4.5:1 on their grounds whenever the typed pairs do (falling back to the text colour for muted), which a unit test checks across a spread of inputs. A stored custom set that fails on load falls back to light.
 
 We refuse rather than warn because the panel that fixes a bad palette is drawn in it. This is the same rule 2c applies to the built-in palettes, now enforced for the reader's own.
 

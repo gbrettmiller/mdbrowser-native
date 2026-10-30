@@ -54,10 +54,10 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 ## Import Direction
 
 - `ui` may use every other layer.
-- `services` may use `model`, `session` and `theme` value types (`ReadingFont`, `Appearance`, `Colours`, `TextSize`, `Spacing`), never `ui`.
+- `services` may use `model`, `session` and `theme` value types (`ReadingFont`, `Appearance`, `Colours`, `TextSize`, `Spacing`) and the `theme::colours` functions for hex and the AA check, never `ui`.
 - `content` may use `session` and `theme` enums, to key its strings. Only `ui` uses `content`.
 - `layout` may use `model` and `theme`.
-- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and the `theme` settings types (`ReadingFont`, `Appearance`, `Colours`, `TextSize`, `Spacing`, `Palette`), the `url` crate for addresses, and `iced::advanced::image::Handle` (also exported as `iced::widget::image::Handle`) as a value type for decoded images.
+- `model` and `theme` use nothing else from this crate. `session` uses `model` (to parse loaded documents) and the `theme` settings types (`ReadingFont`, `Appearance`, `Colours`, `Which`, `TextSize`, `Spacing`, `Palette`) with the `theme::colours` hex parser and AA check (`Unreadable` is its refusal), the `url` crate for addresses, and `iced::advanced::image::Handle` (also exported as `iced::widget::image::Handle`) as a value type for decoded images.
 - Pure layers (`model`, `layout`, `session`, `theme`) never perform I/O and never use iced's runtime (`Task`, `Element`). Iced *value* types (`Color`, `Font`, `Rectangle`, image `Handle`) are allowed.
 
 ## How to Add a Feature

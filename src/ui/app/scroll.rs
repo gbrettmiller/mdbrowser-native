@@ -50,10 +50,7 @@ impl App {
         let generation = self.session().images.generation();
         let gutter = theme::reading(self.look()).gutter;
         let (after, _) = self.page_at(&shown.document, width, generation);
-        match self.viewport.images_arrived(&before, &after, gutter, generation) {
-            Some(y) => operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
-            None => Task::none(),
-        }
+        scroll_task(self.viewport.images_arrived(&before, &after, gutter, generation))
     }
 
     /// A new look moves everything on the page, so lay it out again now and scroll so the
@@ -70,10 +67,7 @@ impl App {
         }
         let generation = self.viewport.applied_images();
         let (after, _) = self.page_at(&shown.document, self.viewport.width(), generation);
-        match self.viewport.relaid(&before, &after, theme::reading(self.look()).gutter) {
-            Some(y) => operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
-            None => Task::none(),
-        }
+        scroll_task(self.viewport.relaid(&before, &after, theme::reading(self.look()).gutter))
     }
 
     /// New documents start at the top; a pending anchor is resolved once the
@@ -114,10 +108,15 @@ impl App {
         let scroll = match page.scroll_offset_for(&fragment, theme::reading(self.look()).gutter) {
             Some(y) => {
                 self.viewport.hold_anchor(fragment.clone(), y);
-                operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) })
+                scroll_task(Some(y))
             }
             None => Task::none(),
         };
         Task::batch([self.dispatch(Event::FragmentHandled), scroll])
     }
+}
+
+/// Scrolls the page to `y`, or leaves it where it is.
+fn scroll_task(y: Option<f32>) -> Task<Message> {
+    y.map_or_else(Task::none, |y| operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }))
 }

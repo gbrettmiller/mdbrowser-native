@@ -66,7 +66,9 @@ impl Store {
     }
 
     pub fn load_settings(&self) -> Settings {
-        let stored = std::fs::read_to_string(self.file(SETTINGS)).ok();
+        let path = self.file(SETTINGS);
+        let small = std::fs::metadata(&path).is_ok_and(|meta| meta.len() <= MAX_SETTINGS_BYTES);
+        let stored = small.then(|| std::fs::read_to_string(&path).ok()).flatten();
         let json = stored.and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok());
         let key = |name: &str| json.as_ref().and_then(|json| json.get(name)).and_then(|value| value.as_str());
         Settings {
@@ -113,6 +115,8 @@ fn stored_colours(stored: &serde_json::Value) -> Option<Colours> {
 
 const HISTORY: &str = "history.json";
 const SETTINGS: &str = "settings.json";
+/// Real settings files are a few hundred bytes; anything past this isn't one of ours.
+const MAX_SETTINGS_BYTES: u64 = 64 * 1024;
 
 /// Write to a sibling temp file, then rename, so a crash never leaves half a file.
 /// The temp name is unique per process and save, so two app instances can't collide.
@@ -190,6 +194,15 @@ mod tests {
         std::fs::write(dir.path().join("settings.json"), r#"{"appearance":"sepia","home":7}"#).unwrap();
         let odd = store.load_settings();
         assert_eq!((odd.appearance, odd.home.as_str()), (Appearance::System, ""));
+    }
+
+    #[test]
+    fn a_settings_file_far_larger_than_any_real_one_is_ignored() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::at(dir.path());
+        let padding = " ".repeat(usize::try_from(MAX_SETTINGS_BYTES).unwrap());
+        std::fs::write(dir.path().join("settings.json"), format!(r#"{{"font":"inter"{padding}}}"#)).unwrap();
+        assert_eq!(store.load_settings(), Settings::default());
     }
 
     #[test]

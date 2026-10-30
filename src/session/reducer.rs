@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use super::address::parse_address;
 use super::error::ErrorCode;
-use super::images::Images;
+use super::images::{ImageLoading, Images};
 use super::links::{self, Link};
 use super::location::{Location, Target};
 use super::navigation::{Entry, Navigation};
@@ -49,44 +49,22 @@ pub fn step(state: State, event: Event) -> Step {
             None => none(state),
         },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
-        Event::ChooseFont(font) => persist_settings(with_settings(state, |settings| Settings { font, ..settings })),
-        Event::ChooseAppearance(appearance) => {
-            let seed = Colours::of(state.palette());
-            persist_settings(with_settings(state, |settings| Settings {
-                appearance,
-                custom: settings.custom.or((appearance == Appearance::Custom).then_some(seed)),
-                ..settings
-            }))
-        }
+        Event::ChooseFont(font) => update_settings(state, |settings| Settings { font, ..settings }),
+        Event::ChooseAppearance(appearance) => choose_appearance(state, appearance),
         Event::ChooseCustomColour(which, typed) => choose_colour(state, which, &typed),
         Event::SystemPalette(system_palette) => none(State { system_palette, ..state }),
-        Event::StepTextSize(by) => persist_settings(with_settings(state, |settings| Settings {
-            text_size: match by {
-                TextStep::Larger => settings.text_size.larger(),
-                TextStep::Smaller => settings.text_size.smaller(),
-                TextStep::Reset => TextSize::default(),
-            },
-            ..settings
-        })),
-        Event::ChooseSpacing(spacing) => {
-            persist_settings(with_settings(state, |settings| Settings { spacing, ..settings }))
-        }
-        Event::ResetReaderControls => persist_settings(with_settings(state, |settings| Settings {
-            text_size: TextSize::default(),
+        Event::StepTextSize(by) => step_text_size(state, by),
+        Event::ChooseSpacing(spacing) => update_settings(state, |settings| Settings { spacing, ..settings }),
+        Event::ResetReaderControls => update_settings(state, |settings| Settings {
+            text_size: reset_text_size(),
             spacing: Spacing::default(),
             ..settings
-        })),
+        }),
         Event::ChooseHome(input) => choose_home(state, &input),
         Event::Home => home(state),
         Event::Launch(Some(input)) => step(state, Event::Enter(input)),
         Event::Launch(None) => home(state),
-        Event::ChooseImageLoading(mode) => {
-            let (state, mut effects) = with_images(state, |images| images.mode_changed(mode));
-            let (state, persist) =
-                persist_settings(with_settings(state, |settings| Settings { images: mode, ..settings }));
-            effects.extend(persist);
-            (state, effects)
-        }
+        Event::ChooseImageLoading(mode) => choose_image_loading(state, mode),
         Event::ImageLoaded { location, result } => with_images(state, |images| images.loaded(location, result)),
         Event::LoadImage(src) => match state.images.location(&src).cloned() {
             Some(location) => with_images(state, |images| images.click(&location)),
@@ -219,16 +197,48 @@ fn with_images(state: State, change: impl FnOnce(Images) -> (Images, Vec<Locatio
     (State { images, ..state }, effects)
 }
 
+fn choose_appearance(state: State, appearance: Appearance) -> Step {
+    let seed = Colours::of(state.palette());
+    update_settings(state, |settings| Settings {
+        appearance,
+        custom: settings.custom.or((appearance == Appearance::Custom).then_some(seed)),
+        ..settings
+    })
+}
+
+fn step_text_size(state: State, by: TextStep) -> Step {
+    update_settings(state, |settings| Settings {
+        text_size: match by {
+            TextStep::Larger => settings.text_size.larger(),
+            TextStep::Smaller => settings.text_size.smaller(),
+            TextStep::Reset => reset_text_size(),
+        },
+        ..settings
+    })
+}
+
+/// The one place the default size is chosen when the reader asks to go back to it.
+fn reset_text_size() -> TextSize {
+    TextSize::default()
+}
+
+fn choose_image_loading(state: State, mode: ImageLoading) -> Step {
+    let (state, mut effects) = with_images(state, |images| images.mode_changed(mode));
+    let (state, persist) = update_settings(state, |settings| Settings { images: mode, ..settings });
+    effects.extend(persist);
+    (state, effects)
+}
+
 /// Stores the home page as its canonical address. A bad value is refused and the old one stays.
 fn choose_home(state: State, input: &str) -> Step {
     let input = input.trim();
     if input.is_empty() {
-        return persist_settings(with_settings(state, |settings| Settings { home: String::new(), ..settings }));
+        return update_settings(state, |settings| Settings { home: String::new(), ..settings });
     }
     match parse_address(input, &state.home) {
         Ok(target) => {
             let home = target.location.address();
-            persist_settings(with_settings(state, |settings| Settings { home, ..settings }))
+            update_settings(state, |settings| Settings { home, ..settings })
         }
         Err(_) => notice(state, NoticeKind::BadHome),
     }
@@ -240,7 +250,7 @@ fn choose_colour(state: State, which: Which, typed: &str) -> Step {
     let Some(rgb) = colours::parse_hex(typed) else { return notice(state, NoticeKind::BadColour) };
     let current = state.settings.custom.unwrap_or_else(|| Colours::of(state.palette()));
     match colours::check(current.with(which, rgb)) {
-        Ok(custom) => persist_settings(with_settings(state, |settings| Settings { custom: Some(custom), ..settings })),
+        Ok(custom) => update_settings(state, |settings| Settings { custom: Some(custom), ..settings }),
         Err(Unreadable::Text) => notice(state, NoticeKind::UnreadableText),
         Err(Unreadable::Link) => notice(state, NoticeKind::UnreadableLink),
     }
@@ -262,6 +272,11 @@ fn home(state: State) -> Step {
 
 fn with_settings(state: State, change: impl FnOnce(Settings) -> Settings) -> State {
     State { settings: change(state.settings.clone()), ..state }
+}
+
+/// Changes the settings and asks for them to be saved.
+fn update_settings(state: State, change: impl FnOnce(Settings) -> Settings) -> Step {
+    persist_settings(with_settings(state, change))
 }
 
 fn persist_settings(state: State) -> Step {

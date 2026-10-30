@@ -108,7 +108,7 @@ mod tests {
         for px in (12..=32).step_by(2) {
             assert_eq!(TextSize::from_px(px).map(|size| u64::from(size.px())), Some(px));
         }
-        for px in [0, 10, 13, 17, 33, 34, 999, u64::MAX] {
+        for px in [0, 10, 13, 17, 33, 34, 256, 300, 999, u64::MAX] {
             assert_eq!(TextSize::from_px(px), None, "{px}");
         }
     }
@@ -120,5 +120,14 @@ mod tests {
         }
         assert_eq!(Spacing::from_key("tight"), None);
         assert_eq!(Spacing::default(), Spacing::Comfortable);
+    }
+
+    #[test]
+    fn every_spacing_measure_grows_from_compact_to_spacious() {
+        let measures: [fn(Spacing) -> f32; 3] = [Spacing::line_ratio, Spacing::block_gap, Spacing::item_gap];
+        for measure in measures {
+            let [compact, comfortable, spacious] = Spacing::ALL.map(measure);
+            assert!(compact < comfortable && comfortable < spacious, "{compact} {comfortable} {spacious}");
+        }
     }
 }

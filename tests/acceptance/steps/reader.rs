@@ -3,7 +3,7 @@
 use cucumber::{given, then, when};
 use mdbrowser::content;
 use mdbrowser::layout::{self, Page};
-use mdbrowser::session::{Event, Status, TextStep};
+use mdbrowser::session::{Event, NoticeKind, Status, TextStep};
 use mdbrowser::theme::colours::{hex, parse_hex};
 use mdbrowser::theme::{self, Colours, Look, Palette, Spacing, TextSize, Which};
 
@@ -137,7 +137,11 @@ fn page_is_dark_page(w: &mut Browser) {
 
 #[then(expr = "I am told that the {word} colour is too close to the page colour")]
 fn told_too_close(w: &mut Browser, which: String) {
-    let notices: Vec<_> = w.state().notices.iter().map(|n| content::notice(n.kind)).collect();
-    let wanted = format!("{which} colour is too close to the page colour");
-    assert!(notices.iter().any(|notice| notice.contains(&wanted)), "notices: {notices:?}");
+    let kind = match which.as_str() {
+        "text" => NoticeKind::UnreadableText,
+        "link" => NoticeKind::UnreadableLink,
+        other => panic!("no notice for the {other} colour"),
+    };
+    let kinds: Vec<_> = w.state().notices.iter().map(|n| n.kind).collect();
+    assert_eq!(kinds, [kind], "notices: {kinds:?}");
 }

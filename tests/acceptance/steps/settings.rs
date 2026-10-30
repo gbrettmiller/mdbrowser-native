@@ -32,7 +32,10 @@ fn stored_appearance(w: &mut Browser, key: String) {
 
 #[given(expr = "the stored settings are {string}")]
 fn stored_settings(w: &mut Browser, json: String) {
-    write_settings(w, &json.replace("\\\"", "\""));
+    let json = json.replace("\\\"", "\"");
+    serde_json::from_str::<serde_json::Value>(&json)
+        .unwrap_or_else(|e| panic!("stored settings must be JSON ({e}): {json}"));
+    write_settings(w, &json);
 }
 
 #[then(expr = "the appearance is {string}")]

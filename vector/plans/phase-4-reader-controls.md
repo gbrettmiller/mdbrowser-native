@@ -33,8 +33,8 @@ Out: column width (the measure), per-site settings, saved themes or named preset
 2. [ ] **Spacing.** Compact, Comfortable and Spacious change line height, block gap and list item gap together. Comfortable gives exactly the layout of phase 3, so the golden snapshots do not change.
 3. [ ] **Custom colours.**
    - Choosing Custom with no saved colours starts from the current palette's page, text and link colours, so nothing jumps.
-   - Page, Text and Link accept `#rgb` and `#rrggbb`, and the field says what it accepts. An invalid value is refused with a message, and the old colour stays.
-   - Text on page, link on page, and the derived muted text on page and on code meet WCAG AA (4.5:1). A unit test checks the derivation across a spread of inputs, and a custom set where text or link on page falls below 4.5:1 is refused with a message saying what failed.
+   - Page, Text and Link accept `#rgb` and `#rrggbb`, and the field says what it accepts. An invalid value is refused with a message, and the old colour stays. The field keeps what was typed, so the reader can correct it.
+   - Text on page and link on page meet WCAG AA (4.5:1), and so does the derived muted text on page and on code. A unit test checks the derivation across a spread of inputs, and a custom set where text or link on page falls below 4.5:1 is refused with a message saying what failed.
    - Selection, rule and code colours are derived, never typed. No colour is hardcoded outside `theme`.
    - The window chrome (toolbar, panels, pick lists, scrollbar) wears the custom palette, as 2c's does for light and dark.
 4. [ ] **The reader keeps their place.** Changing size, spacing or colours relays out, repaints at once, and keeps the reading position (the held anchor, as 2c's palette change does). Selection is cleared the way a width change clears it today.
@@ -140,6 +140,13 @@ Feature: Reader controls
     Then I am told that the text colour is too close to the page colour
     And the custom "Text" colour is what it was
 
+  Scenario: Links that can't be read on the page are refused
+    Given I chose the appearance "Custom"
+    And I set the custom "Page" colour to "#ffffff"
+    When I set the custom "Link" colour to "#ffff00"
+    Then I am told that the link colour is too close to the page colour
+    And the custom "Link" colour is what it was
+
   Scenario: Custom colours survive a restart
     Given I chose the appearance "Custom"
     And I set the custom "Page" colour to "#fdf6e3"
@@ -161,17 +168,30 @@ Feature: Reader controls
     And the spacing is "Comfortable"
     And the appearance is "Dark"
 
+  Scenario: A bad stored value doesn't discard its good neighbours
+    Given the stored settings are "{\"font\":\"inter\",\"spacing\":\"tight\",\"appearance\":\"dark\"}"
+    When I restart the app
+    Then the reading font is "Inter"
+    And the appearance is "Dark"
+    And the spacing is "Comfortable"
+
   Scenario Outline: Unknown stored values fall back to the defaults
     Given the stored settings are "<stored>"
     When I restart the app
     Then the text size is "18"
     And the spacing is "Comfortable"
+    And the custom "Page" colour is "#fbfaf7"
     Examples:
-      | stored                                       |
-      | {"spacing":"tight"}                          |
-      | {"text_size":999}                            |
-      | {"text_size":"big"}                          |
-      | {"appearance":"custom","custom":{"ink":"red"}} |
+      | stored                                                             |
+      | {\\"spacing\\":\\"tight\\"}                                        |
+      | {\\"text_size\\":999}                                              |
+      | {\\"text_size\\":\\"big\\"}                                        |
+
+  Scenario: A stored custom set that can't be used falls back to the light colours
+    Given the stored settings are "{\"appearance\":\"custom\",\"custom\":{\"ink\":\"red\"}}"
+    When I restart the app
+    Then the appearance is "Custom"
+    And the custom "Page" colour is "#fbfaf7"
 ```
 
 ## Decisions (proposed, 2026-10-30)
@@ -179,7 +199,7 @@ Feature: Reader controls
 - **Text size is a scale of steps, not free input.** Whole pixels from 12 to 32 in steps of 2, default 18. A stored out-of-range value is not clamped but ignored (the default), like every other unknown setting. The Settings control is a stepper (smaller, the size, larger) and the shortcuts use the same steps.
 - **The measure scales with text size** (40 em, which is 720 px at 18), and so do the gutter and the indent. Spacing choices scale only line height and the gaps.
 - **Spacing is a three-way choice**, not independent sliders. Line height 1.45 / 1.6 / 1.8, block gap 12 / 16 / 22 px, item gap 2 / 4 / 8 px. Comfortable is today's values exactly.
-- **Custom colours derive the rest.** Muted is the text colour mixed toward the page, code background is the page nudged toward the text, code ink is the text, rule is a lighter mix, selection is the link at 22% on light pages and 30% on dark (as now). The mix amounts are tuned in step 6 so that every derived pair meets AA whenever the typed pairs do. If a typed set can't give AA muted text, the set is refused.
+- **Custom colours derive the rest.** Muted is the text colour mixed toward the page, code background is the page nudged toward the text, code ink is the text, rule is a lighter mix, selection is the link at 22% on light pages and 30% on dark (as now). The mix amounts are tuned in step 6 so that every derived pair meets AA whenever the typed pairs do. If no mix gives AA muted text, muted falls back to the text colour, so a set that passes `check` always yields an all-AA palette.
 - **Refuse, don't warn, below AA.** An unreadable custom palette is the one thing the reader can't see their way out of (the Settings panel itself wears the palette). The reader keeps ownership of everything else.
 - **One ADR** (ADR-007: reader controls, the scale, the derivation and the AA refusal), written through `invest-adr` in step 1.
 
@@ -294,21 +314,21 @@ Each step is test first, red then green, with the order test → build → clipp
 
 ## Pre-PR Quality Gate
 
-- [ ] `cargo test`
-- [ ] `cargo build`
-- [ ] `cargo clippy --all-targets -- -D warnings`
-- [ ] `cargo fmt --check`
-- [ ] Golden snapshots unchanged at the default size, spacing and palettes
-- [ ] Screenshots read (AC 9)
-- [ ] `/code-review` passes
-- [ ] README, DESIGN.md, ARCHITECTURE.md, VECTOR.md and `features/README.md` updated
+- [x] `cargo test`
+- [x] `cargo build`
+- [x] `cargo clippy --all-targets -- -D warnings`
+- [x] `cargo fmt --check`
+- [x] Golden snapshots unchanged at the default size, spacing and palettes
+- [x] Screenshots read (AC 9)
+- [x] `/code-review` passes
+- [x] README, DESIGN.md, ARCHITECTURE.md, VECTOR.md and `features/README.md` updated
 
 ## Risks
 
 - **`reading()` is used everywhere.** Step 3 is the widest change. It is a pure refactor with the goldens as the guard, and it lands before any new behaviour.
 - **Layout cost at large sizes.** Every change relays out the open document. Check on the largest corpus page at 32 px that a step doesn't stutter (the page cache and image generation make repeated relayouts cheap, but not free).
 - **The reader locks themselves out.** A palette with unreadable text would make the Settings panel unreadable too. The AA refusal in step 7 and the check in step 6 are the guard, and a stored palette that fails the check on load falls back to light.
-- **Derived tokens for odd inputs.** A saturated page colour or a mid-grey page can make AA muted text impossible. The derivation refuses those sets with a message rather than choosing an unreadable muted colour.
+- **Derived tokens for odd inputs.** A saturated page colour or a mid-grey page can make AA muted text impossible. The derivation falls back to the text colour for muted (and the page for the code background) rather than choosing an unreadable colour, so only `check` ever refuses a set.
 - **Shortcut clashes.** Ctrl+= and Ctrl+- are the browser convention, but some layouts need Shift for `+`. Step 1 checks, and the stepper is always there.
 - **Welcome page.** It is a normal document, so it follows the new controls with no special case.
 

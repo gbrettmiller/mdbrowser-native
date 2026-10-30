@@ -80,17 +80,13 @@ impl ColourDrafts {
         ColourDrafts(Which::ALL.map(|which| hex(colours.get(which))))
     }
 
-    fn at(which: Which) -> usize {
-        Which::ALL.iter().position(|other| *other == which).expect("a colour field")
-    }
-
     pub fn get(&self, which: Which) -> &str {
-        &self.0[Self::at(which)]
+        &self.0[which.index()]
     }
 
     /// The drafts with `which` as the reader typed it.
     pub fn typed(mut self, which: Which, text: String) -> Self {
-        self.0[Self::at(which)] = text;
+        self.0[which.index()] = text;
         self
     }
 }

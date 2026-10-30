@@ -156,6 +156,24 @@ pub(crate) mod tests {
         assert!(small.height < large.height);
     }
 
+    #[test]
+    fn body_text_is_set_at_the_chosen_size_with_lines_at_the_spacing_ratio() {
+        let source = "word ".repeat(120);
+        for (size, spacing) in [
+            (TextSize::default().smaller(), Spacing::Compact),
+            (TextSize::default(), Spacing::Comfortable),
+            (TextSize::default().larger(), Spacing::Spacious),
+        ] {
+            let page = page_looking(&source, Look { size, spacing, ..Look::default() });
+            let px = f32::from(size.px());
+            let lines: Vec<_> = page.fragments.iter().map(|f| (f.size, f.bounds.y)).collect();
+            assert!(lines.len() > 2, "the paragraph wraps");
+            assert!(lines.iter().all(|(set, _)| *set == px), "{lines:?}");
+            let pitch = lines[1].1 - lines[0].1;
+            assert!((pitch - px * spacing.line_ratio()).abs() < 0.5, "{pitch} at {px} px, {spacing:?}");
+        }
+    }
+
     fn centre(rect: Rectangle) -> Point {
         Point::new(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0)
     }

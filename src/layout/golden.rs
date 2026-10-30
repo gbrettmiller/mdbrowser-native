@@ -104,12 +104,31 @@ fn spec_timing() {
 }
 
 fn framed_page(source: &str) -> Page {
+    framed_page_looking(source, crate::theme::Look::default())
+}
+
+fn framed_page_looking(source: &str, look: crate::theme::Look) -> Page {
     use crate::layout::{layout, no_images};
     use crate::model::{Labels, assemble, parse};
-    use crate::theme::{Look, reading};
+    use crate::theme::reading;
     let labels = Labels { listen: "Listen:", previous: "← Previous", next: "Next →" };
     let document = parse(source);
-    layout(&assemble(&document, &labels), &reading(Look::default()), WIDTH, &no_images)
+    layout(&assemble(&document, &labels), &reading(look), WIDTH, &no_images)
+}
+
+/// The byline and the previous/next row follow the reader's text size like the body does.
+#[test]
+fn front_matter_follows_the_text_size() {
+    use crate::theme::{Look, TextSize};
+    let source = include_str!("../../corpus/markdownweb/2024/03/05/200550.md");
+    let size_of = |page: &Page, text: &str| {
+        page.fragments.iter().find(|f| f.text.contains(text)).unwrap_or_else(|| panic!("no {text:?}")).size
+    };
+    let at = |size: TextSize| framed_page_looking(source, Look { size, ..Look::default() });
+    let (small, large) = (at(TextSize::default().smaller()), at(TextSize::default().larger()));
+    for text in ["Dave Winer", "Next →"] {
+        assert!(size_of(&small, text) < size_of(&large, text), "{text}");
+    }
 }
 
 /// Example 1 of the markdownWeb examples: a byline under no heading, and a previous/next row.

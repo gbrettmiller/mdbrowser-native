@@ -91,6 +91,13 @@ Feature: Reader controls
     Then I am told that the text colour is too close to the page colour
     And the custom "Text" colour is what it was
 
+  Scenario: Links that can't be read on the page are refused
+    Given I chose the appearance "Custom"
+    And I set the custom "Page" colour to "#ffffff"
+    When I set the custom "Link" colour to "#ffff00"
+    Then I am told that the link colour is too close to the page colour
+    And the custom "Link" colour is what it was
+
   Scenario: Custom colours survive a restart
     Given I chose the appearance "Custom"
     And I set the custom "Page" colour to "#fdf6e3"
@@ -112,6 +119,13 @@ Feature: Reader controls
     And the spacing is "Comfortable"
     And the appearance is "Dark"
 
+  Scenario: A bad stored value doesn't discard its good neighbours
+    Given the stored settings are "{\"font\":\"inter\",\"spacing\":\"tight\",\"appearance\":\"dark\"}"
+    When I restart the app
+    Then the reading font is "Inter"
+    And the appearance is "Dark"
+    And the spacing is "Comfortable"
+
   Scenario Outline: Unknown stored values fall back to the defaults
     Given the stored settings are "<stored>"
     When I restart the app
@@ -123,4 +137,9 @@ Feature: Reader controls
       | {\\"spacing\\":\\"tight\\"}                                        |
       | {\\"text_size\\":999}                                              |
       | {\\"text_size\\":\\"big\\"}                                        |
-      | {\\"appearance\\":\\"custom\\",\\"custom\\":{\\"ink\\":\\"red\\"}} |
+
+  Scenario: A stored custom set that can't be used falls back to the light colours
+    Given the stored settings are "{\"appearance\":\"custom\",\"custom\":{\"ink\":\"red\"}}"
+    When I restart the app
+    Then the appearance is "Custom"
+    And the custom "Page" colour is "#fbfaf7"

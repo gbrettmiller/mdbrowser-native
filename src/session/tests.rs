@@ -220,19 +220,52 @@ fn choosing_an_appearance_persists_it_and_keeps_the_other_settings() {
     assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings)]));
 }
 
+fn text_size_after(events: impl IntoIterator<Item = Event>) -> (u8, Vec<Effect>) {
+    let (state, effects) = run(events);
+    (state.settings.text_size.px(), effects)
+}
+
+fn steps(by: TextStep, times: usize) -> impl Iterator<Item = Event> {
+    (0..times).map(move |_| Event::StepTextSize(by))
+}
+
 #[test]
-fn stepping_the_text_size_persists_it_one_step_at_a_time_and_stops_at_the_ends() {
+fn stepping_the_text_size_persists_it_one_step_at_a_time() {
     let (state, effects) = run([Event::StepTextSize(TextStep::Larger)]);
     assert_eq!(state.settings.text_size.px(), 20);
     assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
-    let (state, _) = run([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Smaller)]);
+    let (px, _) = text_size_after([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Smaller)]);
+    assert_eq!(px, TextSize::default().px());
+}
+
+#[test]
+fn the_text_size_stops_at_both_ends_and_still_persists_what_it_holds() {
+    let (px, effects) = text_size_after(steps(TextStep::Smaller, 40));
+    assert_eq!(px, 12);
+    assert!(matches!(effects.as_slice(), [Effect::PersistSettings(settings)] if settings.text_size.px() == 12));
+    let (px, effects) = text_size_after(steps(TextStep::Larger, 40));
+    assert_eq!(px, 32);
+    assert!(matches!(effects.as_slice(), [Effect::PersistSettings(settings)] if settings.text_size.px() == 32));
+}
+
+#[test]
+fn resetting_the_text_size_persists_the_default() {
+    let (state, effects) = run([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Reset)]);
     assert_eq!(state.settings.text_size, TextSize::default());
-    let (state, _) = run((0..40).map(|_| Event::StepTextSize(TextStep::Smaller)));
-    assert_eq!(state.settings.text_size.px(), 12);
-    let (state, _) = run((0..40).map(|_| Event::StepTextSize(TextStep::Larger)));
-    assert_eq!(state.settings.text_size.px(), 32);
-    let (state, _) = run([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Reset)]);
-    assert_eq!(state.settings.text_size, TextSize::default());
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+}
+
+#[test]
+fn restoring_saved_settings_brings_back_size_spacing_and_custom_colours() {
+    let saved = Settings {
+        text_size: TextSize::default().larger(),
+        spacing: Spacing::Spacious,
+        appearance: Appearance::Custom,
+        custom: Some(SEPIA),
+        ..Settings::default()
+    };
+    let (state, effects) = run([Event::Restore { visits: Vec::new(), settings: saved.clone() }]);
+    assert_eq!((state.settings, effects), (saved, vec![]));
 }
 
 #[test]

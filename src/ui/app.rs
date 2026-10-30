@@ -141,7 +141,11 @@ impl App {
         let home_before = self.session().settings.home.clone();
         let colours_before = self.session().settings.colours();
         let look_before = self.look();
-        let page_before = self.shown().map(|shown| self.page(&shown.document, self.viewport.width()).0);
+        let page_before = if may_change_look(&event) {
+            self.shown().map(|shown| self.page(&shown.document, self.viewport.width()).0)
+        } else {
+            None
+        };
         let (state, effects) = session::step(self.session.take().expect("session"), event);
         self.session = Some(state);
         if self.session().address() != previous_address {
@@ -255,4 +259,20 @@ pub fn run() -> iced::Result {
         .theme(|app: &App| super::chrome::theme(app.palette()))
         .window_size(WINDOW_SIZE)
         .run()
+}
+
+/// Whether an event can change how pages look, which is when the page as it was is needed
+/// to keep the reader's place.
+const fn may_change_look(event: &Event) -> bool {
+    matches!(
+        event,
+        Event::ChooseFont(_)
+            | Event::ChooseAppearance(_)
+            | Event::ChooseCustomColour(..)
+            | Event::SystemPalette(_)
+            | Event::StepTextSize(_)
+            | Event::ChooseSpacing(_)
+            | Event::ResetReaderControls
+            | Event::Restore { .. }
+    )
 }

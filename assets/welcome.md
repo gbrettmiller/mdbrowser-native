@@ -13,4 +13,4 @@ Open **Settings** and put the address of any Markdown page in **Home page**. It 
 
 ## Choose how it looks
 
-Settings also holds the reading font, the text size (or Ctrl+= and Ctrl+- , with Ctrl+0 to go back), the spacing, whether web images load, and a light, dark, system or custom palette. Choose Custom to type your own page, text and link colours. Documents never choose their own style: how they look is up to you.
+Settings also holds the reading font, the text size (or Ctrl+= and Ctrl+-, with Ctrl+0 to go back; Cmd instead of Ctrl on macOS), the spacing, whether web images load, and a light, dark, system or custom palette. Choose Custom to type your own page, text and link colours. Documents never choose their own style: how they look is up to you.
