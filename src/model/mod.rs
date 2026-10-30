@@ -2,7 +2,9 @@
 //! nothing downstream ever sees HTML.
 
 mod blocks;
+mod date;
 mod frontmatter;
+pub use date::readable as readable_date;
 pub use frontmatter::{Enclosure, FrontMatter, Source};
 mod html;
 mod inlines;
