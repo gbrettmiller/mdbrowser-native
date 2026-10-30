@@ -175,7 +175,7 @@ mod tests {
         let keys =
             [Named::PageUp, Named::PageDown, Named::Space, Named::ArrowUp, Named::ArrowDown, Named::Home, Named::End];
         for key in keys {
-            for modifiers in [Modifiers::CTRL, Modifiers::ALT] {
+            for modifiers in [primary(), Modifiers::ALT] {
                 assert_eq!(scroll(named(key), modifiers, true), None, "{key:?} with {modifiers:?}");
             }
         }
