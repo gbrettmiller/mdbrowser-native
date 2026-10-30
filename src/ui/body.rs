@@ -8,7 +8,7 @@ use super::app::Message;
 use crate::content;
 use crate::session::error::ErrorCode;
 use crate::session::location::Location;
-use crate::session::{Event, Notice, State};
+use crate::session::{Event, Notice, State, Status};
 use crate::theme;
 
 pub fn message<'a>(message: impl text::IntoFragment<'a>) -> Element<'a, Message> {
@@ -42,4 +42,40 @@ pub fn notices(notices: &[Notice]) -> Element<'_, Message> {
         .into()
     }))
     .into()
+}
+
+/// The document's title, for windows that have no title bar to show it: only
+/// when a document is on screen.
+pub fn title_line(status: &Status) -> Option<&str> {
+    match status {
+        Status::Ready(shown) => Some(shown.title.as_str()),
+        _ => None,
+    }
+}
+
+pub fn title_bar<'a>(title: &'a str, theme: &theme::Theme) -> Element<'a, Message> {
+    let muted = theme.muted;
+    container(text(title).size(13).style(move |_| text::Style { color: Some(muted) }).wrapping(text::Wrapping::None))
+        .padding([2, 8])
+        .width(Fill)
+        .center_x(Fill)
+        .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::model::parse;
+    use crate::session::Shown;
+
+    #[test]
+    fn the_title_shows_only_with_a_document() {
+        let shown = Shown { document: Arc::new(parse("# Hi")), title: "Hi".into() };
+        assert_eq!(title_line(&Status::Ready(Arc::new(shown))), Some("Hi"));
+        for status in [Status::Idle, Status::Loading, Status::Failed(ErrorCode::NotFound)] {
+            assert_eq!(title_line(&status), None);
+        }
+    }
 }

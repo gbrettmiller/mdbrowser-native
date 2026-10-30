@@ -62,12 +62,11 @@ impl App {
             .push(self.settings_open.then(|| settings::panel(state, &self.home_draft)));
         let content: Element<'_, Message> = panels.into();
         let status = self.hover.clone().unwrap_or_default();
-        column![
-            toolbar::toolbar(state, &self.draft),
-            body::notices(&state.notices),
-            content,
-            container(text(status).size(12)).padding([2, 8]),
-        ]
-        .into()
+        column![toolbar::toolbar(state, &self.draft)]
+            .push(body::title_line(&state.status).map(|title| body::title_bar(title, &reader)))
+            .push(body::notices(&state.notices))
+            .push(content)
+            .push(container(text(status).size(12)).padding([2, 8]))
+            .into()
     }
 }
