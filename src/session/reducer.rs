@@ -10,8 +10,9 @@ use super::location::{Location, Target};
 use super::navigation::{Entry, Navigation};
 use super::visits;
 use super::web::Origin;
-use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status};
+use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status, TextStep};
 use crate::model;
+use crate::theme::{Spacing, TextSize};
 
 type Step = (State, Vec<Effect>);
 
@@ -51,6 +52,22 @@ pub fn step(state: State, event: Event) -> Step {
         Event::ChooseAppearance(appearance) => {
             persist_settings(with_settings(state, |settings| Settings { appearance, ..settings }))
         }
+        Event::StepTextSize(by) => persist_settings(with_settings(state, |settings| Settings {
+            text_size: match by {
+                TextStep::Larger => settings.text_size.larger(),
+                TextStep::Smaller => settings.text_size.smaller(),
+                TextStep::Reset => TextSize::default(),
+            },
+            ..settings
+        })),
+        Event::ChooseSpacing(spacing) => {
+            persist_settings(with_settings(state, |settings| Settings { spacing, ..settings }))
+        }
+        Event::ResetReaderControls => persist_settings(with_settings(state, |settings| Settings {
+            text_size: TextSize::default(),
+            spacing: Spacing::default(),
+            ..settings
+        })),
         Event::ChooseHome(input) => choose_home(state, &input),
         Event::Home => home(state),
         Event::Launch(Some(input)) => step(state, Event::Enter(input)),

@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::session::Settings;
 use crate::session::images::ImageLoading;
 use crate::session::visits::{self, Visit};
-use crate::theme::{Appearance, ReadingFont};
+use crate::theme::{Appearance, ReadingFont, Spacing, TextSize};
 
 /// Orders saves: issued when an effect is created (in dispatch order), so a
 /// save that finishes late can't overwrite a newer one.
@@ -72,6 +72,13 @@ impl Store {
             font: key("font").and_then(ReadingFont::from_key).unwrap_or_default(),
             images: key("images").and_then(ImageLoading::from_key).unwrap_or_default(),
             appearance: key("appearance").and_then(Appearance::from_key).unwrap_or_default(),
+            text_size: json
+                .as_ref()
+                .and_then(|json| json.get("text_size"))
+                .and_then(serde_json::Value::as_u64)
+                .and_then(TextSize::from_px)
+                .unwrap_or_default(),
+            spacing: key("spacing").and_then(Spacing::from_key).unwrap_or_default(),
             home: key("home").map(str::to_string).unwrap_or_default(),
         }
     }
@@ -81,6 +88,8 @@ impl Store {
             "font": settings.font.key(),
             "images": settings.images.key(),
             "appearance": settings.appearance.key(),
+            "text_size": settings.text_size.px(),
+            "spacing": settings.spacing.key(),
             "home": settings.home,
         });
         self.save(SETTINGS, ticket, &json.to_string())
@@ -166,6 +175,28 @@ mod tests {
         std::fs::write(dir.path().join("settings.json"), r#"{"appearance":"sepia","home":7}"#).unwrap();
         let odd = store.load_settings();
         assert_eq!((odd.appearance, odd.home.as_str()), (Appearance::System, ""));
+    }
+
+    #[test]
+    fn size_and_spacing_round_trip_and_odd_files_get_the_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::at(dir.path());
+        let settings =
+            Settings { text_size: TextSize::from_px(24).unwrap(), spacing: Spacing::Spacious, ..Settings::default() };
+        store.save_settings(store.ticket(), settings.clone()).unwrap();
+        assert_eq!(store.load_settings(), settings);
+        let defaults = |stored: &str| {
+            std::fs::write(dir.path().join("settings.json"), stored).unwrap();
+            let loaded = store.load_settings();
+            (loaded.text_size, loaded.spacing)
+        };
+        let expected = (TextSize::default(), Spacing::Comfortable);
+        assert_eq!(defaults(r#"{"font":"inter","appearance":"dark"}"#), expected, "a phase 3 file");
+        assert_eq!(defaults(r#"{"spacing":"tight"}"#), expected);
+        for text_size in ["999", "13", "-2", "18.5", r#""big""#, "null"] {
+            assert_eq!(defaults(&format!(r#"{{"text_size":{text_size}}}"#)), expected, "{text_size}");
+        }
+        assert_eq!(defaults(r#"{"text_size":28}"#).0.px(), 28);
     }
 
     #[test]

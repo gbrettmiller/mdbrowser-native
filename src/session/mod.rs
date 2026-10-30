@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::model::Document;
-use crate::theme::{Appearance, ReadingFont};
+use crate::theme::{Appearance, ReadingFont, Spacing, TextSize};
 use error::ErrorCode;
 use location::Location;
 use navigation::Navigation;
@@ -30,8 +30,18 @@ pub struct Settings {
     pub font: ReadingFont,
     pub images: images::ImageLoading,
     pub appearance: Appearance,
+    pub text_size: TextSize,
+    pub spacing: Spacing,
     /// A canonical address; empty means the built-in welcome page.
     pub home: String,
+}
+
+/// How the text size moves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextStep {
+    Larger,
+    Smaller,
+    Reset,
 }
 
 /// What a load found: the source, and where it was finally found (after redirects).
@@ -113,6 +123,11 @@ pub enum Event {
     ClearHistory,
     ChooseFont(ReadingFont),
     ChooseAppearance(Appearance),
+    /// Move the text size one step, or back to the default.
+    StepTextSize(TextStep),
+    ChooseSpacing(Spacing),
+    /// Put text size and spacing back to the defaults, leaving everything else.
+    ResetReaderControls,
     /// Set the home page from typed input; empty clears it.
     ChooseHome(String),
     /// Open the home page, or the welcome page when none is set.

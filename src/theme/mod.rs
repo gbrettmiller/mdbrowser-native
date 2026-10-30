@@ -1,9 +1,12 @@
 //! The reader's stylesheet. Documents carry no presentation; all of it lives here.
 
 pub mod fonts;
+pub mod scale;
 
 use iced::font::{Style, Weight};
 use iced::{Color, Font};
+
+pub use scale::{Spacing, TextSize};
 
 /// The body typeface the reader has chosen. Code is always JetBrains Mono.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]

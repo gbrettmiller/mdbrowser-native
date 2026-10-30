@@ -4,7 +4,7 @@ use super::*;
 use crate::session::address::native;
 use crate::session::images::{ImageLoading, Note, Problem, View};
 use crate::session::web::Origin;
-use crate::theme::Appearance;
+use crate::theme::{Appearance, Spacing, TextSize};
 
 fn run(events: impl IntoIterator<Item = Event>) -> (State, Vec<Effect>) {
     events.into_iter().fold((State::new(native("/home/r")), Vec::new()), |(state, _), event| step(state, event))
@@ -218,6 +218,47 @@ fn choosing_an_appearance_persists_it_and_keeps_the_other_settings() {
     let (state, effects) = run([Event::ChooseFont(ReadingFont::Inter), Event::ChooseAppearance(Appearance::Dark)]);
     let settings = Settings { font: ReadingFont::Inter, appearance: Appearance::Dark, ..Settings::default() };
     assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings)]));
+}
+
+#[test]
+fn stepping_the_text_size_persists_it_one_step_at_a_time_and_stops_at_the_ends() {
+    let (state, effects) = run([Event::StepTextSize(TextStep::Larger)]);
+    assert_eq!(state.settings.text_size.px(), 20);
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
+    let (state, _) = run([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Smaller)]);
+    assert_eq!(state.settings.text_size, TextSize::default());
+    let (state, _) = run((0..40).map(|_| Event::StepTextSize(TextStep::Smaller)));
+    assert_eq!(state.settings.text_size.px(), 12);
+    let (state, _) = run((0..40).map(|_| Event::StepTextSize(TextStep::Larger)));
+    assert_eq!(state.settings.text_size.px(), 32);
+    let (state, _) = run([Event::StepTextSize(TextStep::Larger), Event::StepTextSize(TextStep::Reset)]);
+    assert_eq!(state.settings.text_size, TextSize::default());
+}
+
+#[test]
+fn choosing_a_spacing_persists_it_and_keeps_the_other_settings() {
+    let (state, effects) = run([Event::ChooseFont(ReadingFont::Inter), Event::ChooseSpacing(Spacing::Spacious)]);
+    let settings = Settings { font: ReadingFont::Inter, spacing: Spacing::Spacious, ..Settings::default() };
+    assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings)]));
+}
+
+#[test]
+fn resetting_the_reader_controls_restores_size_and_spacing_only() {
+    let (state, effects) = run([
+        Event::ChooseFont(ReadingFont::Inter),
+        Event::ChooseAppearance(Appearance::Dark),
+        Event::ChooseHome(native("/d/start.md")),
+        Event::StepTextSize(TextStep::Larger),
+        Event::ChooseSpacing(Spacing::Compact),
+        Event::ResetReaderControls,
+    ]);
+    assert_eq!(state.settings.text_size, TextSize::default());
+    assert_eq!(state.settings.spacing, Spacing::Comfortable);
+    assert_eq!(
+        (state.settings.font, state.settings.appearance, state.settings.home.as_str()),
+        (ReadingFont::Inter, Appearance::Dark, native("/d/start.md").as_str())
+    );
+    assert_eq!(effects, vec![Effect::PersistSettings(state.settings.clone())]);
 }
 
 #[test]
