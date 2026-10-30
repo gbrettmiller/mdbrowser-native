@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-30
 **Branch**: `feat/phase-5`, from `main` after phase 4 (#13)
-**Status**: approved (2026-10-30), building
+**Status**: built (2026-10-30)
 
 ## Goal
 
@@ -29,7 +29,7 @@ Out: screen-reader support (iced 0.14 exposes no accessibility tree; recorded as
 
 ## Acceptance Criteria
 
-1. [ ] **Links.** On a page with links, Tab focuses the first link and each further Tab the next, in reading order; Shift+Tab goes back. Past the last link, Tab moves on to the next control; before the first, Shift+Tab moves to the one before. A page with no links is passed straight through.
+1. [ ] **Links.** On a page with links, Tab focuses the first link and each further Tab the next, in reading order; Shift+Tab goes back. Past the last link, Tab moves on to the next control; before the first, Shift+Tab moves to the one before. A page is itself a stop before its links: Tab from the page enters the first link, and a page with no links takes one Tab to pass through.
    - The focused link shows a ring in the link colour (at least 2 px, outside the glyphs), drawn over every line a wrapped link covers.
    - Enter follows it. Image notes with a click action are stops too, and Enter does the click.
    - Moving focus scrolls the link into view (centred if it was off screen, untouched if already visible).
@@ -103,9 +103,9 @@ Feature: Keyboard access
     Then the page is scrolled to <offset>
     Examples:
       | key        | offset |
-      | PageDown   | 492    |
-      | Space      | 492    |
-      | Down       | 29     |
+      | PageDown   | 513.6  |
+      | Space      | 513.6  |
+      | Down       | 28.8   |
       | End        | the end |
 
   Scenario: Scrolling stops at the ends

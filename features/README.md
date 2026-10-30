@@ -11,6 +11,7 @@ Gherkin specs for user-visible behaviour, ported from the predecessor `mdbrowser
 - `fallbacks.feature` — a page that isn't Markdown: its Link alternate or `.md` sibling is shown, the reader is told, and `llms.txt` is offered, never substituted
 - `frontmatter.feature` — the shared front matter: byline, description, previous and next, the enclosure line, and values that are missing, of the wrong kind or unknown
 - `remote.feature` — pages over `http(s)`: what counts as Markdown, redirects, fetch failures, links across sites, and Open in browser
+- `keyboard-access.feature` — Tab through a page's links, Enter, scrolling by key, and panels giving way in a narrow window. Driven through the pure rules the widgets use; focus on the toolbar and Settings controls is covered by unit tests and screenshots
 - `images.feature` — images from files and the web: formats, what can't be shown, the Web images setting, clicks, linked images, four loads at a time, and the cache
 
 **The web server fixture.** Each scenario gets its own std-only HTTP server on `127.0.0.1` with a random port (`tests/support/http.rs`, also used by `services::web`'s unit tests). Its routes are listed at the top of `remote.feature` and defined in `tests/acceptance/world.rs`. A step can change a route (`"/broken.md" now serves …`), hold a load until released, and count the requests the server saw. The world fails any load addressed anywhere but the test server, so scenarios never reach the internet.
