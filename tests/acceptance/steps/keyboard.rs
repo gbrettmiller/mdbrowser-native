@@ -102,6 +102,7 @@ fn focus_on_link(w: &mut Browser, number: usize) {
 }
 
 #[given("the focus is on the address bar")]
+#[when("the focus is on the address bar")]
 fn focus_on_address(w: &mut Browser) {
     w.keys.page_focused = false;
 }
@@ -132,10 +133,7 @@ fn tab(w: &mut Browser, direction: Direction) {
         Reach::Stop(i) => {
             w.keys.focus = Some(i);
             w.keys.left = None;
-            let (top, bottom) = stops[i]
-                .rects
-                .iter()
-                .fold((f32::MAX, f32::MIN), |(top, bottom), r| (top.min(r.y), bottom.max(r.y + r.height)));
+            let (top, bottom) = stops[i].span();
             if let Some(y) = viewport(w).reveal(top, bottom) {
                 w.keys.scroll = y;
             }
@@ -210,9 +208,14 @@ fn one_line_down(w: &mut Browser) {
     assert_close(w.keys.scroll, line(w));
 }
 
-#[then("the page is scrolled to the end")]
+#[then("the page is at the end")]
 fn to_the_end(w: &mut Browser) {
     assert_close(w.keys.scroll, end(w));
+}
+
+#[then("the page is scrolled two pages up from the end")]
+fn two_pages_up_from_end(w: &mut Browser) {
+    assert_close(w.keys.scroll, end(w) - 2.0 * page_step(w));
 }
 
 #[then("the page is scrolled one page up from the end")]
@@ -223,11 +226,6 @@ fn one_page_up_from_end(w: &mut Browser) {
 #[then("the page is at the top")]
 fn at_top(w: &mut Browser) {
     assert_close(w.keys.scroll, 0.0);
-}
-
-#[then("the page is at the end")]
-fn at_end(w: &mut Browser) {
-    assert_close(w.keys.scroll, end(w));
 }
 
 fn assert_close(actual: f32, expected: f32) {

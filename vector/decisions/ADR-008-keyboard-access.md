@@ -83,6 +83,12 @@ The session or app holds a "focused link" index and handles Tab itself, bypassin
 - Chrome text will not grow for a reader who raises the text size. Readers who need larger chrome have only the OS scale.
 - Screen-reader users still cannot use the app.
 
+**Known limits (found in review, 2026-10-30):**
+- Shift+Tab from a control after the page enters the page itself, not its last link (iced's focus callback doesn't say which way focus came). Tab from before the page does enter the first link.
+- A focused button that becomes disabled (the end of the text-size scale, Clear history) gives up focus; the next Tab starts again from the top.
+- PageUp and PageDown scroll the page even when focus is in a panel. Tab does scroll a panel to show the focused control.
+- Chrome geometry (panel width, minimum window, ring size) lives in `ui`, with the chrome text sizes in `theme::chrome_text`; the "sizes in theme" rule is read as covering the reader's stylesheet, not widget geometry.
+
 **Neutral:**
 - Space, arrows, Home and End scroll only while the page has focus. After typing in the address bar, Tab or Esc moves back to the page.
 - Esc in a text field first unfocuses the field (iced captures it), then a second Esc closes a panel.

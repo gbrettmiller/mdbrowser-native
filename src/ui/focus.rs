@@ -5,23 +5,29 @@
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::overlay;
 use iced::advanced::renderer::{self, Quad, Renderer as _};
-use iced::advanced::widget::operation::{Focusable, Operation};
-use iced::advanced::widget::{Tree, Widget, tree};
+use iced::advanced::widget::operation::scrollable::AbsoluteOffset;
+use iced::advanced::widget::operation::{Focusable, Operation, Outcome};
+use iced::advanced::widget::{self, Id, Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
 use iced::keyboard::{self, Key, Modifiers, key::Named};
-use iced::{Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Theme, Vector, mouse, widget};
+use iced::widget as widgets;
+use iced::{Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Task, Theme, Vector, mouse};
+
+use super::viewport::reveal_target;
 
 /// The ring sits this far clear of the control, so it shows against a button of its own colour.
 const RING_GAP: f32 = 2.0;
-const RING_WIDTH: f32 = 2.0;
-const RING_RADIUS: f32 = 4.0;
+pub(super) const RING_WIDTH: f32 = 2.0;
+pub(super) const RING_RADIUS: f32 = 4.0;
+/// How far a ring reaches outside its control: room a scrolling panel must leave, or it clips it.
+pub(super) const RING_REACH: f32 = RING_GAP + RING_WIDTH;
 
 /// A button that Tab can reach and Enter or Space presses. A disabled one (no message) is skipped.
 pub fn button<'a, Message: Clone + 'a>(
     content: impl Into<Element<'a, Message>>,
     on_press: Option<Message>,
 ) -> Element<'a, Message> {
-    pressable(widget::button(content).on_press_maybe(on_press.clone()), on_press)
+    pressable(widgets::button(content).on_press_maybe(on_press.clone()), on_press)
 }
 
 /// The same for a button built by hand (to style it): `button` must carry the same `on_press`.
@@ -30,7 +36,11 @@ pub fn pressable<'a, Message: Clone + 'a>(
     on_press: Option<Message>,
 ) -> Element<'a, Message> {
     let reachable = on_press.is_some();
-    Element::new(Stop { content: button.into(), keys: Keys { press: on_press, previous: None, next: None }, reachable })
+    Element::new(FocusStop {
+        content: button.into(),
+        keys: Keys { press: on_press, previous: None, next: None },
+        reachable,
+    })
 }
 
 /// A choice that Tab can reach and Up and Down change, stopping at the ends. `previous` and
@@ -40,13 +50,71 @@ pub fn choice<'a, Message: Clone + 'a>(
     previous: Option<Message>,
     next: Option<Message>,
 ) -> Element<'a, Message> {
-    Element::new(Stop { content: content.into(), keys: Keys { press: None, previous, next }, reachable: true })
+    Element::new(FocusStop { content: content.into(), keys: Keys { press: None, previous, next }, reachable: true })
 }
 
 /// The option before or after `current`, if there is one: where Up and Down take a choice.
 pub fn neighbour<T: Copy + PartialEq>(all: &[T], current: T, forward: bool) -> Option<T> {
     let at = all.iter().position(|&option| option == current)?;
     if forward { all.get(at + 1) } else { at.checked_sub(1).and_then(|before| all.get(before)) }.copied()
+}
+
+/// Scrolls the scrollable that holds the focused control (a panel) so the control shows.
+/// Tab moves focus but iced doesn't move the view, so this follows it. `skip` is the id of
+/// the page, which does its own scrolling.
+pub fn reveal_focused<Message: Send + 'static>(skip: &'static str) -> Task<Message> {
+    widget::operate(Find { skip: Id::new(skip), found: None }).then(|focused| widget::operate(ScrollTo { focused }))
+}
+
+/// Finds the bounds of the focused control.
+struct Find {
+    skip: Id,
+    found: Option<Rectangle>,
+}
+
+impl Operation<Rectangle> for Find {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<Rectangle>)) {
+        operate(self);
+    }
+
+    fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn Focusable) {
+        if state.is_focused() && id != Some(&self.skip) {
+            self.found = Some(bounds);
+        }
+    }
+
+    fn finish(&self) -> Outcome<Rectangle> {
+        self.found.map_or(Outcome::None, Outcome::Some)
+    }
+}
+
+/// Scrolls each scrollable that holds `focused` just far enough to show it.
+struct ScrollTo {
+    focused: Rectangle,
+}
+
+impl<T> Operation<T> for ScrollTo {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
+        operate(self);
+    }
+
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        bounds: Rectangle,
+        content_bounds: Rectangle,
+        translation: Vector,
+        state: &mut dyn widget::operation::Scrollable,
+    ) {
+        if !content_bounds.contains(self.focused.center()) {
+            return;
+        }
+        // Content space starts at the scrollable's own origin.
+        let (top, bottom) = (self.focused.y - bounds.y, self.focused.y + self.focused.height - bounds.y);
+        if let Some(y) = reveal_target(translation.y, bounds.height, top, bottom) {
+            state.scroll_to(AbsoluteOffset { x: None, y: Some(y) });
+        }
+    }
 }
 
 /// What a stop sends for each key.
@@ -71,7 +139,7 @@ impl<Message> Keys<Message> {
     }
 }
 
-struct Stop<'a, Message> {
+struct FocusStop<'a, Message> {
     content: Element<'a, Message>,
     keys: Keys<Message>,
     reachable: bool,
@@ -96,7 +164,7 @@ impl Focusable for State {
     }
 }
 
-impl<Message: Clone> Widget<Message, Theme, Renderer> for Stop<'_, Message> {
+impl<Message: Clone> Widget<Message, Theme, Renderer> for FocusStop<'_, Message> {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
     }
@@ -197,7 +265,7 @@ impl<Message: Clone> Widget<Message, Theme, Renderer> for Stop<'_, Message> {
         if tree.state.downcast_ref::<State>().focused {
             let bounds = layout.bounds();
             // The quad's border is drawn inside it, so the quad reaches out gap plus width.
-            let reach = RING_GAP + RING_WIDTH;
+            let reach = RING_REACH;
             let ring = Rectangle {
                 x: bounds.x - reach,
                 y: bounds.y - reach,
@@ -221,8 +289,8 @@ impl<Message: Clone> Widget<Message, Theme, Renderer> for Stop<'_, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'a> From<Stop<'a, Message>> for Element<'a, Message> {
-    fn from(stop: Stop<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'a> From<FocusStop<'a, Message>> for Element<'a, Message> {
+    fn from(stop: FocusStop<'a, Message>) -> Self {
         Element::new(stop)
     }
 }

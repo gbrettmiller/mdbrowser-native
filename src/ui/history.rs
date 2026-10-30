@@ -4,7 +4,7 @@ use iced::widget::{button, column, container, scrollable, text};
 use iced::{Element, Fill, Length};
 
 use super::app::Message;
-use super::focus::pressable;
+use super::focus::{RING_REACH, pressable};
 use super::panels::PANEL_WIDTH;
 use crate::content;
 use crate::session::{Event, State};
@@ -32,7 +32,12 @@ pub fn panel(state: &State, palette: theme::Palette) -> Element<'_, Message> {
     let clear =
         pressable(button(content::CLEAR_HISTORY).style(button::secondary).on_press_maybe(clearing.clone()), clearing);
     container(
-        column![text(content::HISTORY).size(chrome_text::HEADING), clear, scrollable(entries).height(Fill)].spacing(12),
+        column![
+            text(content::HISTORY).size(chrome_text::HEADING),
+            clear,
+            scrollable(container(entries).padding(RING_REACH)).height(Fill)
+        ]
+        .spacing(12),
     )
     .width(Length::Fixed(PANEL_WIDTH))
     .height(Fill)

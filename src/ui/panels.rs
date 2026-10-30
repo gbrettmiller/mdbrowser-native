@@ -33,6 +33,18 @@ impl Open {
     }
 }
 
+impl Open {
+    /// The panels after Esc: Settings closes first, then History; none open stays none.
+    pub const fn after_escape(self) -> Self {
+        if self.settings { Self { settings: false, ..self } } else { Self { history: false, ..self } }
+    }
+
+    /// Whether `after` has closed a panel that this had open, so focus inside it was lost.
+    pub const fn lost_a_panel(self, after: Self) -> bool {
+        (self.history && !after.history) || (self.settings && !after.settings)
+    }
+}
+
 const fn other(panel: Panel) -> Panel {
     match panel {
         Panel::History => Panel::Settings,
@@ -92,6 +104,26 @@ mod tests {
     fn a_single_panel_is_allowed_in_the_smallest_window() {
         let open = toggled(Open::default(), Panel::Settings, 480.0);
         assert!(open.settings);
+    }
+
+    #[test]
+    fn escape_closes_settings_first_then_history_and_leaves_none_alone() {
+        let both = Open { history: true, settings: true };
+        assert_eq!(both.after_escape(), Open { history: true, settings: false });
+        assert_eq!(both.after_escape().after_escape(), Open::default());
+        assert_eq!(Open { history: false, settings: true }.after_escape(), Open::default());
+        assert_eq!(Open::default().after_escape(), Open::default());
+    }
+
+    #[test]
+    fn a_panel_is_lost_when_one_that_was_open_is_closed() {
+        let both = Open { history: true, settings: true };
+        let history = Open { history: true, settings: false };
+        assert!(both.lost_a_panel(history));
+        assert!(history.lost_a_panel(Open::default()));
+        assert!(history.lost_a_panel(Open { history: false, settings: true }), "swapped: History went");
+        assert!(!history.lost_a_panel(both), "opening one loses none");
+        assert!(!Open::default().lost_a_panel(history));
     }
 
     #[test]

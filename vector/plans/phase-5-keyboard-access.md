@@ -29,18 +29,18 @@ Out: screen-reader support (iced 0.14 exposes no accessibility tree; recorded as
 
 ## Acceptance Criteria
 
-1. [ ] **Links.** On a page with links, Tab focuses the first link and each further Tab the next, in reading order; Shift+Tab goes back. Past the last link, Tab moves on to the next control; before the first, Shift+Tab moves to the one before. A page is itself a stop before its links: Tab from the page enters the first link, and a page with no links takes one Tab to pass through.
+1. [x] **Links.** On a page with links, Tab focuses the first link and each further Tab the next, in reading order; Shift+Tab goes back. Past the last link, Tab moves on to the next control; before the first, Shift+Tab moves to the one before. A page is itself a stop before its links: Tab from the page enters the first link, and a page with no links takes one Tab to pass through.
    - The focused link shows a ring in the link colour (at least 2 px, outside the glyphs), drawn over every line a wrapped link covers.
    - Enter follows it. Image notes with a click action are stops too, and Enter does the click.
    - Moving focus scrolls the link into view (centred if it was off screen, untouched if already visible).
-2. [ ] **Opening a page focuses it**, so the scroll keys work straight away. Typing in a text field (address, home, colours) never scrolls the page.
-3. [ ] **Scrolling.** PageDown and Space move down by the viewport minus a three-line overlap; PageUp and Shift+Space up; Down and Up by one line; Home and End jump to the ends. Scrolling stops at both ends. PageUp and PageDown work wherever focus is; the other keys only when the page has focus.
-4. [ ] **Toolbar and panels.** Tab reaches Back, Forward, Reload, Home, the address bar, History and Settings in that order, then the page. Disabled buttons are skipped. Enter and Space press a button. In Settings, Tab reaches every control; on a choice (font, images, appearance, spacing), Up and Down change it (one step each, stopping at the ends), and the change applies and saves like a click. Esc closes an open panel and returns focus to the page.
-5. [ ] **Visible focus everywhere.** Every focus stop shows the same ring, derived from the palette, and it meets 3:1 against the page for light, dark and every custom set that passes `check`. A unit test checks it.
-6. [ ] **Chrome text.** The decision (below) is recorded in DESIGN.md and ADR-008. All chrome text sizes are `theme` tokens; none is below 13 px.
-7. [ ] **Narrow windows.** The window cannot be made smaller than 480 x 360. When History and Settings are both open and the page column would fall under 320 px, opening one closes the other. Resizing does not close anything.
-8. [ ] **Nothing else moves.** Shortcuts from earlier phases still work. Golden snapshots do not change (focus is drawn by the widget, not laid out). Colours stay in `theme`, text in `content`.
-9. [ ] **CI and screenshots.** Test, build, clippy and fmt are green on all four platform jobs. Screenshots through `scripts/shoot.sh` (focus ring on a link in light, dark and a custom palette; Settings with focus on a control; narrowest window with a panel open) are read and checked.
+2. [x] **Opening a page focuses it**, so the scroll keys work straight away. Typing in a text field (address, home, colours) never scrolls the page.
+3. [x] **Scrolling.** PageDown and Space move down by the viewport minus a three-line overlap; PageUp and Shift+Space up; Down and Up by one line; Home and End jump to the ends. Scrolling stops at both ends. PageUp and PageDown work wherever focus is; the other keys only when the page has focus.
+4. [x] **Toolbar and panels.** Tab reaches Back, Forward, Reload, Home, the address bar, History and Settings in that order, then the page. Disabled buttons are skipped. Enter and Space press a button. In Settings, Tab reaches every control; on a choice (font, images, appearance, spacing), Up and Down change it (one step each, stopping at the ends), and the change applies and saves like a click. Esc closes an open panel and returns focus to the page.
+5. [x] **Visible focus everywhere.** Every focus stop shows the same ring, derived from the palette, and it meets 3:1 against the page for light, dark and every custom set that passes `check`. A unit test checks it.
+6. [x] **Chrome text.** The decision (below) is recorded in DESIGN.md and ADR-008. All chrome text sizes are `theme` tokens; none is below 13 px.
+7. [x] **Narrow windows.** The window cannot be made smaller than 480 x 360. When History and Settings are both open and the page column would fall under 320 px, opening one closes the other. Resizing does not close anything.
+8. [x] **Nothing else moves.** Shortcuts from earlier phases still work. Golden snapshots do not change (focus is drawn by the widget, not laid out). Colours stay in `theme`, text in `content`.
+9. [x] **CI and screenshots.** Test, build, clippy and fmt are green on all four platform jobs. Screenshots through `scripts/shoot.sh` (focus ring on a link in light, dark and a custom palette; Settings with focus on a control; narrowest window with a panel open) are read and checked.
 
 ## User-Facing Behavior
 
@@ -175,13 +175,13 @@ Feature: Keyboard access
 - **A `Focusable` wrapper for the chrome.** iced's `button` and `pick_list` cannot take focus, so `ui/focus.rs` wraps an element, makes it a stop, draws the ring and turns Enter and Space into its message. For the four choices in Settings it also turns Up and Down into "previous / next option" events, so no pop-up menu is needed from the keyboard. The pick lists stay for the mouse.
 - **The ring is the link colour**, 2 px, outside the shape, so it needs no new colour token. For custom palettes `check` already guarantees link on page at 4.5:1, which is above the 3:1 non-text minimum.
 - **Opening a page focuses it** (`operation::focus` on the document id once a new page is ready), as browsers do. Scroll keys other than PageUp and PageDown act only when the page has focus, because text fields need Space, the arrows, Home and End.
-- **Chrome text does not follow the reader's text size** (recommended), but its floor rises to 13 px and the sizes become `theme` tokens. The reader controls are for the *document*; the chrome is a fixed 300 px panel and a one-line toolbar that would break at 32 px. The reader who needs larger chrome can use the OS scale, which iced honours. To be confirmed (below).
-- **Narrow windows:** minimum 480 x 360. The page column is at least 320 px. A pure `panels_for(width, open)` closes the older panel when both don't fit, so a resize never closes a panel the reader opened.
+- **Chrome text does not follow the reader's text size** (recommended), but its floor rises to 13 px and the sizes become `theme` tokens. The reader controls are for the *document*; the chrome is a fixed 300 px panel and a one-line toolbar that would break at 32 px. The reader who needs larger chrome can use the OS scale, which iced honours. Confirmed 2026-10-30.
+- **Narrow windows:** minimum 480 x 360. The page column is at least 320 px. A pure `panels::toggled(open, panel, width)` (planned as `panels_for`) closes the older panel when both don't fit, so a resize never closes a panel the reader opened.
 - **One ADR** (ADR-008: keyboard access, the focus model, the chrome-size decision and the screen-reader limit), written through `invest-adr` in step 1.
 
-## Needs your call before building
+## Decisions taken (2026-10-30: 1 fixed, 2 arrow keys, 3 PageUp and PageDown anywhere)
 
-1. **Chrome text: fixed (recommended, above) or scaling** with the reader's size. Scaling means a panel that grows with the size, a toolbar that wraps, and a new set of golden screenshots.
+1. **Chrome text: fixed (decided: fixed; ADR-008) or scaling** with the reader's size. Scaling means a panel that grows with the size, a toolbar that wraps, and a new set of golden screenshots.
 2. **Arrow keys on choices** (above) versus opening the pick list's menu from the keyboard. iced 0.14 gives no way to open a pick list from code, so a menu route would mean replacing the pick lists with our own widget.
 3. **Scroll keys when the page lacks focus.** Above: only PageUp and PageDown. The alternative is to scroll on every bare key unless a text field is focused, which needs an async focus query before each key.
 
@@ -293,15 +293,15 @@ Each step is test first, red then green, with the order test → build → clipp
 
 ## Pre-PR Quality Gate
 
-- [ ] `cargo test`
-- [ ] `cargo build`
-- [ ] `cargo clippy --all-targets -- -D warnings`
-- [ ] `cargo fmt --check`
-- [ ] Golden snapshots unchanged
-- [ ] Screenshots read (AC 9)
-- [ ] `/code-review` passes, `a11y-review` included
-- [ ] `/impeccable audit` re-run; no P1 left
-- [ ] README, DESIGN.md, ARCHITECTURE.md, VECTOR.md and `features/README.md` updated
+- [x] `cargo test`
+- [x] `cargo build`
+- [x] `cargo clippy --all-targets -- -D warnings`
+- [x] `cargo fmt --check`
+- [x] Golden snapshots unchanged
+- [x] Screenshots read (AC 9)
+- [x] `/code-review` passes, `a11y-review` included
+- [x] `/impeccable audit` re-run; no P1 left
+- [x] README, DESIGN.md, ARCHITECTURE.md, VECTOR.md and `features/README.md` updated
 
 ## Risks
 

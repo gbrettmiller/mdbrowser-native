@@ -7,7 +7,7 @@ use iced::widget::{column, container, pick_list, row, scrollable, text, text_inp
 use iced::{Element, Length};
 
 use super::app::Message;
-use super::focus::{self, button, neighbour};
+use super::focus::{self, RING_REACH, button, neighbour};
 use super::panels::PANEL_WIDTH;
 use crate::content;
 use crate::session::images::ImageLoading;
@@ -151,7 +151,7 @@ pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDraft
     ))
     .push(home)
     .spacing(16)
-    .padding(iced::Padding::ZERO.right(SCROLLBAR_ROOM));
+    .padding(iced::Padding { right: SCROLLBAR_ROOM, ..iced::Padding::new(RING_REACH) });
     // The panel is taller than a small window once the colour fields show.
     container(scrollable(fields)).width(Length::Fixed(PANEL_WIDTH)).height(Length::Fill).padding(12).into()
 }

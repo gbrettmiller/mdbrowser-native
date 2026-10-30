@@ -73,21 +73,23 @@ Feature: Keyboard access
     And I am viewing "long.md"
     And the window is 600 pixels tall
     When I press "<key>"
-    Then the page is scrolled <by>
+    Then the page is <by>
     Examples:
       | key      | by                 |
-      | PageDown | one page down      |
-      | Space    | one page down      |
-      | Down     | one line down      |
-      | End      | to the end         |
+      | PageDown | scrolled one page down |
+      | Space    | scrolled one page down |
+      | Down     | scrolled one line down |
+      | End      | at the end             |
 
-  Scenario: Shift+Space and PageUp scroll back up
+  Scenario: PageUp, Shift+Space and Home scroll back up
     Given a document "long.md" that is 80 paragraphs long
     And I am viewing "long.md"
     And the window is 600 pixels tall
     When I press "End"
     And I press "PageUp"
     Then the page is scrolled one page up from the end
+    When I press "Shift+Space"
+    Then the page is scrolled two pages up from the end
     When I press "Home"
     Then the page is at the top
 
@@ -105,9 +107,10 @@ Feature: Keyboard access
     Given a document "long.md" that is 80 paragraphs long
     And I am viewing "long.md"
     And the window is 600 pixels tall
+    When I press "PageDown"
     And the focus is on the address bar
-    When I press "Space"
-    Then the page is at the top
+    And I press "Space"
+    Then the page is scrolled one page down
 
   Scenario: PageDown scrolls the page wherever the focus is
     Given a document "long.md" that is 80 paragraphs long

@@ -122,16 +122,13 @@ impl Viewport {
     /// Where to scroll so the page-space span `top` to `bottom` can be seen: `None` if it already
     /// is, the centre of the view if it was off screen, and its top if it is taller than the view.
     pub fn reveal(&mut self, top: f32, bottom: f32) -> Option<f32> {
-        let (scroll, height) = (self.scroll_y.get(), self.height.get());
-        let target = if bottom - top > height - 2.0 * REVEAL_MARGIN {
-            top - REVEAL_MARGIN
-        } else if top >= scroll + REVEAL_MARGIN && bottom <= scroll + height - REVEAL_MARGIN {
-            return None;
-        } else {
-            (top + bottom) / 2.0 - height / 2.0
-        };
-        let target = target.max(0.0);
-        if (target - scroll).abs() < 0.5 {
+        let target = reveal_target(self.scroll_y.get(), self.height.get(), top, bottom)?;
+        self.move_to(target)
+    }
+
+    /// Scrolls to `target` unless the view is already there (within half a pixel).
+    fn move_to(&self, target: f32) -> Option<f32> {
+        if (target - self.scroll_y.get()).abs() < 0.5 {
             return None;
         }
         self.scroll_y.set(target);
@@ -151,12 +148,7 @@ impl Viewport {
             Scroll::Top => 0.0,
             Scroll::Bottom => f32::INFINITY,
         };
-        let target = target.clamp(0.0, (content - height).max(0.0));
-        if (target - scroll).abs() < 0.5 {
-            return None;
-        }
-        self.scroll_y.set(target);
-        Some(target)
+        self.move_to(target.clamp(0.0, (content - height).max(0.0)))
     }
 
     pub fn scrolled(&mut self, y: f32) {
@@ -188,12 +180,22 @@ impl Viewport {
             }
             None => anchor::keep(before, after, scroll),
         };
-        if (target - scroll).abs() < 0.5 {
-            return None;
-        }
-        self.scroll_y.set(target);
-        Some(target)
+        self.move_to(target)
     }
+}
+
+/// Where a view `height` tall, scrolled to `scroll`, should go to show the span `top` to
+/// `bottom` (the same space as `scroll`): `None` if it is already in view with a margin, the
+/// span's top if it is taller than the view, else the view centred on it. Never above 0.
+pub fn reveal_target(scroll: f32, height: f32, top: f32, bottom: f32) -> Option<f32> {
+    let target = if bottom - top > height - 2.0 * REVEAL_MARGIN {
+        top - REVEAL_MARGIN
+    } else if top >= scroll + REVEAL_MARGIN && bottom <= scroll + height - REVEAL_MARGIN {
+        return None;
+    } else {
+        (top + bottom) / 2.0 - height / 2.0
+    };
+    Some(target.max(0.0))
 }
 
 #[cfg(test)]
@@ -259,14 +261,24 @@ mod tests {
         assert_eq!(viewport.key_scroll(Scroll::PageDown, 5000.0, LINE), Some(LINE));
     }
 
+    /// A page whose "later" heading is held, then the view moved by `by` and followed: the
+    /// anchor must be let go, so images arriving don't pull the view back to the heading.
+    fn assert_anchor_let_go(by: impl FnOnce(&mut Viewport) -> Option<f32>) {
+        let (before, after) = (page(10), page(300));
+        let gutter = reading(Look::default()).gutter;
+        let mut viewport = Viewport::new(600.0, 600.0);
+        viewport.hold_anchor("later".into(), before.scroll_offset_for("later", gutter).unwrap());
+        let target = by(&mut viewport).unwrap();
+        viewport.scrolled(target);
+        let pulled = after.scroll_offset_for("later", gutter);
+        let arrived = viewport.images_arrived(&before, &after, gutter, 1);
+        assert_ne!(arrived, pulled, "not pulled back to the anchor");
+        assert_eq!(arrived, Some(anchor::keep(&before, &after, target)).filter(|y| (y - target).abs() >= 0.5));
+    }
+
     #[test]
     fn a_key_scroll_lets_go_of_a_held_anchor_once_the_view_has_moved() {
-        let mut viewport = scrolled_to(0.0);
-        viewport.hold_anchor("x".into(), 0.0);
-        let target = viewport.key_scroll(Scroll::PageDown, 5000.0, LINE).unwrap();
-        viewport.scrolled(target);
-        let (before, after) = (page(10), page(300));
-        assert_ne!(viewport.images_arrived(&before, &after, 0.0, 1), Some(0.0));
+        assert_anchor_let_go(|viewport| viewport.key_scroll(Scroll::PageDown, 5000.0, LINE));
     }
 
     #[test]
@@ -286,9 +298,26 @@ mod tests {
     }
 
     #[test]
-    fn a_stop_hard_against_an_edge_is_moved_in() {
-        assert!(scrolled_to(100.0).reveal(105.0, 125.0).is_some(), "too close to the top");
-        assert!(scrolled_to(100.0).reveal(670.0, 695.0).is_some(), "too close to the bottom");
+    fn a_stop_hard_against_an_edge_is_moved_in_to_the_centre() {
+        assert_eq!(scrolled_to(100.0).reveal(105.0, 125.0), Some(0.0), "too close to the top");
+        assert_eq!(scrolled_to(100.0).reveal(670.0, 695.0), Some(382.5), "too close to the bottom");
+    }
+
+    #[test]
+    fn the_margin_is_where_a_stop_starts_to_count_as_hard_against_the_edge() {
+        let at_top = 100.0 + REVEAL_MARGIN;
+        assert_eq!(scrolled_to(100.0).reveal(at_top, at_top + 20.0), None, "exactly the margin from the top");
+        assert!(scrolled_to(100.0).reveal(at_top - 1.0, at_top + 19.0).is_some());
+        let bottom = 100.0 + 600.0 - REVEAL_MARGIN;
+        assert_eq!(scrolled_to(100.0).reveal(bottom - 20.0, bottom), None, "exactly the margin from the bottom");
+        assert!(scrolled_to(100.0).reveal(bottom - 19.0, bottom + 1.0).is_some());
+    }
+
+    #[test]
+    fn a_stop_just_short_of_the_view_height_is_centred_not_top_aligned() {
+        let fits = 600.0 - 2.0 * REVEAL_MARGIN;
+        assert_eq!(reveal_target(0.0, 600.0, 1000.0, 1000.0 + fits), Some(1000.0 + fits / 2.0 - 300.0));
+        assert_eq!(reveal_target(0.0, 600.0, 1000.0, 1000.0 + fits + 1.0), Some(1000.0 - REVEAL_MARGIN));
     }
 
     #[test]
@@ -300,12 +329,7 @@ mod tests {
 
     #[test]
     fn a_reveal_lets_go_of_a_held_anchor_when_the_view_follows_it() {
-        let mut viewport = scrolled_to(0.0);
-        viewport.hold_anchor("x".into(), 0.0);
-        let target = viewport.reveal(1000.0, 1020.0).unwrap();
-        viewport.scrolled(target);
-        let (before, after) = (page(10), page(300));
-        assert_ne!(viewport.images_arrived(&before, &after, 0.0, 1), Some(0.0), "not pulled back to the anchor");
+        assert_anchor_let_go(|viewport| viewport.reveal(2000.0, 2020.0));
     }
 
     #[test]

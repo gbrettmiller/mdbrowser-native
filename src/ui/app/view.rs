@@ -1,5 +1,5 @@
-//! The window's contents: toolbar, notices, the page or a message, the History
-//! panel, and the status line.
+//! The window's contents: toolbar, notices, the page or a message, the side
+//! panels, and the status line.
 
 use std::sync::Arc;
 

@@ -21,6 +21,15 @@ pub struct Stop {
     pub rects: Vec<Rectangle>,
 }
 
+impl Stop {
+    /// The top and bottom of the page that the stop covers, over every line it wraps onto.
+    pub fn span(&self) -> (f32, f32) {
+        self.rects
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(top, bottom), rect| (top.min(rect.y), bottom.max(rect.y + rect.height)))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Forward,
@@ -193,6 +202,27 @@ mod tests {
     fn a_page_without_stops_is_passed_straight_through() {
         assert_eq!(reach(0, None, Direction::Forward), Reach::Leave);
         assert_eq!(reach(0, None, Direction::Back), Reach::Leave);
+    }
+
+    #[test]
+    fn a_stop_spans_every_line_it_wraps_onto() {
+        let p = built(vec![fragment(Some("a.md"), None, 20.0), fragment(Some("a.md"), None, 60.0)]);
+        assert_eq!(p.stops()[0].span(), (20.0, 80.0));
+    }
+
+    #[test]
+    fn two_different_links_with_no_text_between_are_two_stops() {
+        let p = built(vec![fragment(Some("a.md"), None, 0.0), fragment(Some("b.md"), None, 0.0)]);
+        assert_eq!(targets(&p), [link("a.md"), link("b.md")]);
+    }
+
+    #[test]
+    fn reach_holds_at_its_edges() {
+        use Direction::{Back, Forward};
+        assert_eq!(reach(0, Some(0), Back), Reach::Leave);
+        assert_eq!(reach(0, Some(3), Back), Reach::Leave);
+        assert_eq!(reach(2, Some(2), Back), Reach::Stop(1), "one past the end steps back onto the last");
+        assert_eq!(reach(2, Some(usize::MAX), Forward), Reach::Leave, "no overflow");
     }
 
     #[test]

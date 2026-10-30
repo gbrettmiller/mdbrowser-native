@@ -77,11 +77,12 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         Key::Character("l") if primary => Command::FocusAddress,
         Key::Character("h") if primary => Command::ToggleHistory,
         Key::Character(",") if primary => Command::ToggleSettings,
-        // The previous and next post of a blog. Not bare keys: those type into the address bar.
-        // `=` and `+` are one key; Shift makes the second on most layouts. Neither is a bare key.
+        // `=` and `+` are one key; Shift makes the second on most layouts. Not bare keys: those
+        // type into the address bar.
         Key::Character("=" | "+") if primary => Command::Session(Event::StepTextSize(TextStep::Larger)),
         Key::Character("-") if primary => Command::Session(Event::StepTextSize(TextStep::Smaller)),
         Key::Character("0") if primary => Command::Session(Event::StepTextSize(TextStep::Reset)),
+        // The previous and next post of a blog.
         Key::Character("[") if primary => Command::Session(Event::Neighbour(Neighbour::Previous)),
         Key::Character("]") if primary => Command::Session(Event::Neighbour(Neighbour::Next)),
         Key::Named(Named::Home) if alt => Command::Session(Event::Home),
@@ -159,6 +160,24 @@ mod tests {
             assert_eq!(scroll(named(key), modifiers, true), Some(expected), "{key:?}");
             assert_eq!(scroll(named(key), modifiers, false), None, "{key:?} types into a field");
             assert_eq!(command(named(key), modifiers), None, "{key:?} is not an app shortcut");
+        }
+    }
+
+    #[test]
+    fn shift_turns_none_of_the_other_scroll_keys_into_a_scroll() {
+        for key in [Named::PageUp, Named::PageDown, Named::ArrowUp, Named::ArrowDown, Named::Home, Named::End] {
+            assert_eq!(scroll(named(key), Modifiers::SHIFT, true), None, "{key:?}");
+        }
+    }
+
+    #[test]
+    fn every_scroll_key_ignores_ctrl_and_alt() {
+        let keys =
+            [Named::PageUp, Named::PageDown, Named::Space, Named::ArrowUp, Named::ArrowDown, Named::Home, Named::End];
+        for key in keys {
+            for modifiers in [Modifiers::CTRL, Modifiers::ALT] {
+                assert_eq!(scroll(named(key), modifiers, true), None, "{key:?} with {modifiers:?}");
+            }
         }
     }
 

@@ -13,13 +13,10 @@ use iced::advanced::{Clipboard, Shell, clipboard};
 use iced::keyboard::{self, Key, key::Named};
 use iced::{Border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 
+use super::focus::{RING_RADIUS, RING_WIDTH};
 use super::keys::{self, Scroll};
 use crate::layout::{Caret, Direction, Page, Reach, Stop, Target, reach};
 use crate::theme;
-
-/// How far the focus ring sits outside a link, and how thick it is.
-const RING_GAP: f32 = 2.0;
-const RING_WIDTH: f32 = 2.0;
 
 pub struct Document<'a, Message> {
     id: Option<Id>,
@@ -119,6 +116,23 @@ impl State {
         }
     }
 
+    /// A mouse press: on the page it takes the keyboard (the page itself, no link yet); anywhere
+    /// else the keyboard belongs to whatever was pressed.
+    fn clicked(&mut self, on_page: bool) {
+        self.focused = on_page;
+        self.stop = None;
+    }
+
+    /// The top and bottom of the focused stop, all its lines, for scrolling it into view.
+    fn reveal(&self) -> Option<(f32, f32)> {
+        self.stop.and_then(|stop| self.stops.get(stop)).map(Stop::span)
+    }
+
+    /// Whether the page itself wears the ring: it has the keyboard but no link is chosen.
+    fn ring_page(&self) -> bool {
+        self.focused && self.stop.is_none()
+    }
+
     /// The rectangles to ring: those of the focused stop.
     fn ring(&self) -> &[Rectangle] {
         self.stop.and_then(|stop| self.stops.get(stop)).map_or(&[], |stop| &stop.rects)
@@ -142,7 +156,7 @@ impl Focusable for State {
 }
 
 /// Items whose page-space bounds intersect the viewport (given in page space).
-pub fn visible<'p, T>(
+fn visible<'p, T>(
     items: &'p [T],
     bounds: impl Fn(&T) -> Rectangle + 'p,
     viewport: Rectangle,
@@ -273,15 +287,21 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
             }
         }
         if state.focused && state.page == page_id(&self.page) {
-            let border = Border { color: self.theme.ring(), width: RING_WIDTH, radius: RING_GAP.into() };
+            // The ring sits against the text, so it is the width and no more outside the link.
+            let border = Border { color: self.theme.ring(), width: RING_WIDTH, radius: RING_RADIUS.into() };
             for rect in visible(state.ring(), |rect| *rect, in_page) {
                 let outer = Rectangle {
-                    x: rect.x - RING_GAP,
-                    y: rect.y - RING_GAP,
-                    width: rect.width + 2.0 * RING_GAP,
-                    height: rect.height + 2.0 * RING_GAP,
+                    x: rect.x - RING_WIDTH,
+                    y: rect.y - RING_WIDTH,
+                    width: rect.width + 2.0 * RING_WIDTH,
+                    height: rect.height + 2.0 * RING_WIDTH,
                 };
                 renderer.fill_quad(Quad { bounds: outer + offset, border, ..Quad::default() }, Color::TRANSPARENT);
+            }
+            if state.ring_page() {
+                // Inside the visible part of the page, so it can't scroll out of sight.
+                let border = Border { color: self.theme.ring(), width: RING_WIDTH, radius: 0.0.into() };
+                renderer.fill_quad(Quad { bounds: view, border, ..Quad::default() }, Color::TRANSPARENT);
             }
         }
         for (bounds, handle) in visible(&self.pictures, |(bounds, _)| *bounds, in_page) {
@@ -313,6 +333,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
             *state = State::on(&self.page, self.document, Some(state));
         }
         let bounds = layout.bounds();
+        if let Event::Mouse(mouse::Event::ButtonPressed(_)) = event {
+            state.clicked(cursor.position_in(bounds).is_some());
+        }
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 if let Some(point) = cursor.position_in(bounds) {
@@ -328,8 +351,8 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
             {
                 let direction = if modifiers.shift() { Direction::Back } else { Direction::Forward };
                 if state.tab(direction) {
-                    if let Some(line) = state.ring().first() {
-                        shell.publish((self.on.reveal)(line.y, line.y + line.height));
+                    if let Some((top, bottom)) = state.reveal() {
+                        shell.publish((self.on.reveal)(top, bottom));
                     }
                     shell.request_redraw();
                     shell.capture_event();
@@ -346,9 +369,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
                 shell.capture_event();
             }
             Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
-                if state.focused
-                    && !shell.is_event_captured()
-                    && keys::scroll(key.as_ref(), *modifiers, true).is_some() =>
+                if state.focused && !shell.is_event_captured() =>
             {
                 if let Some(scroll) = keys::scroll(key.as_ref(), *modifiers, true) {
                     shell.publish((self.on.scroll)(scroll));
@@ -447,6 +468,43 @@ mod tests {
         assert!(state.ring().len() > 2, "every line of the wrapped link");
         state.tab(Direction::Forward);
         assert_eq!(state.ring().len(), 1);
+    }
+
+    #[test]
+    fn a_click_on_the_page_focuses_it_and_a_click_elsewhere_gives_focus_up() {
+        let p = page("[a](a.md)");
+        let mut state = State::on(&p, 1, None);
+        state.clicked(true);
+        assert!(state.focused && state.stop.is_none(), "the page itself, no link yet");
+        state.tab(Direction::Forward);
+        state.clicked(true);
+        assert_eq!(state.stop, None, "a click on the page starts over from the page");
+        state.tab(Direction::Forward);
+        state.clicked(false);
+        assert!(!state.focused && state.stop.is_none(), "another widget has the keyboard now");
+    }
+
+    #[test]
+    fn a_stop_that_wraps_is_revealed_over_all_its_lines() {
+        let source = format!("[{}](long.md)", "word ".repeat(40));
+        let mut state = focused(&page(&source));
+        state.tab(Direction::Forward);
+        let (top, bottom) = state.reveal().expect("a stop is focused");
+        let rects = state.ring();
+        assert_eq!(top, rects.first().unwrap().y);
+        assert_eq!(bottom, rects.last().map(|r| r.y + r.height).unwrap());
+        assert!(rects.len() > 1);
+    }
+
+    #[test]
+    fn the_page_shows_its_own_ring_when_focused_with_no_stop() {
+        let p = page("[a](a.md)");
+        let mut state = focused(&p);
+        assert!(state.ring_page());
+        state.tab(Direction::Forward);
+        assert!(!state.ring_page(), "the link has the ring");
+        state.unfocus();
+        assert!(!state.ring_page());
     }
 
     #[test]
