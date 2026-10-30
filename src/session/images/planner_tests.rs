@@ -9,6 +9,43 @@ use super::*;
 use crate::session::images::limits::MAX_CONCURRENT_LOADS;
 use crate::session::images::{ImageLoading, Note, Problem};
 
+/// Checks of the planner's own state, which only tests need.
+impl Images {
+    /// Bytes of every shown picture; only eviction makes it fall.
+    const fn shown_bytes(&self) -> u64 {
+        self.shown_bytes
+    }
+
+    /// Checks the planner's own consistency, for tests: the queue holds exactly the
+    /// queued entries, waiting/off/queued entries belong to the current page, the
+    /// running totals match the table, the cache tracks only entries, and a
+    /// non-empty queue means every load slot is in use.
+    fn check(&self) {
+        let queued: HashSet<&Location> = self
+            .table
+            .iter()
+            .filter(|(_, entry)| matches!(entry, Entry::Queued))
+            .map(|(location, _)| location)
+            .collect();
+        assert_eq!(queued, self.queue.iter().collect(), "queue and queued entries agree");
+        assert_eq!(queued.len(), self.queue.len(), "nothing is queued twice");
+        for (location, entry) in &self.table {
+            if matches!(entry, Entry::Queued | Entry::AwaitingClick | Entry::Off) {
+                assert!(self.pinned.contains(location), "{location:?} is {entry:?} but not on the page");
+            }
+        }
+        let loading = self.table.values().filter(|entry| matches!(entry, Entry::Loading)).count();
+        assert_eq!(self.loading, loading, "the running count matches the table");
+        let shown: u64 = self.shown().map(|(_, picture)| picture.pixel_bytes()).sum();
+        assert_eq!(self.shown_bytes, shown, "the shown total matches the table");
+        assert!(
+            self.cache.locations().all(|location| self.table.contains_key(location)),
+            "the cache tracks only entries"
+        );
+        assert!(self.queue.is_empty() || self.loading == MAX_CONCURRENT_LOADS, "a queue never waits for a free slot");
+    }
+}
+
 fn page() -> Location {
     Location::web(Url::parse("https://x.org/post.md").unwrap())
 }
