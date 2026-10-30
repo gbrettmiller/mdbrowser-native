@@ -46,7 +46,7 @@ fn images_as_placeholders() {
 fn every_corpus_image_becomes_a_block_and_lays_out() {
     use crate::layout::{ImageNote, ImageView, layout};
     use crate::model::parse;
-    use crate::theme::{Palette, reading};
+    use crate::theme::{Look, reading};
     let mut files = vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus")];
     let mut checked = 0;
     while let Some(path) = files.pop() {
@@ -65,10 +65,10 @@ fn every_corpus_image_becomes_a_block_and_lays_out() {
             note: Some(ImageNote { text: "Loading image…".into(), clickable: false }),
         };
         for view in [&shown as &dyn Fn(&str) -> ImageView, &placeholder] {
-            let page = layout(&document.blocks, &reading(ReadingFont::Literata, Palette::Light), WIDTH, view);
+            let page = layout(&document.blocks, &reading(Look::default()), WIDTH, view);
             assert!(page.height > 0.0, "{path:?}");
         }
-        let page = layout(&document.blocks, &reading(ReadingFont::Literata, Palette::Light), WIDTH, &shown);
+        let page = layout(&document.blocks, &reading(Look::default()), WIDTH, &shown);
         assert_eq!(page.images.len(), images, "{path:?}");
         checked += 1;
     }
@@ -106,10 +106,10 @@ fn spec_timing() {
 fn framed_page(source: &str) -> Page {
     use crate::layout::{layout, no_images};
     use crate::model::{Labels, assemble, parse};
-    use crate::theme::{Palette, reading};
+    use crate::theme::{Look, reading};
     let labels = Labels { listen: "Listen:", previous: "← Previous", next: "Next →" };
     let document = parse(source);
-    layout(&assemble(&document, &labels), &reading(ReadingFont::Literata, Palette::Light), WIDTH, &no_images)
+    layout(&assemble(&document, &labels), &reading(Look::default()), WIDTH, &no_images)
 }
 
 /// Example 1 of the markdownWeb examples: a byline under no heading, and a previous/next row.

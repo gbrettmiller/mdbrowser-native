@@ -73,7 +73,12 @@ impl Pages {
         let started = Instant::now();
         let labels = Labels { listen: content::LISTEN, previous: content::PREVIOUS, next: content::NEXT };
         let blocks = assemble(document, &labels);
-        let page = Arc::new(layout::layout(&blocks, &theme::reading(font, palette), width, view));
+        let page = Arc::new(layout::layout(
+            &blocks,
+            &theme::reading(theme::Look { font, palette, ..theme::Look::default() }),
+            width,
+            view,
+        ));
         let cost = started.elapsed();
         self.laid =
             Some(Laid { document: document.clone(), font, palette, width, generation, page: page.clone(), cost });

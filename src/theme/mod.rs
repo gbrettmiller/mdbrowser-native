@@ -179,9 +179,35 @@ pub const fn tokens(palette: Palette) -> Theme {
     }
 }
 
-/// The reader theme with the chosen body typeface and palette.
-pub const fn reading(font: ReadingFont, palette: Palette) -> Theme {
-    Theme { body_font: Font::with_name(font.family()), ..tokens(palette) }
+/// Everything the reader chooses about how a page looks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct Look {
+    pub font: ReadingFont,
+    pub palette: Palette,
+    pub size: TextSize,
+    pub spacing: Spacing,
+}
+
+/// A length set for the default body size, scaled to `size`. Multiplying first keeps
+/// whole numbers exact, so the default size gives back the base value unchanged.
+fn per_size(at_default: f32, size: TextSize) -> f32 {
+    at_default * f32::from(size.px()) / f32::from(TextSize::default().px())
+}
+
+/// The reader theme for a look: its typeface and palette, and its size and spacing.
+pub fn reading(look: Look) -> Theme {
+    let base = tokens(look.palette);
+    Theme {
+        body_font: Font::with_name(look.font.family()),
+        body_size: f32::from(look.size.px()),
+        line_ratio: look.spacing.line_ratio(),
+        measure: per_size(base.measure, look.size),
+        gutter: per_size(base.gutter, look.size),
+        indent: per_size(base.indent, look.size),
+        block_gap: look.spacing.block_gap(),
+        item_gap: look.spacing.item_gap(),
+        ..base
+    }
 }
 
 pub fn bold(font: Font) -> Font {
@@ -195,6 +221,10 @@ pub fn italic(font: Font) -> Font {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn look(font: ReadingFont, palette: Palette) -> Look {
+        Look { font, palette, ..Look::default() }
+    }
 
     #[test]
     fn keys_round_trip_and_unknown_keys_are_rejected() {
@@ -224,7 +254,8 @@ mod tests {
 
     #[test]
     fn dark_changes_every_colour_and_nothing_else() {
-        let (light, dark) = (reading(ReadingFont::Inter, Palette::Light), reading(ReadingFont::Inter, Palette::Dark));
+        let (light, dark) =
+            (reading(look(ReadingFont::Inter, Palette::Light)), reading(look(ReadingFont::Inter, Palette::Dark)));
         let colours =
             |t: &Theme| [t.background, t.ink, t.muted, t.link, t.code_ink, t.code_background, t.rule, t.selection];
         for (l, d) in colours(&light).into_iter().zip(colours(&dark)) {
@@ -257,7 +288,7 @@ mod tests {
     #[test]
     fn text_meets_wcag_aa_in_both_palettes() {
         for palette in [Palette::Light, Palette::Dark] {
-            let t = reading(ReadingFont::Literata, palette);
+            let t = reading(look(ReadingFont::Literata, palette));
             for (name, ink, ground) in [
                 ("ink", t.ink, t.background),
                 ("muted", t.muted, t.background),
@@ -273,9 +304,62 @@ mod tests {
 
     #[test]
     fn reading_theme_swaps_only_the_body_face() {
-        let theme = reading(ReadingFont::Inter, Palette::Light);
+        let theme = reading(look(ReadingFont::Inter, Palette::Light));
         assert_eq!(theme.body_font, Font::with_name("Inter"));
         assert_eq!(theme.mono_font, Font::with_name(MONO_FAMILY));
-        assert_eq!(reading(ReadingFont::default(), Palette::Light).body_font, Font::with_name("Literata"));
+        assert_eq!(reading(Look::default()).body_font, Font::with_name("Literata"));
+    }
+
+    #[test]
+    fn the_default_look_is_exactly_the_fixed_light_theme() {
+        assert_eq!(reading(Look::default()), Theme { body_font: Font::with_name("Literata"), ..LIGHT });
+        assert_eq!(reading(Look { palette: Palette::Dark, ..Look::default() }), DARK);
+    }
+
+    #[test]
+    fn size_scales_the_measure_gutter_and_indent_in_proportion() {
+        let size = |px| TextSize::from_px(px).unwrap();
+        for px in (12..=32).step_by(2) {
+            let (base, scaled) = (reading(Look::default()), reading(Look { size: size(px), ..Look::default() }));
+            let ratio = px as f32 / 18.0;
+            assert_eq!(scaled.body_size, px as f32);
+            for (name, was, now) in [
+                ("measure", base.measure, scaled.measure),
+                ("gutter", base.gutter, scaled.gutter),
+                ("indent", base.indent, scaled.indent),
+            ] {
+                assert!((now - was * ratio).abs() < 0.01, "{px} {name}: {now}");
+            }
+            assert_eq!(scaled.measure, 40.0 * px as f32, "the measure is 40 em");
+            assert_eq!((scaled.heading_scales, scaled.mono_scale), (base.heading_scales, base.mono_scale));
+        }
+    }
+
+    #[test]
+    fn size_leaves_spacing_and_colours_alone() {
+        let (base, big) =
+            (reading(Look::default()), reading(Look { size: TextSize::default().larger(), ..Look::default() }));
+        assert_eq!(
+            Theme { body_size: base.body_size, measure: base.measure, gutter: base.gutter, indent: base.indent, ..big },
+            base
+        );
+    }
+
+    #[test]
+    fn compact_is_tighter_and_spacious_looser_on_every_spacing_value() {
+        let at = |spacing| reading(Look { spacing, ..Look::default() });
+        let (compact, comfortable, spacious) = (at(Spacing::Compact), at(Spacing::Comfortable), at(Spacing::Spacious));
+        assert_eq!((comfortable.line_ratio, comfortable.block_gap, comfortable.item_gap), (1.6, 16.0, 4.0));
+        assert_eq!((compact.line_ratio, compact.block_gap, compact.item_gap), (1.45, 12.0, 2.0));
+        assert_eq!((spacious.line_ratio, spacious.block_gap, spacious.item_gap), (1.8, 22.0, 8.0));
+    }
+
+    #[test]
+    fn spacing_leaves_size_and_colours_alone() {
+        let (base, loose) = (reading(Look::default()), reading(Look { spacing: Spacing::Spacious, ..Look::default() }));
+        assert_eq!(
+            Theme { line_ratio: base.line_ratio, block_gap: base.block_gap, item_gap: base.item_gap, ..loose },
+            base
+        );
     }
 }

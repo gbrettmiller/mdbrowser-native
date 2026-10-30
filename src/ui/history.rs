@@ -11,7 +11,7 @@ use crate::theme;
 const WIDTH: f32 = 300.0;
 
 pub fn panel(state: &State, palette: theme::Palette) -> Element<'_, Message> {
-    let reader = theme::reading(state.settings.font, palette);
+    let reader = theme::reading(theme::Look { font: state.settings.font, palette, ..theme::Look::default() });
     let muted = reader.muted;
     let entries: Element<'_, Message> = if state.visits.is_empty() {
         text(content::HISTORY_EMPTY).size(14).into()

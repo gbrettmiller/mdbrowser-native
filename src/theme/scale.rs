@@ -60,6 +60,33 @@ impl Spacing {
     pub fn from_key(key: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|spacing| spacing.key() == key)
     }
+
+    /// Line height as a multiple of the body size.
+    pub const fn line_ratio(self) -> f32 {
+        match self {
+            Self::Compact => 1.45,
+            Self::Comfortable => 1.6,
+            Self::Spacious => 1.8,
+        }
+    }
+
+    /// The gap between blocks, in pixels.
+    pub const fn block_gap(self) -> f32 {
+        match self {
+            Self::Compact => 12.0,
+            Self::Comfortable => 16.0,
+            Self::Spacious => 22.0,
+        }
+    }
+
+    /// The gap between list items, in pixels.
+    pub const fn item_gap(self) -> f32 {
+        match self {
+            Self::Compact => 2.0,
+            Self::Comfortable => 4.0,
+            Self::Spacious => 8.0,
+        }
+    }
 }
 
 #[cfg(test)]

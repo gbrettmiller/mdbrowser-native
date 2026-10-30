@@ -49,7 +49,12 @@ impl App {
         let width = self.viewport.width();
         let (before, _) = self.page(&shown.document, width);
         let generation = self.session().images.generation();
-        let gutter = theme::reading(self.session().settings.font, self.palette()).gutter;
+        let gutter = theme::reading(theme::Look {
+            font: self.session().settings.font,
+            palette: self.palette(),
+            ..theme::Look::default()
+        })
+        .gutter;
         let (after, _) = self.page_at(&shown.document, width, generation);
         match self.viewport.images_arrived(&before, &after, gutter, generation) {
             Some(y) => operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
@@ -93,7 +98,10 @@ impl App {
         }
         let font = self.session().settings.font;
         let (page, _) = self.page(&shown.document, self.viewport.width());
-        let scroll = match page.scroll_offset_for(&fragment, theme::reading(font, self.palette()).gutter) {
+        let scroll = match page.scroll_offset_for(
+            &fragment,
+            theme::reading(theme::Look { font, palette: self.palette(), ..theme::Look::default() }).gutter,
+        ) {
             Some(y) => {
                 self.viewport.hold_anchor(fragment.clone(), y);
                 operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) })

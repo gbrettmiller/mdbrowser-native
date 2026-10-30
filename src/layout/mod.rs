@@ -118,17 +118,42 @@ impl Page {
 pub(crate) mod tests {
     use super::*;
     use crate::model::parse;
-    use crate::theme::{Palette, ReadingFont, fonts, reading};
+    use crate::theme::{Look, ReadingFont, Spacing, TextSize, fonts, reading};
 
     const WIDTH: f32 = 400.0;
 
     pub fn page_at(source: &str, font: ReadingFont, width: f32) -> Page {
         fonts::install();
-        layout(&parse(source).blocks, &reading(font, Palette::Light), width, &no_images)
+        layout(&parse(source).blocks, &reading(Look { font, ..Look::default() }), width, &no_images)
     }
 
     fn page(source: &str) -> Page {
         page_at(source, ReadingFont::Literata, WIDTH)
+    }
+
+    fn page_looking(source: &str, look: Look) -> Page {
+        fonts::install();
+        layout(&parse(source).blocks, &reading(look), WIDTH, &no_images)
+    }
+
+    const SPACED: &str = "# Title\n\nA paragraph that runs over a few lines so the line height shows up in the page's \
+        height, because the text wraps at this width.\n\n- one\n- two\n- three\n\nAnother paragraph.";
+
+    #[test]
+    fn compact_pages_are_shorter_and_spacious_pages_taller() {
+        let height = |spacing| page_looking(SPACED, Look { spacing, ..Look::default() }).height;
+        let (compact, comfortable, spacious) =
+            (height(Spacing::Compact), height(Spacing::Comfortable), height(Spacing::Spacious));
+        assert!(compact < comfortable && comfortable < spacious, "{compact} {comfortable} {spacious}");
+    }
+
+    #[test]
+    fn larger_text_is_set_larger_and_a_longer_page() {
+        let at = |size: TextSize| page_looking(SPACED, Look { size, ..Look::default() });
+        let (small, large) = (at(TextSize::default().smaller()), at(TextSize::default().larger()));
+        let body = |p: &Page| p.fragments.iter().find(|f| f.text.starts_with("Another")).map(|f| f.size).unwrap();
+        assert!(body(&small) < body(&large));
+        assert!(small.height < large.height);
     }
 
     fn centre(rect: Rectangle) -> Point {
@@ -141,7 +166,7 @@ pub(crate) mod tests {
         let lines: std::collections::BTreeSet<_> = p.fragments.iter().map(|f| f.line).collect();
         assert!(lines.len() > 3, "expected wrapping, got {} lines", lines.len());
         let left = p.fragments.iter().map(|f| f.bounds.x).fold(f32::MAX, f32::min);
-        let measure = reading(ReadingFont::Literata, Palette::Light).measure.min(WIDTH);
+        let measure = reading(Look::default()).measure.min(WIDTH);
         assert!(p.fragments.iter().all(|f| f.bounds.x + f.bounds.width <= left + measure + 0.5));
     }
 
