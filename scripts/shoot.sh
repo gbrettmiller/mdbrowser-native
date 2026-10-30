@@ -9,7 +9,7 @@
 # -c: custom page,text,link colours as hex; shoots the Custom appearance (ignores -a).
 # -k: keys to press before the shot, in order: tab, stab (Shift+Tab), settings, history, esc.
 #     "tab" puts the focus ring on the first link; "settings tab" focuses a control in the panel.
-# -w: float the window at WxH first (480x360 is the smallest the app allows).
+# -w: float the window at WxH first (620x360 is the smallest the app allows).
 set -euo pipefail
 
 fonts="literata"

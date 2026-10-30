@@ -101,9 +101,10 @@ mod tests {
     }
 
     #[test]
-    fn a_single_panel_is_allowed_in_the_smallest_window() {
-        let open = toggled(Open::default(), Panel::Settings, 480.0);
-        assert!(open.settings);
+    fn a_single_panel_leaves_the_page_its_minimum_in_the_smallest_window() {
+        let (width, _) = crate::ui::app::MIN_WINDOW;
+        assert!(toggled(Open::default(), Panel::Settings, width).settings);
+        assert!(width - PANEL_WIDTH >= MIN_PAGE, "the page is {} px beside a panel", width - PANEL_WIDTH);
     }
 
     #[test]

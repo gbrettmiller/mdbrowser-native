@@ -37,7 +37,7 @@ Task-list checkboxes are drawn as shapes rather than typed glyphs, because none 
 |---|---|---|
 | Focus ring | The link colour, 2 px, outside the shape (2 px clear of a button). Over every line of a wrapped link | `Theme::ring()`. Needs no new colour: link on page is at least 4.5:1 in every palette, and a unit test checks the ring meets 3:1 |
 | Chrome text | `NOTE` 13, `LABEL` 14, `BODY` 16, `HEADING` 18, `HEADLINE` 20 px (`theme::chrome_text`) | Fixed: it does not follow the reader's text size, which is for the document. A 300 px panel and a one-line toolbar would break at 32 px. A reader who needs larger chrome has the OS scale. The floor is 13 px; a test fails if the UI sets a literal size |
-| Panels | 300 px each; the page column is at least 320 px; window at least 480 by 360 | Opening a second panel closes the older one when the page would be narrower. A resize never closes a panel |
+| Panels | 300 px each; the page column is at least 320 px; window at least 620 by 360 | Opening a second panel closes the older one when the page would be narrower. A resize never closes a panel |
 
 Decision and reasons: ADR-008.
 

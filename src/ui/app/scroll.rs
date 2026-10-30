@@ -76,13 +76,17 @@ impl App {
         scroll_task(self.viewport.reveal(top, bottom))
     }
 
+    /// The distance between lines of text at the reader's size and spacing.
+    pub(super) fn line(&self) -> f32 {
+        let reader = theme::reading(self.look());
+        reader.body_size * reader.line_ratio
+    }
+
     /// Scrolls the page by a key: a screen, a line, or to an end.
     pub(super) fn key_scroll(&mut self, by: Scroll) -> Task<Message> {
         let Some(shown) = self.shown() else { return Task::none() };
         let (page, _) = self.page(&shown.document, self.viewport.width());
-        let reader = theme::reading(self.look());
-        let line = reader.body_size * reader.line_ratio;
-        scroll_task(self.viewport.key_scroll(by, page.height, line))
+        scroll_task(self.viewport.key_scroll(by, page.height, self.line()))
     }
 
     /// New documents start at the top; a pending anchor is resolved once the

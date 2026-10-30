@@ -121,7 +121,7 @@ Feature: Keyboard access
     Then the page is scrolled one page down
 
   Scenario: The window has a minimum size
-    Then the smallest window is 480 by 360
+    Then the smallest window is 620 by 360
 
   Scenario: A second panel gives way when the page would be squeezed
     Given the window is 700 pixels wide

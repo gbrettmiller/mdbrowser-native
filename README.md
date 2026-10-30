@@ -69,7 +69,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Scroll a line, or to the top or bottom | Up / Down, Home / End, when the page has focus | the same |
 | Close a panel and return to the page | Esc | Esc |
 
-Opening a page puts the keyboard on it, so the scroll keys work at once. While you type in a text field, only PageUp and PageDown scroll the page; Tab or Esc takes you out of the field. A ring in the link colour shows where focus is. The window can't be made smaller than 480 by 360, and if History and Settings are both open and there isn't room for the page beside them, opening one closes the other. Screen readers are not supported yet: iced has no accessibility tree.
+Opening a page puts the keyboard on it, so the scroll keys work at once. While you type in a text field, only PageUp and PageDown scroll the page; Tab or Esc takes you out of the field. A ring in the link colour shows where focus is. The window can't be made smaller than 620 by 360, and if History and Settings are both open and there isn't room for the page beside them, opening one closes the other. Screen readers are not supported yet: iced has no accessibility tree.
 
 ### Where your data lives
 

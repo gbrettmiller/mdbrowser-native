@@ -38,7 +38,7 @@ Out: screen-reader support (iced 0.14 exposes no accessibility tree; recorded as
 4. [x] **Toolbar and panels.** Tab reaches Back, Forward, Reload, Home, the address bar, History and Settings in that order, then the page. Disabled buttons are skipped. Enter and Space press a button. In Settings, Tab reaches every control; on a choice (font, images, appearance, spacing), Up and Down change it (one step each, stopping at the ends), and the change applies and saves like a click. Esc closes an open panel and returns focus to the page.
 5. [x] **Visible focus everywhere.** Every focus stop shows the same ring, derived from the palette, and it meets 3:1 against the page for light, dark and every custom set that passes `check`. A unit test checks it.
 6. [x] **Chrome text.** The decision (below) is recorded in DESIGN.md and ADR-008. All chrome text sizes are `theme` tokens; none is below 13 px.
-7. [x] **Narrow windows.** The window cannot be made smaller than 480 x 360. When History and Settings are both open and the page column would fall under 320 px, opening one closes the other. Resizing does not close anything.
+7. [x] **Narrow windows.** The window cannot be made smaller than 620 x 360. When History and Settings are both open and the page column would fall under 320 px, opening one closes the other. Resizing does not close anything.
 8. [x] **Nothing else moves.** Shortcuts from earlier phases still work. Golden snapshots do not change (focus is drawn by the widget, not laid out). Colours stay in `theme`, text in `content`.
 9. [x] **CI and screenshots.** Test, build, clippy and fmt are green on all four platform jobs. Screenshots through `scripts/shoot.sh` (focus ring on a link in light, dark and a custom palette; Settings with focus on a control; narrowest window with a panel open) are read and checked.
 
@@ -151,7 +151,7 @@ Feature: Keyboard access
     And the focus is on the page
 
   Scenario: The window has a minimum size
-    Then the smallest window is 480 by 360
+    Then the smallest window is 620 by 360
 
   Scenario: A second panel gives way when the page would be squeezed
     Given the window is 700 pixels wide
@@ -176,7 +176,7 @@ Feature: Keyboard access
 - **The ring is the link colour**, 2 px, outside the shape, so it needs no new colour token. For custom palettes `check` already guarantees link on page at 4.5:1, which is above the 3:1 non-text minimum.
 - **Opening a page focuses it** (`operation::focus` on the document id once a new page is ready), as browsers do. Scroll keys other than PageUp and PageDown act only when the page has focus, because text fields need Space, the arrows, Home and End.
 - **Chrome text does not follow the reader's text size** (recommended), but its floor rises to 13 px and the sizes become `theme` tokens. The reader controls are for the *document*; the chrome is a fixed 300 px panel and a one-line toolbar that would break at 32 px. The reader who needs larger chrome can use the OS scale, which iced honours. Confirmed 2026-10-30.
-- **Narrow windows:** minimum 480 x 360. The page column is at least 320 px. A pure `panels::toggled(open, panel, width)` (planned as `panels_for`) closes the older panel when both don't fit, so a resize never closes a panel the reader opened.
+- **Narrow windows:** minimum 620 x 360. The page column is at least 320 px. A pure `panels::toggled(open, panel, width)` (planned as `panels_for`) closes the older panel when both don't fit, so a resize never closes a panel the reader opened.
 - **One ADR** (ADR-008: keyboard access, the focus model, the chrome-size decision and the screen-reader limit), written through `invest-adr` in step 1.
 
 ## Decisions taken (2026-10-30: 1 fixed, 2 arrow keys, 3 PageUp and PageDown anywhere)
@@ -247,7 +247,7 @@ Each step is test first, red then green, with the order test → build → clipp
 
 8. **Narrow windows.** `min_size` on the window; the window size kept in the app; `panels_for(width, open)` decides which panels stay open when one is toggled.
    **Complexity**: standard
-   **RED**: `panels_for` at widths under and over the limit, opening and closing each way, and a resize leaves both open; the window settings carry 480 x 360
+   **RED**: `panels_for` at widths under and over the limit, opening and closing each way, and a resize leaves both open; the window settings carry 620 x 360
    **GREEN**: the function, the size tracking from `window::resize_events`, the settings
    **REFACTOR**: None needed
    **Files**: `src/ui/app.rs`, `src/ui/app/view.rs`, `src/ui/panels.rs` (new, pure)

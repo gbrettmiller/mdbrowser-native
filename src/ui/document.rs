@@ -78,6 +78,35 @@ struct State {
     highlight: Vec<Rectangle>,
 }
 
+/// After Shift+Tab moved focus backwards: if it arrived on the page from behind, put it on the
+/// page's last link. Reports that link's top and bottom, to scroll it into view.
+pub fn enter_from_behind(page: &'static str) -> impl operation::Operation<(f32, f32)> {
+    struct EnterLast {
+        page: Id,
+        span: Option<(f32, f32)>,
+    }
+
+    impl operation::Operation<(f32, f32)> for EnterLast {
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn operation::Operation<(f32, f32)>)) {
+            operate(self);
+        }
+
+        fn custom(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
+            if id == Some(&self.page)
+                && let Some(state) = state.downcast_mut::<State>()
+            {
+                self.span = state.enter_last();
+            }
+        }
+
+        fn finish(&self) -> operation::Outcome<(f32, f32)> {
+            self.span.map_or(operation::Outcome::None, operation::Outcome::Some)
+        }
+    }
+
+    EnterLast { page: Id::new(page), span: None }
+}
+
 fn page_id(page: &Arc<Page>) -> usize {
     Arc::as_ptr(page) as usize
 }
@@ -126,6 +155,16 @@ impl State {
     /// The top and bottom of the focused stop, all its lines, for scrolling it into view.
     fn reveal(&self) -> Option<(f32, f32)> {
         self.stop.and_then(|stop| self.stops.get(stop)).map(Stop::span)
+    }
+
+    /// Focus arrived from behind (Shift+Tab from a control after the page): on the page itself
+    /// with no stop yet, it goes to the last stop. Returns that stop's span, to scroll it into view.
+    fn enter_last(&mut self) -> Option<(f32, f32)> {
+        if !self.focused || self.stop.is_some() {
+            return None;
+        }
+        self.stop = self.stops.len().checked_sub(1);
+        self.reveal()
     }
 
     /// Whether the page itself wears the ring: it has the keyboard but no link is chosen.
@@ -261,6 +300,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
     ) {
         let state = tree.state.downcast_mut::<State>();
         operation.focusable(self.id.as_ref(), layout.bounds(), state);
+        operation.custom(self.id.as_ref(), layout.bounds(), state);
     }
 
     fn draw(
@@ -505,6 +545,28 @@ mod tests {
         assert!(!state.ring_page(), "the link has the ring");
         state.unfocus();
         assert!(!state.ring_page());
+    }
+
+    #[test]
+    fn arriving_from_behind_lands_on_the_last_link_and_reports_where_it_is() {
+        let mut state = focused(&page(THREE_LINKS));
+        let span = state.enter_last().expect("the page has links");
+        assert_eq!(state.stop, Some(2));
+        assert_eq!(Some(span), state.reveal());
+    }
+
+    #[test]
+    fn arriving_from_behind_changes_nothing_when_there_is_no_link_or_no_focus() {
+        let mut none = focused(&page("No links."));
+        assert_eq!(none.enter_last(), None);
+        assert!(none.ring_page(), "the page itself keeps the ring");
+        let mut unfocused = State::on(&page(THREE_LINKS), 1, None);
+        assert_eq!(unfocused.enter_last(), None);
+        assert_eq!(unfocused.stop, None);
+        let mut on_a_link = focused(&page(THREE_LINKS));
+        on_a_link.tab(Direction::Forward);
+        assert_eq!(on_a_link.enter_last(), None, "already on a link: left alone");
+        assert_eq!(on_a_link.stop, Some(0));
     }
 
     #[test]

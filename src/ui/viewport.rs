@@ -139,7 +139,7 @@ impl Viewport {
     /// screen less an overlap, a line, or an end. Never past either end; `None` if already there.
     pub fn key_scroll(&mut self, by: Scroll, content: f32, line: f32) -> Option<f32> {
         let (scroll, height) = (self.scroll_y.get(), self.height.get());
-        let page = (height - PAGE_OVERLAP_LINES * line).max(line);
+        let page = page_step(height, line);
         let target = match by {
             Scroll::PageDown => scroll + page,
             Scroll::PageUp => scroll - page,
@@ -184,6 +184,12 @@ impl Viewport {
     }
 }
 
+/// How far a page key moves a view `height` tall on lines `line` apart: a screen less an overlap
+/// of three lines, and never less than a line.
+pub fn page_step(height: f32, line: f32) -> f32 {
+    (height - PAGE_OVERLAP_LINES * line).max(line)
+}
+
 /// Where a view `height` tall, scrolled to `scroll`, should go to show the span `top` to
 /// `bottom` (the same space as `scroll`): `None` if it is already in view with a margin, the
 /// span's top if it is taller than the view, else the view centred on it. Never above 0.
@@ -226,6 +232,12 @@ mod tests {
     fn a_page_key_moves_a_screen_less_three_lines() {
         assert_eq!(scrolled_to(0.0).key_scroll(Scroll::PageDown, 5000.0, LINE), Some(510.0));
         assert_eq!(scrolled_to(1000.0).key_scroll(Scroll::PageUp, 5000.0, LINE), Some(490.0));
+    }
+
+    #[test]
+    fn a_page_step_is_the_screen_less_three_lines_and_at_least_a_line() {
+        assert_eq!(page_step(600.0, LINE), 510.0);
+        assert_eq!(page_step(60.0, LINE), LINE);
     }
 
     #[test]

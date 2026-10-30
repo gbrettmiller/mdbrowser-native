@@ -67,7 +67,7 @@ The session or app holds a "focused link" index and handles Tab itself, bypassin
 - **Controls.** `ui/focus.rs` wraps any element as a stop with the same ring. Enter and Space activate it. For the four choices in Settings (font, images, appearance, spacing), Up and Down step to the previous or next option, stopping at the ends. The pick lists stay for the mouse, because iced offers no way to open one from code.
 - **Scroll keys.** PageUp, PageDown, Space and Shift+Space move by the viewport minus a three-line overlap; arrows move one line; Home and End jump to the ends. PageUp and PageDown work wherever focus is. Space, arrows, Home and End act only when the page has focus, because text fields need them. Opening a page focuses it, as browsers do.
 - **Chrome text stays fixed.** It does not follow the reader's text size: the 300 px panel and the one-line toolbar would break at 32 px, and the reader's controls are for the document. Its sizes become `theme` tokens with a floor of 13 px (the audit found 12 px labels). A reader who needs larger chrome has the OS scale.
-- **Narrow windows.** The minimum window size is 480 x 360. The page column is at least 320 px. When both panels are open and the page would fall under that, opening one closes the other. A resize never closes a panel.
+- **Narrow windows.** The minimum window size is 620 x 360. The page column is at least 320 px. When both panels are open and the page would fall under that, opening one closes the other. A resize never closes a panel.
 - **Known limit: screen readers.** iced 0.14 exposes no accessibility tree, so a screen reader cannot read the page or the controls. This ADR does not fix it. Revisit when iced gains an accessibility layer.
 
 ## Consequences
@@ -84,9 +84,9 @@ The session or app holds a "focused link" index and handles Tab itself, bypassin
 - Screen-reader users still cannot use the app.
 
 **Known limits (found in review, 2026-10-30):**
-- Shift+Tab from a control after the page enters the page itself, not its last link (iced's focus callback doesn't say which way focus came). Tab from before the page does enter the first link.
-- A focused button that becomes disabled (the end of the text-size scale, Clear history) gives up focus; the next Tab starts again from the top.
-- PageUp and PageDown scroll the page even when focus is in a panel. Tab does scroll a panel to show the focused control.
+- Shift+Tab from a control after the page lands on the page's last link (a custom operation on the document), not on the page itself.
+- A button that becomes disabled (the end of the text-size scale, Clear history) keeps its place in the tab order while it has focus, so the ring stays.
+- PageUp and PageDown scroll the panel that holds focus, and the page otherwise.
 - Chrome geometry (panel width, minimum window, ring size) lives in `ui`, with the chrome text sizes in `theme::chrome_text`; the "sizes in theme" rule is read as covering the reader's stylesheet, not widget geometry.
 
 **Neutral:**

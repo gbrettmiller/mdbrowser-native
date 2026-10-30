@@ -13,7 +13,7 @@ use iced::keyboard::{self, Key, Modifiers, key::Named};
 use iced::widget as widgets;
 use iced::{Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Task, Theme, Vector, mouse};
 
-use super::viewport::reveal_target;
+use super::viewport::{page_step, reveal_target};
 
 /// The ring sits this far clear of the control, so it shows against a button of its own colour.
 const RING_GAP: f32 = 2.0;
@@ -63,17 +63,29 @@ pub fn neighbour<T: Copy + PartialEq>(all: &[T], current: T, forward: bool) -> O
 /// Tab moves focus but iced doesn't move the view, so this follows it. `skip` is the id of
 /// the page, which does its own scrolling.
 pub fn reveal_focused<Message: Send + 'static>(skip: &'static str) -> Task<Message> {
-    widget::operate(Find { skip: Id::new(skip), found: None }).then(|focused| widget::operate(ScrollTo { focused }))
+    widget::operate(Find { skip: Id::new(skip), found: None }).then(|found| match found {
+        Some(focused) => widget::operate(ScrollTo { focused }),
+        None => Task::none(),
+    })
 }
 
-/// Finds the bounds of the focused control.
+/// PageUp or PageDown while the keyboard is on a control in a panel: scrolls that panel a
+/// screen less the overlap, with lines `line` apart. Reports whether one scrolled; if not, the page should.
+pub fn scroll_focused_panel(skip: &'static str, down: bool, line: f32) -> Task<bool> {
+    widget::operate(Find { skip: Id::new(skip), found: None }).then(move |found| match found {
+        Some(focused) => widget::operate(ScrollBy { focused, down, line, scrolled: false }),
+        None => Task::done(false),
+    })
+}
+
+/// Finds the bounds of the focused control, if any outside `skip`.
 struct Find {
     skip: Id,
     found: Option<Rectangle>,
 }
 
-impl Operation<Rectangle> for Find {
-    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<Rectangle>)) {
+impl Operation<Option<Rectangle>> for Find {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<Option<Rectangle>>)) {
         operate(self);
     }
 
@@ -83,8 +95,8 @@ impl Operation<Rectangle> for Find {
         }
     }
 
-    fn finish(&self) -> Outcome<Rectangle> {
-        self.found.map_or(Outcome::None, Outcome::Some)
+    fn finish(&self) -> Outcome<Option<Rectangle>> {
+        Outcome::Some(self.found)
     }
 }
 
@@ -115,6 +127,46 @@ impl<T> Operation<T> for ScrollTo {
             state.scroll_to(AbsoluteOffset { x: None, y: Some(y) });
         }
     }
+}
+
+/// Scrolls the scrollable that holds `focused` by a page.
+struct ScrollBy {
+    focused: Rectangle,
+    down: bool,
+    line: f32,
+    scrolled: bool,
+}
+
+impl Operation<bool> for ScrollBy {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<bool>)) {
+        operate(self);
+    }
+
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        bounds: Rectangle,
+        content_bounds: Rectangle,
+        _translation: Vector,
+        state: &mut dyn widget::operation::Scrollable,
+    ) {
+        if content_bounds.contains(self.focused.center()) {
+            let step = page_step(bounds.height, self.line);
+            let y = if self.down { step } else { -step };
+            state.scroll_by(AbsoluteOffset { x: 0.0, y }, bounds, content_bounds);
+            self.scrolled = true;
+        }
+    }
+
+    fn finish(&self) -> Outcome<bool> {
+        Outcome::Some(self.scrolled)
+    }
+}
+
+/// Whether Tab can land on a stop. A control that is disabled while it has the keyboard keeps
+/// it, so the reader's place isn't lost, until Tab moves on.
+const fn in_tab_order(reachable: bool, focused: bool) -> bool {
+    reachable || focused
 }
 
 /// What a stop sends for each key.
@@ -191,10 +243,8 @@ impl<Message: Clone> Widget<Message, Theme, Renderer> for FocusStop<'_, Message>
 
     fn operate(&mut self, tree: &mut Tree, layout: Layout<'_>, renderer: &Renderer, operation: &mut dyn Operation) {
         let state = tree.state.downcast_mut::<State>();
-        if self.reachable {
+        if in_tab_order(self.reachable, state.focused) {
             operation.focusable(None, layout.bounds(), state);
-        } else {
-            state.unfocus();
         }
         self.content.as_widget_mut().operate(&mut tree.children[0], layout, renderer, operation);
     }
@@ -357,6 +407,13 @@ mod tests {
         assert_eq!(neighbour(&all, 3, true), None);
         assert_eq!(neighbour(&all, 1, false), None);
         assert_eq!(neighbour(&all, 9, true), None, "not one of the options");
+    }
+
+    #[test]
+    fn a_disabled_control_keeps_the_keyboard_it_had_but_cannot_be_tabbed_to() {
+        assert!(in_tab_order(true, false));
+        assert!(in_tab_order(false, true), "disabled while focused: the place is kept");
+        assert!(!in_tab_order(false, false), "a disabled control is skipped");
     }
 
     #[test]

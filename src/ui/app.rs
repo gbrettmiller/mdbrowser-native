@@ -9,6 +9,7 @@ use iced::keyboard;
 use iced::widget::operation;
 use iced::{Font, Size, Subscription, Task, window};
 
+use super::document;
 use super::focus;
 use super::keys::{self, Command, Scroll};
 use super::pages::{Pages, SETTLE};
@@ -37,8 +38,9 @@ const ANCHOR_RETRY: Duration = Duration::from_millis(16);
 const ANCHOR_ATTEMPTS: u32 = 60;
 /// Window size at launch, and the layout width assumed before the first frame.
 const WINDOW_SIZE: (f32, f32) = (1000.0, 1000.0);
-/// The smallest window: the toolbar fits, and one panel can open beside a page.
-pub const MIN_WINDOW: (f32, f32) = (480.0, 360.0);
+/// The smallest window: the toolbar fits, and one panel can open beside a page of its
+/// minimum width.
+pub const MIN_WINDOW: (f32, f32) = (panels::PANEL_WIDTH + panels::MIN_PAGE, 360.0);
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -246,14 +248,33 @@ impl App {
             Some(Command::FocusAddress) => {
                 Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
             }
-            Some(Command::Scroll(by)) => self.key_scroll(by),
+            Some(Command::Scroll(by)) => self.shortcut_scroll(by),
             Some(Command::ClosePanel) => self.close_panel(),
             Some(Command::FocusNext) => operation::focus_next().chain(focus::reveal_focused(PAGE_ID)),
-            Some(Command::FocusPrevious) => operation::focus_previous().chain(focus::reveal_focused(PAGE_ID)),
+            Some(Command::FocusPrevious) => {
+                operation::focus_previous().chain(self.enter_page_from_behind()).chain(focus::reveal_focused(PAGE_ID))
+            }
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),
             Some(Command::ToggleSettings) => self.update(Message::ToggleSettings),
             None => Task::none(),
         }
+    }
+
+    /// Shift+Tab can land on the page from behind: then it goes to the last link, and shows it.
+    fn enter_page_from_behind(&self) -> Task<Message> {
+        iced::advanced::widget::operate(document::enter_from_behind(PAGE_ID))
+            .map(|(top, bottom)| Message::Reveal(top, bottom))
+    }
+
+    /// PageUp and PageDown from a shortcut: they scroll the panel the keyboard is in, or else the page.
+    fn shortcut_scroll(&mut self, by: Scroll) -> Task<Message> {
+        let down = match by {
+            Scroll::PageDown => true,
+            Scroll::PageUp => false,
+            _ => return self.key_scroll(by),
+        };
+        focus::scroll_focused_panel(PAGE_ID, down, self.line())
+            .then(move |scrolled| if scrolled { Task::none() } else { Task::done(Message::Scroll(by)) })
     }
 
     /// Opens or closes a panel. A control inside one that closes can't keep the keyboard, so
