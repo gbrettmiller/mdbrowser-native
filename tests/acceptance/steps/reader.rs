@@ -9,7 +9,7 @@ use mdbrowser::theme::{self, Colours, Look, Palette, Spacing, TextSize, Which};
 
 use crate::world::Browser;
 
-const WIDTH: f32 = 600.0;
+pub(super) const WIDTH: f32 = 600.0;
 
 fn spacing_named(name: &str) -> Spacing {
     Spacing::ALL.into_iter().find(|s| content::spacing(*s) == name).expect("a spacing menu label")
@@ -20,14 +20,14 @@ fn colour_named(name: &str) -> Which {
 }
 
 /// The open document laid out at `look`, with no images.
-fn page_at(w: &Browser, look: Look) -> Page {
+pub(super) fn page_at(w: &Browser, look: Look) -> Page {
     let Status::Ready(shown) = &w.state().status else { panic!("no document: {:?}", w.state().status) };
     theme::fonts::install();
     layout::layout(&shown.document.blocks, &theme::reading(look), WIDTH, &layout::no_images)
 }
 
 /// How the reader has the page now.
-fn look(w: &Browser) -> Look {
+pub(super) fn look(w: &Browser) -> Look {
     let settings = &w.state().settings;
     Look { font: settings.font, palette: w.state().palette(), size: settings.text_size, spacing: settings.spacing }
 }

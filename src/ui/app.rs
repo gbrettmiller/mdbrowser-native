@@ -37,7 +37,7 @@ const ANCHOR_ATTEMPTS: u32 = 60;
 /// Window size at launch, and the layout width assumed before the first frame.
 const WINDOW_SIZE: (f32, f32) = (1000.0, 1000.0);
 /// The smallest window: the toolbar fits, and one panel can open beside a page.
-const MIN_WINDOW: (f32, f32) = (480.0, 360.0);
+pub const MIN_WINDOW: (f32, f32) = (480.0, 360.0);
 
 #[derive(Debug, Clone)]
 pub enum Message {

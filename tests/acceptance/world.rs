@@ -126,6 +126,33 @@ pub struct Browser {
     clock: u64,
     /// The reader's colours before the last one was set, for "is what it was".
     pub colours_before: Option<mdbrowser::theme::Colours>,
+    pub keys: Keys,
+}
+
+/// Where the keyboard is, as the widgets would keep it: the stop on the page, whether the
+/// page has focus, how far it is scrolled, and the window around it.
+#[derive(Debug)]
+pub struct Keys {
+    pub focus: Option<usize>,
+    /// Which way focus last left the page, if it did.
+    pub left: Option<mdbrowser::layout::Direction>,
+    pub page_focused: bool,
+    pub scroll: f32,
+    pub window: (f32, f32),
+    pub panels: mdbrowser::ui::panels::Open,
+}
+
+impl Default for Keys {
+    fn default() -> Self {
+        Keys {
+            focus: None,
+            left: None,
+            page_focused: true,
+            scroll: 0.0,
+            window: (1000.0, 600.0),
+            panels: Default::default(),
+        }
+    }
 }
 
 impl Browser {
@@ -168,6 +195,7 @@ impl Browser {
             store,
             clock: 0,
             colours_before: None,
+            keys: Keys::default(),
         }
     }
 
