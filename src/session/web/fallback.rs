@@ -3,10 +3,24 @@
 
 use url::Url;
 
+use super::Origin;
+
 /// Every address worth trying for `page`, best first: the `Link` header's Markdown
-/// alternate (same host only), then the `.md` sibling.
+/// alternate (same host only), then the `.md` sibling. Each is listed once, and
+/// `page` itself, which just failed, is not.
 pub fn candidates(page: &Url, link_header: Option<&str>) -> Vec<Url> {
-    link_header.and_then(|header| alternate(page, header)).into_iter().chain(siblings(page)).collect()
+    let all = link_header.and_then(|header| alternate(page, header)).into_iter().chain(siblings(page));
+    all.fold(Vec::new(), |found, candidate| {
+        if candidate == *page || found.contains(&candidate) { found } else { [found, vec![candidate]].concat() }
+    })
+}
+
+/// Who a candidate's fetch answers to. `found` is where the page ended up after
+/// redirects: a host the site chose, not the reader, so its candidates get the
+/// checks a public page's links get, or a name that resolves into the reader's
+/// network could be reached through them (ADR-003).
+pub fn candidate_origin(origin: Origin, asked: &Url, found: &Url) -> Origin {
+    if asked.host_str() == found.host_str() { origin } else { Origin::Public }
 }
 
 /// The `rel="alternate"; type="text/markdown"` target in a `Link` header, if it
@@ -135,6 +149,32 @@ mod tests {
             let header = format!(r#"<{target}>; rel="alternate"; type="text/markdown""#);
             assert_eq!(alternate(&url("https://a.example/post"), &header), None, "{target}");
         }
+    }
+
+    #[test]
+    fn an_alternate_that_is_the_sibling_is_tried_once() {
+        let header = r#"</post.md>; rel="alternate"; type="text/markdown""#;
+        assert_eq!(texts(candidates(&url("https://a.example/post"), Some(header))), ["https://a.example/post.md"]);
+    }
+
+    #[test]
+    fn the_page_itself_is_never_its_own_candidate() {
+        let header = r#"</post>; rel="alternate"; type="text/markdown""#;
+        assert_eq!(texts(candidates(&url("https://a.example/post"), Some(header))), ["https://a.example/post.md"]);
+    }
+
+    #[test]
+    fn a_dotted_directory_has_no_sibling() {
+        assert!(candidates(&url("https://a.example/v1.2/"), None).is_empty());
+    }
+
+    #[test]
+    fn candidates_keep_the_origin_while_on_the_asked_host_and_are_public_off_it() {
+        let (asked, same, other) =
+            (url("https://a.example/post"), url("https://a.example/new"), url("https://b.example/x"));
+        assert_eq!(candidate_origin(Origin::Trusted, &asked, &same), Origin::Trusted);
+        assert_eq!(candidate_origin(Origin::Public, &asked, &same), Origin::Public);
+        assert_eq!(candidate_origin(Origin::Trusted, &asked, &other), Origin::Public);
     }
 
     #[test]

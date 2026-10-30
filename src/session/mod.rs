@@ -97,6 +97,9 @@ pub enum Event {
     OpenerFailed,
     /// Hand the current page to the system browser (see `State::browser_offer`).
     OpenInBrowser,
+    /// Open the site's `llms.txt` offered on the error (see `State::llms_offer`), as the
+    /// failed page's origin would.
+    OpenLlmsTxt,
     OpenHistory(String),
     ClearHistory,
     ChooseFont(ReadingFont),

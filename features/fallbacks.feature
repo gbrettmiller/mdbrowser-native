@@ -9,6 +9,12 @@ Feature: Markdown fallbacks
   #   /linked        text/html with Link: </alt/linked.md>; rel="alternate"; type="text/markdown"
   #   /alt/linked.md text/markdown  "# Linked Alternate"   /linked.md text/markdown "# Sibling Loses"
   #   /bare          text/html, no Markdown anywhere       /llms.txt    text/markdown "# Site Index"
+  #   /folder/       text/html     /folder/index.md text/markdown "# Folder Index"
+  #   /old           302 to /article                       /ghost.md    text/markdown "# Ghost" (no /ghost)
+  #
+  # The banner's wording and layout are drawn by the iced view, which these steps cannot
+  # see: they check what the session reports (`fallback_from`). Check the banner by eye
+  # with scripts/shoot.sh.
 
   Scenario: The .md sibling is shown, and the reader is told
     When I enter the URL of "/article"
@@ -21,6 +27,19 @@ Feature: Markdown fallbacks
     When I enter the URL of "/linked"
     Then I see the document titled "Linked Alternate"
     And the address shows the URL of "/alt/linked.md"
+    And the site was not asked for "/linked.md"
+
+  Scenario: A trailing slash tries the folder's index
+    When I enter the URL of "/folder/"
+    Then I see the document titled "Folder Index"
+    And the address shows the URL of "/folder/index.md"
+    And the page says it was found instead of the URL of "/folder/"
+
+  Scenario: A redirect is followed before looking for a sibling
+    When I enter the URL of "/old"
+    Then I see the document titled "Article In Markdown"
+    And the page says it was found instead of the URL of "/old"
+    And the site was not asked for "/old.md"
 
   Scenario: The system browser is offered for the original
     Given I am viewing the URL of "/article"
@@ -57,6 +76,7 @@ Feature: Markdown fallbacks
     Then the site was not asked for "/llms.txt"
 
   Scenario: Other failures never fall back
-    When I enter the URL of "/missing.md"
+    When I enter the URL of "/ghost"
     Then I see the error "notFound"
     And I am not offered the site's llms.txt
+    And the site was not asked for "/ghost.md"

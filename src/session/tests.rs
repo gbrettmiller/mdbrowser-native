@@ -544,10 +544,56 @@ fn a_page_with_no_markdown_version_offers_the_sites_llms_txt() {
         run([Event::Enter("https://x.org/a/b?q=1#top".into()), failed_with(ErrorCode::NotMarkdownWithLlms)]);
     assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/a/b?q=1"));
     assert_eq!(state.llms_offer().as_deref(), Some("https://x.org/llms.txt"));
-    let offer = state.llms_offer().unwrap();
-    let (state, _) = step(state, Event::Enter(offer));
+    let (state, _) = step(state, Event::OpenLlmsTxt);
     assert_eq!(state.status, Status::Loading);
     assert_eq!(state.address(), "https://x.org/llms.txt");
+}
+
+#[test]
+fn opening_llms_txt_keeps_the_origin_of_the_failed_page() {
+    let (state, _) = run([
+        Event::Enter("https://x.org/a.md".into()),
+        fetched(1, "https://x.org/a.md", "# A"),
+        Event::Follow("https://y.org/post.md".into()),
+        Event::Loaded { request_id: 2, result: Err(ErrorCode::NotMarkdownWithLlms), now: 1 },
+    ]);
+    let (_, effects) = step(state, Event::OpenLlmsTxt);
+    assert!(
+        matches!(&effects[..], [Effect::Load { origin: Origin::Public, location, .. }] if location.address() == "https://y.org/llms.txt"),
+        "{effects:?}"
+    );
+}
+
+#[test]
+fn opening_llms_txt_with_no_offer_does_nothing() {
+    let (state, _) = run([Event::Enter("https://x.org/a".into()), failed_with(ErrorCode::NotMarkdown)]);
+    let (after, effects) = step(state.clone(), Event::OpenLlmsTxt);
+    assert_eq!((after, effects), (state, vec![]));
+}
+
+#[test]
+fn the_offer_keeps_a_port_and_ends_when_a_page_loads() {
+    let (state, _) = run([Event::Enter("https://x.org:8443/a".into()), failed_with(ErrorCode::NotMarkdownWithLlms)]);
+    assert_eq!(state.llms_offer().as_deref(), Some("https://x.org:8443/llms.txt"));
+    let (state, _) = run([
+        Event::Enter("https://x.org/a".into()),
+        failed_with(ErrorCode::NotMarkdownWithLlms),
+        Event::Enter("https://x.org/b.md".into()),
+        fetched(2, "https://x.org/b.md", "# B"),
+    ]);
+    assert_eq!(state.llms_offer(), None);
+}
+
+#[test]
+fn a_fallback_banner_does_not_outlive_the_next_page() {
+    let (state, _) = run([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "# Post"),
+        Event::Enter("https://x.org/b.md".into()),
+        fetched(2, "https://x.org/b.md", "# B"),
+    ]);
+    assert_eq!(shown(&state).fallback_from, None);
+    assert_eq!(state.browser_offer().as_deref(), None);
 }
 
 #[test]

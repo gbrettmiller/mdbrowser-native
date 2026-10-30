@@ -32,8 +32,8 @@ fn not_asked(w: &mut Browser, path: String) {
 
 #[when("I choose the site's llms.txt")]
 fn choose_llms(w: &mut Browser) {
-    let offer = w.state().llms_offer().expect("llms.txt offered");
-    w.send(Event::Enter(offer));
+    assert!(w.state().llms_offer().is_some(), "llms.txt offered");
+    w.send(Event::OpenLlmsTxt);
 }
 
 #[then("I am not offered the site's llms.txt")]

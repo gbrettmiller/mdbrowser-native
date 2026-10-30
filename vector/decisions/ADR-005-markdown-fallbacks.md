@@ -30,7 +30,7 @@ Keep the "not Markdown" error and the Open in browser action.
 
 ### Option B: Try alternates in a fixed order, tell the reader
 
-On a successful response whose type isn't Markdown: (1) the `Link: <…>; rel="alternate"; type="text/markdown"` header on that response, same host only; (2) the `.md` sibling (`/post` → `/post.md`; with a trailing slash, `/post.md` then `/post/index.md`). First hit wins, with one level only. The shown URL goes in the address bar and History, and a notice names the original address on every such load. `llms.txt` is offered as a button on the error screen when nothing is found and the site answers for `/llms.txt` (probed once, after the fallbacks miss, under the same checks as any page).
+On a successful response whose type isn't Markdown: (1) the `Link: <…>; rel="alternate"; type="text/markdown"` header on that response, same scheme, host and port only; (2) the `.md` sibling (`/post` → `/post.md`; with a trailing slash, `/post.md` then `/post/index.md`). First hit wins, with one level only. The shown URL goes in the address bar and History, and a notice names the original address on every such load. `llms.txt` is offered as a button on the error screen when nothing is found and the site answers for `/llms.txt` (probed once, on the address the reader asked for, after the fallbacks miss, under the same checks as any page). The whole search shares one deadline.
 
 **Pros:**
 - Uses existing conventions, with at most two extra requests, and only after a type mismatch.
@@ -64,7 +64,7 @@ The trigger is only a type mismatch on a success response. A 404, a timeout or a
 
 **Negative:**
 - A site that serves Markdown only through `<link rel="alternate">` in its HTML is not covered yet.
-- A failed type mismatch costs up to three requests before the error appears.
+- A failed type mismatch costs up to five requests before the error appears: the page, the `Link` alternate, two siblings and the `llms.txt` probe, all within one shared deadline.
 - Back, Reload and History use the Markdown URL, so the original HTML address isn't kept except in the notice and Open in browser.
 
 **Neutral:**

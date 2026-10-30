@@ -6,9 +6,9 @@ use super::FetchError;
 use crate::session::location::is_markdown_name;
 
 const MARKDOWN_TYPES: [&str; 2] = ["text/markdown", "text/x-markdown"];
-/// No type (`""`) or plain text: they say nothing about the format, so the path decides.
 /// Where a site keeps its index for language models.
 pub const LLMS_TXT: &str = "/llms.txt";
+/// No type (`""`) or plain text: they say nothing about the format, so the path decides.
 const PLAIN_TYPES: [&str; 2] = ["", "text/plain"];
 /// Charsets that decode as UTF-8 (`utf8` is a common misspelling).
 const READABLE_CHARSETS: [&str; 3] = ["utf-8", "utf8", "us-ascii"];
@@ -90,9 +90,17 @@ mod tests {
         assert_eq!(body(Some("text/plain"), "https://example.com/a.md?v=1"), Ok(()));
         assert_eq!(body(Some("text/plain"), "https://example.com/notes.markdown"), Ok(()));
         assert_eq!(body(Some("text/plain"), "https://example.com/llms.txt"), Ok(()));
+        assert_eq!(body(Some("text/plain"), "https://example.com/llms.txt?x=1"), Ok(()));
         assert_eq!(body(None, "https://example.com/A.MD"), Ok(()));
         assert_eq!(body(Some(""), "https://example.com/a.md"), Ok(()));
-        for at in ["https://example.com/a.txt", "https://example.com/a.md/", "https://example.com/readme"] {
+        for at in [
+            "https://example.com/a.txt",
+            "https://example.com/a.md/",
+            "https://example.com/readme",
+            "https://example.com/docs/llms.txt",
+            "https://example.com/llms.txt/",
+            "https://example.com/LLMS.TXT",
+        ] {
             assert_eq!(body(Some("text/plain; charset=utf-8"), at), Err(FetchError::WrongType), "{at}");
         }
         assert_eq!(body(None, "https://example.com/"), Err(FetchError::WrongType));

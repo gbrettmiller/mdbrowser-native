@@ -22,8 +22,7 @@ pub fn error<'a>(code: ErrorCode, state: &State, theme: &theme::Theme) -> Elemen
     let (message, hint) = content::failure(code, state.current_location().is_some_and(Location::is_web));
     let (address, browser_offered) = (state.address(), state.browser_offer().is_some());
     let open = button(content::OPEN_IN_BROWSER).on_press(Message::Session(Event::OpenInBrowser));
-    let llms =
-        state.llms_offer().map(|url| button(content::TRY_LLMS_TXT).on_press(Message::Session(Event::Enter(url))));
+    let llms = state.llms_offer().map(|_| button(content::TRY_LLMS_TXT).on_press(Message::Session(Event::OpenLlmsTxt)));
     column![text(message).size(20)]
         .push(hint.map(|hint| text(hint).size(16)))
         .push(text(address).size(14).style(move |_| text::Style { color: Some(muted) }))

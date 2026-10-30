@@ -38,6 +38,10 @@ pub fn step(state: State, event: Event) -> Step {
             Some(url) => (state, vec![Effect::OpenExternal(url)]),
             None => none(state),
         },
+        Event::OpenLlmsTxt => match state.llms_offer() {
+            Some(url) => open_offer(state, &url),
+            None => none(state),
+        },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
         Event::ChooseFont(font) => persist_settings(with_settings(state, |settings| Settings { font, ..settings })),
         Event::ChooseAppearance(appearance) => {
@@ -76,6 +80,14 @@ fn entry_for(input: &str, state: &State) -> Entry {
         Ok(target) => Entry { input: target.location.address(), target: Some(target), origin: Origin::Trusted },
         Err(_) => Entry { input: input.to_string(), target: None, origin: Origin::Trusted },
     }
+}
+
+/// Opens an address the session offered, under the rules of the page it was offered on.
+fn open_offer(state: State, url: &str) -> Step {
+    let Ok(target) = parse_address(url, &state.home) else { return none(state) };
+    let origin = state.nav.current().map_or(Origin::Trusted, |entry| entry.origin);
+    let entry = Entry { input: target.location.address(), target: Some(target), origin };
+    navigate_to(state, entry)
 }
 
 fn navigate_to(state: State, entry: Entry) -> Step {

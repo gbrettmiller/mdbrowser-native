@@ -4,7 +4,7 @@
 
 mod fetch;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub use fetch::fetch_bytes;
 use fetch::{Refused, fetch_page_bytes};
@@ -56,8 +56,11 @@ fn page(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Refused> 
 
 /// `url`, or when it isn't Markdown, the first of its `Link` alternate and `.md`
 /// siblings that is. One level only: a candidate's own refusal is never followed,
-/// and any other failure (404, timeout, bad body) never starts a search.
+/// and any other failure (404, timeout, bad body) never starts a search. The whole
+/// search shares one deadline, and a candidate off the asked host is fetched as Public.
 fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, ErrorCode> {
+    let started = Instant::now();
+    let remaining = || Limits { overall: limits.overall.saturating_sub(started.elapsed()), ..*limits };
     let refused = match page(url, limits, origin) {
         Ok(found) => return Ok(found),
         Err(refused) => refused,
@@ -68,17 +71,22 @@ fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Error
     let asked = refused.url.as_ref().unwrap_or(url);
     web::candidates(asked, refused.link.as_deref())
         .iter()
-        .find_map(|candidate| page(candidate, limits, origin).ok())
+        .find_map(|candidate| page(candidate, &remaining(), web::candidate_origin(origin, asked, candidate)).ok())
         .map(|found| Fetched { fallback_from: Some(url.clone()), ..found })
         .ok_or_else(|| {
-            if has_llms_txt(asked, limits, origin) { ErrorCode::NotMarkdownWithLlms } else { ErrorCode::NotMarkdown }
+            if has_llms_txt(url, &remaining(), origin) {
+                ErrorCode::NotMarkdownWithLlms
+            } else {
+                ErrorCode::NotMarkdown
+            }
         })
 }
 
 /// Whether the site answers for `/llms.txt` the way a click on it would be read, so
-/// the offer is never made for a page that would only fail.
-fn has_llms_txt(asked: &Url, limits: &Limits, origin: Origin) -> bool {
-    asked.join(web::LLMS_TXT).is_ok_and(|llms| page(&llms, limits, origin).is_ok())
+/// the offer is never made for a page that would only fail. It probes the address the
+/// reader asked for, which is the one the offer joins `/llms.txt` onto.
+fn has_llms_txt(requested: &Url, limits: &Limits, origin: Origin) -> bool {
+    requested.join(web::LLMS_TXT).is_ok_and(|llms| page(&llms, limits, origin).is_ok())
 }
 
 #[cfg(test)]
@@ -239,11 +247,63 @@ mod tests {
         })
     }
 
+    fn fall(server: &Server, path: &str) -> Result<Fetched, ErrorCode> {
+        fallback(&Url::parse(&server.url(path)).unwrap(), &limits(), Origin::Trusted)
+    }
+
+    fn paths(server: &Server) -> Vec<String> {
+        server.requests().into_iter().map(|request| request.path).collect()
+    }
+
     #[test]
     fn an_html_page_falls_back_to_its_md_sibling() {
         let server = site(html());
-        let found = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        let found = fall(&server, "/post").unwrap();
         assert_eq!((found.url.path(), found.source.as_str()), ("/post.md", "# Found"));
+        assert_eq!(found.fallback_from, Some(Url::parse(&server.url("/post")).unwrap()));
+    }
+
+    #[test]
+    fn a_trailing_slash_tries_the_sibling_then_the_index() {
+        let server = Server::start(|request| match request.path.as_str() {
+            "/post/" => html(),
+            "/post/index.md" => Reply::markdown("# Index"),
+            _ => Reply::new(404),
+        });
+        let found = fall(&server, "/post/").unwrap();
+        assert_eq!(found.url.path(), "/post/index.md");
+        assert_eq!(found.fallback_from, Some(Url::parse(&server.url("/post/")).unwrap()));
+        assert_eq!(paths(&server), ["/post/", "/post.md", "/post/index.md"]);
+    }
+
+    #[test]
+    fn a_redirected_page_looks_for_siblings_of_where_it_ended() {
+        let server = Server::start(|request| match request.path.as_str() {
+            "/old" => Reply::redirect(302, "/new"),
+            "/new" => html(),
+            "/new.md" => Reply::markdown("# New"),
+            _ => Reply::new(404),
+        });
+        let found = fall(&server, "/old").unwrap();
+        assert_eq!(found.url.path(), "/new.md");
+        assert_eq!(found.fallback_from, Some(Url::parse(&server.url("/old")).unwrap()));
+        assert!(!paths(&server).contains(&"/old.md".to_string()));
+    }
+
+    #[test]
+    fn a_failing_alternate_falls_through_to_the_sibling() {
+        for alternate in
+            [Reply::new(500), Reply::new(200).header("Content-Type", "text/markdown").body("x".repeat(2000))]
+        {
+            let linked = html().header("Link", r#"</raw/post.md>; rel="alternate"; type="text/markdown""#);
+            let server = Server::start(move |request| match request.path.as_str() {
+                "/post" => linked.clone(),
+                "/raw/post.md" => alternate.clone(),
+                "/post.md" => Reply::markdown("# Found"),
+                _ => Reply::new(404),
+            });
+            assert_eq!(fall(&server, "/post").unwrap().url.path(), "/post.md");
+        }
     }
 
     #[test]
@@ -293,6 +353,41 @@ mod tests {
     }
 
     #[test]
+    fn an_llms_txt_that_cannot_be_read_is_not_offered() {
+        let looping = Server::start(|request| match request.path.as_str() {
+            "/post" => html(),
+            "/llms.txt" => Reply::redirect(302, "/llms.txt"),
+            _ => Reply::new(404),
+        });
+        let latin = Reply::new(200).header("Content-Type", "text/markdown; charset=iso-8859-1").body("# Site");
+        let replies = [
+            Reply::markdown(&"x".repeat(2000)),
+            Reply::new(200).header("Content-Type", "text/markdown").body(vec![0xff, 0xfe]),
+            latin,
+        ];
+        for llms in replies {
+            assert_eq!(fall(&with_llms(llms), "/post"), Err(ErrorCode::NotMarkdown));
+        }
+        assert_eq!(fall(&looping, "/post"), Err(ErrorCode::NotMarkdown));
+    }
+
+    #[test]
+    fn the_search_shares_one_deadline() {
+        let server = Server::start(|request| match request.path.as_str() {
+            "/post" => html(),
+            _ => {
+                std::thread::sleep(Duration::from_millis(300));
+                Reply::new(404)
+            }
+        });
+        let quick = Limits { overall: Duration::from_millis(500), ..limits() };
+        let started = Instant::now();
+        let result = fallback(&Url::parse(&server.url("/post")).unwrap(), &quick, Origin::Trusted);
+        assert_eq!(result, Err(ErrorCode::NotMarkdown));
+        assert!(started.elapsed() < Duration::from_millis(1500), "{:?}", started.elapsed());
+    }
+
+    #[test]
     fn llms_txt_is_only_looked_for_when_nothing_else_was_found() {
         let server = site(html());
         fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
@@ -319,17 +414,18 @@ mod tests {
                 "/post.md" => Reply::markdown("# Found"),
                 _ => Reply::new(status),
             });
-            let result = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted);
-            assert!(result.is_err(), "{status}");
-            assert!(server.requests().iter().all(|request| request.path != "/post.md"), "{status}");
+            let expected = if status == 404 { ErrorCode::NotFound } else { ErrorCode::ServerError };
+            assert_eq!(fall(&server, "/post"), Err(expected), "{status}");
+            assert_eq!(paths(&server), ["/post"], "{status}");
         }
     }
 
     #[test]
     fn markdown_is_returned_as_it_is() {
         let server = Server::start(|_| Reply::markdown("# Here"));
-        let found = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        let found = fall(&server, "/post").unwrap();
         assert_eq!((found.url.path(), found.source.as_str()), ("/post", "# Here"));
+        assert_eq!(found.fallback_from, None);
         assert_eq!(server.requests().len(), 1);
     }
 
