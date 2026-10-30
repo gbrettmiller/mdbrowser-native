@@ -74,7 +74,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - Functional style: functions take values and return new values. Mutation stays local to a function (builders, accumulators) and never leaks through shared state. No trait-object hierarchies without an ADR.
 - No `unsafe`.
 - Tests live beside the code in `#[cfg(test)] mod tests`. Layout gets golden snapshots for the corpus documents whose glyphs are all in the bundled fonts. Documents that fall back to host fonts (mixed scripts, symbols) get smoke tests only, because fallback faces differ between machines.
-- Files stay under roughly 300 lines. Split by responsibility before that.
+- Non-test code stays under roughly 300 lines per file: count up to the `#[cfg(test)]` module, and test files (`tests/`, `*_tests.rs`, `tests.rs`, golden snapshots) are exempt. Split by responsibility before that.
 
 ## What Not to Do
 

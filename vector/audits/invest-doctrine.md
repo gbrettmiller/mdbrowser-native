@@ -46,4 +46,4 @@
 3. `ARCHITECTURE.md:Conventions` — decide the 300-line rule: scope it to non-test code, or split `services/web/mod.rs` and `model/mod.rs` first (the two largest with real logic).
 
 ### Resolved after this run
-Actions 1 and 2 were applied the same day: the Research Status row, the project tree (`tests/`, `DESIGN.md`, `audits/`) and the Stack table (`open`, `libc`, `flate2`). Action 3 (the 300-line rule) is open for gBRETT.
+Actions 1 and 2 were applied the same day: the Research Status row, the project tree (`tests/`, `DESIGN.md`, `audits/`) and the Stack table (`open`, `libc`, `flate2`). Action 3 was decided by gBRETT: the 300-line rule now counts non-test code only. Under it, one file is still over: `session/images/planner.rs` has about 333 lines before its tests.
