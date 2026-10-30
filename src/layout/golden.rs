@@ -130,7 +130,7 @@ fn every_markdownweb_post_shows_its_front_matter() {
             continue;
         }
         let source = std::fs::read_to_string(&path).unwrap_or_default();
-        if path.extension().is_none_or(|ext| ext != "md") || !source.starts_with("---\n") {
+        if path.extension().is_none_or(|ext| ext != "md") || !source.starts_with("---") {
             continue;
         }
         let page = framed_page(&source);
