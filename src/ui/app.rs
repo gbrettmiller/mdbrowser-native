@@ -244,12 +244,22 @@ impl App {
                 Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
             }
             Some(Command::Scroll(by)) => self.key_scroll(by),
+            Some(Command::ClosePanel) => self.close_panel(),
             Some(Command::FocusNext) => operation::focus_next(),
             Some(Command::FocusPrevious) => operation::focus_previous(),
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),
             Some(Command::ToggleSettings) => self.update(Message::ToggleSettings),
             None => Task::none(),
         }
+    }
+
+    /// Esc: closes the Settings panel, or else History, and puts the keyboard back on the page.
+    fn close_panel(&mut self) -> Task<Message> {
+        let Some((history, settings)) = after_escape(self.history_open, self.settings_open) else {
+            return Task::none();
+        };
+        (self.history_open, self.settings_open) = (history, settings);
+        operation::focus(PAGE_ID)
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -286,4 +296,26 @@ const fn may_change_look(event: &Event) -> bool {
             | Event::ResetReaderControls
             | Event::Restore { .. }
     )
+}
+
+/// The panels that stay open after Esc: Settings goes first, then History. `None` if none was open.
+const fn after_escape(history: bool, settings: bool) -> Option<(bool, bool)> {
+    match (history, settings) {
+        (false, false) => None,
+        (_, true) => Some((history, false)),
+        (true, false) => Some((false, false)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escape_closes_settings_first_then_history_and_does_nothing_with_none_open() {
+        assert_eq!(after_escape(false, false), None);
+        assert_eq!(after_escape(true, true), Some((true, false)));
+        assert_eq!(after_escape(false, true), Some((false, false)));
+        assert_eq!(after_escape(true, false), Some((false, false)));
+    }
 }

@@ -4,6 +4,7 @@ use iced::widget::{button, column, container, scrollable, text};
 use iced::{Element, Fill, Length};
 
 use super::app::Message;
+use super::focus::pressable;
 use crate::content;
 use crate::session::{Event, State};
 use crate::theme;
@@ -22,18 +23,15 @@ pub fn panel(state: &State, palette: theme::Palette) -> Element<'_, Message> {
                 text(visit.address.as_str()).size(12).style(move |_| text::Style { color: Some(muted) }),
             ]
             .spacing(2);
-            button(label)
-                .width(Fill)
-                .style(button::text)
-                .on_press(Message::Session(Event::OpenHistory(visit.address.clone())))
-                .into()
+            let open = Message::Session(Event::OpenHistory(visit.address.clone()));
+            pressable(button(label).width(Fill).style(button::text).on_press(open.clone()), Some(open))
         }))
         .spacing(2)
         .into()
     };
-    let clear = button(content::CLEAR_HISTORY)
-        .style(button::secondary)
-        .on_press_maybe((!state.visits.is_empty()).then_some(Message::Session(Event::ClearHistory)));
+    let clearing = (!state.visits.is_empty()).then_some(Message::Session(Event::ClearHistory));
+    let clear =
+        pressable(button(content::CLEAR_HISTORY).style(button::secondary).on_press_maybe(clearing.clone()), clearing);
     container(column![text(content::HISTORY).size(18), clear, scrollable(entries).height(Fill)].spacing(12))
         .width(Length::Fixed(WIDTH))
         .height(Fill)

@@ -4,6 +4,7 @@ pub mod app;
 mod body;
 mod chrome;
 pub mod document;
+mod focus;
 mod history;
 pub mod images;
 mod keys;

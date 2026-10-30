@@ -51,6 +51,8 @@ pub enum Command {
     FocusNext,
     FocusPrevious,
     Scroll(Scroll),
+    /// Esc: close the panel that is open, and return to the page.
+    ClosePanel,
 }
 
 /// The command for `key` pressed with `modifiers`, if it is a shortcut.
@@ -69,6 +71,7 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
                 Command::FocusNext
             }
         }
+        Key::Named(Named::Escape) if !primary && !alt && !shift => Command::ClosePanel,
         Key::Named(Named::F5) => Command::Session(Event::Reload),
         Key::Character("r") if primary => Command::Session(Event::Reload),
         Key::Character("l") if primary => Command::FocusAddress,
@@ -165,6 +168,13 @@ mod tests {
         assert_eq!(scroll(named(Named::ArrowDown), Modifiers::ALT, true), None);
         assert_eq!(scroll(named(Named::Home), Modifiers::ALT, true), None, "Alt+Home is the home page");
         assert_eq!(command(named(Named::Home), Modifiers::ALT), Some(Command::Session(Event::Home)));
+    }
+
+    #[test]
+    fn escape_closes_a_panel_but_not_with_a_modifier() {
+        assert_eq!(command(named(Named::Escape), Modifiers::empty()), Some(Command::ClosePanel));
+        assert_eq!(command(named(Named::Escape), Modifiers::SHIFT), None);
+        assert_eq!(command(named(Named::Escape), primary()), None);
     }
 
     #[test]

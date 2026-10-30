@@ -1,10 +1,11 @@
 //! Everything the document area can show besides a document: welcome, loading,
 //! errors, and the notices above it.
 
-use iced::widget::{button, column, container, row, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Fill};
 
 use super::app::Message;
+use super::focus::button;
 use crate::content;
 use crate::session::error::ErrorCode;
 use crate::session::location::Location;
@@ -21,8 +22,8 @@ pub fn error<'a>(code: ErrorCode, state: &State, theme: &theme::Theme) -> Elemen
     let muted = theme.muted;
     let (message, hint) = content::failure(code, state.current_location().is_some_and(Location::is_web));
     let (address, browser_offered) = (state.address(), state.browser_offer().is_some());
-    let open = button(content::OPEN_IN_BROWSER).on_press(Message::Session(Event::OpenInBrowser));
-    let llms = state.llms_offer().map(|_| button(content::TRY_LLMS_TXT).on_press(Message::Session(Event::OpenLlmsTxt)));
+    let open = button(content::OPEN_IN_BROWSER, Some(Message::Session(Event::OpenInBrowser)));
+    let llms = state.llms_offer().map(|_| button(content::TRY_LLMS_TXT, Some(Message::Session(Event::OpenLlmsTxt))));
     column![text(message).size(20)]
         .push(hint.map(|hint| text(hint).size(16)))
         .push(text(address).size(14).style(move |_| text::Style { color: Some(muted) }))
@@ -40,7 +41,7 @@ pub fn fallback_banner(status: &Status) -> Option<Element<'_, Message>> {
     Some(
         row![
             text(content::found_instead(original)).width(Fill),
-            button(content::OPEN_IN_BROWSER).on_press(Message::Session(Event::OpenInBrowser)),
+            button(content::OPEN_IN_BROWSER, Some(Message::Session(Event::OpenInBrowser))),
         ]
         .spacing(8)
         .padding([4, 8])
@@ -52,7 +53,7 @@ pub fn notices(notices: &[Notice]) -> Element<'_, Message> {
     column(notices.iter().map(|notice| {
         row![
             text(content::notice(notice.kind)).width(Fill),
-            button(content::DISMISS).on_press(Message::Session(Event::DismissNotice(notice.id))),
+            button(content::DISMISS, Some(Message::Session(Event::DismissNotice(notice.id)))),
         ]
         .spacing(8)
         .padding([4, 8])

@@ -3,10 +3,11 @@
 
 use std::fmt;
 
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
+use iced::widget::{column, container, pick_list, row, scrollable, text, text_input};
 use iced::{Element, Length};
 
 use super::app::Message;
+use super::focus::{self, button, neighbour};
 use crate::content;
 use crate::session::images::ImageLoading;
 use crate::session::{Event, State, TextStep};
@@ -41,10 +42,15 @@ fn choice<'a, T: Copy + PartialEq + 'static>(
     event: fn(T) -> Event,
 ) -> Element<'a, Message> {
     let options: Vec<_> = all.iter().map(|&value| Shown(value, name)).collect();
+    let step = |forward| neighbour(all, current, forward).map(|value| Message::Session(event(value)));
     column![
         text(label).size(14),
-        pick_list(options, Some(Shown(current, name)), move |Shown(value, _)| Message::Session(event(value)))
-            .width(Length::Fill),
+        focus::choice(
+            pick_list(options, Some(Shown(current, name)), move |Shown(value, _)| Message::Session(event(value)))
+                .width(Length::Fill),
+            step(false),
+            step(true),
+        ),
     ]
     .spacing(4)
     .into()
@@ -54,8 +60,7 @@ fn choice<'a, T: Copy + PartialEq + 'static>(
 fn text_size<'a>(state: &State) -> Element<'a, Message> {
     let size = state.settings.text_size;
     let step = |label: &'static str, step, enabled: bool| {
-        button(text(label).size(14).center())
-            .on_press_maybe(enabled.then_some(Message::Session(Event::StepTextSize(step))))
+        button(text(label).size(14).center(), enabled.then_some(Message::Session(Event::StepTextSize(step))))
     };
     column![
         text(content::TEXT_SIZE_LABEL).size(14),
@@ -137,7 +142,7 @@ pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDraft
     .push((settings.appearance == Appearance::Custom).then(|| colour_fields(colours)))
     .push(text_size(state))
     .push(choice(content::SPACING_LABEL, &Spacing::ALL, settings.spacing, content::spacing, Event::ChooseSpacing))
-    .push(button(text(content::RESET_READER_CONTROLS).size(14)).on_press(Message::Session(Event::ResetReaderControls)))
+    .push(button(text(content::RESET_READER_CONTROLS).size(14), Some(Message::Session(Event::ResetReaderControls))))
     .push(home)
     .spacing(16)
     .padding(iced::Padding::ZERO.right(SCROLLBAR_ROOM));
