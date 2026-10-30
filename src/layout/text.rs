@@ -29,10 +29,11 @@ impl Flow<'_> {
         let font = if span.style.code { theme.mono_font } else { ink.font };
         let font = if span.style.strong { bold(font) } else { font };
         let font = if span.style.emphasis { italic(font) } else { font };
-        let color = match (&span.link, span.style.code) {
-            (Some(_), _) => theme.link,
-            (None, true) => theme.code_ink,
-            (None, false) => ink.color,
+        let color = match (&span.link, span.style.code, span.style.quiet) {
+            (Some(_), ..) => theme.link,
+            (None, true, _) => theme.code_ink,
+            (None, false, true) => theme.muted,
+            (None, false, false) => ink.color,
         };
         (font, color)
     }

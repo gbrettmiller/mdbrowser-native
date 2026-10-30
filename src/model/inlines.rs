@@ -50,7 +50,13 @@ struct Depth {
 
 impl Depth {
     fn style(&self) -> Style {
-        Style { strong: self.strong > 0, emphasis: self.emphasis > 0, strike: self.strike > 0, code: false }
+        Style {
+            strong: self.strong > 0,
+            emphasis: self.emphasis > 0,
+            strike: self.strike > 0,
+            code: false,
+            quiet: false,
+        }
     }
 }
 

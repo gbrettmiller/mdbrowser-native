@@ -3,8 +3,10 @@
 
 mod blocks;
 mod date;
+mod frame;
 mod frontmatter;
 pub use date::readable as readable_date;
+pub use frame::{EnclosureLine, Frame, Labels, assemble, frame};
 pub use frontmatter::{Enclosure, FrontMatter, Source};
 mod html;
 mod inlines;
@@ -21,6 +23,8 @@ pub struct Style {
     pub emphasis: bool,
     pub strike: bool,
     pub code: bool,
+    /// The browser's own aside (a byline): drawn muted. Markdown never sets it.
+    pub quiet: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
