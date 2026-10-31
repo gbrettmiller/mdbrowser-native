@@ -1,49 +1,48 @@
 ## Doctrine Audit
 
-**Files audited:** VECTOR.md, CLAUDE.md, ARCHITECTURE.md (cross-checked against `src/`, `tests/`, `Cargo.toml`, `.github/workflows/ci.yml`)
+**Files audited:** VECTOR.md, CLAUDE.md, ARCHITECTURE.md (cross-checked against `src/`, `tests/`, `Cargo.toml`, README.md, ADR-003, ADR-005, ADR-006 and the release plan)
 **Project stage:** development
-**Run:** 2026-10-30, on `feat/phase-3` at 4f35ffa
+**Run:** 2026-10-31, on `main` at 43248d7 (after PR #17). CI on `main` is green.
 
 ### Findings
 
 #### CONTRADICTION — high
-- `VECTOR.md:Research Status` says "Community examples: Not yet in the corpus", but `corpus/markdownweb/` holds examples 0–8 and three extras (the phase 3 plan surveys them).
+- `VECTOR.md:What This Is Not` says "Non-Markdown links are handed off to the system", but since PR #17 every web link is tried in the app first and only `mailto:` leaves, after the reader agrees.
 
-#### STRUCTURE — medium
-- `ARCHITECTURE.md:Project Structure` doesn't declare `tests/` (`acceptance/` and `support/`), which is a source directory. The Stack table mentions `tests/acceptance/`, but the tree doesn't.
-- `ARCHITECTURE.md:Project Structure` doesn't declare `DESIGN.md` (the Impeccable visual system doc) or `corpus/examples.md`, the new examples index. `corpus/` is declared, so the index is covered; `DESIGN.md` is not.
-- `vector/audits/` did not exist before this run and is not in the declared `vector/` tree (`decisions/`, `plans/`, `research/`, `schemas/`).
+#### DRIFT — high
+- `VECTOR.md:Direction 2d` and `ADR-005:Option B` say the reader is told which address was shown (a notice names the original address). The banner was removed in PR #17; the address bar is the signal and `Ctrl/Cmd+Shift+O` opens the original. ADR-005 needs an amendment note, as ADR-003 has for its changes.
+- `README.md` still says "Other `http` and `https` links, and `mailto` links, open in your system's handler" and "a **Listen** line … opens in your system's player". Web links now open in the app, and a Listen link tries the app first and ends on the error page's **Open in browser**. The `Ctrl+Shift+O` row also omits that it opens the original of a fallback page. `VECTOR.md:Direction 3` and `ADR-006` repeat the enclosure claim.
 
 #### DRIFT — medium
-- `ARCHITECTURE.md:Conventions` says files stay under roughly 300 lines. Ten files are over: `session/tests.rs` (651), `services/web/mod.rs` (498), `model/mod.rs` (441), `session/web/mod.rs` (380), `session/images/planner_tests.rs` (365), `session/images/resolve.rs` (351), `tests/acceptance/steps/local.rs` (346), `tests/acceptance/world.rs` (337), `session/images/planner.rs` (336) and `services/web/fetch.rs` (314). Most are test files or have inline tests. Either the rule should say "non-test code" or these should be split.
-- `ARCHITECTURE.md:Stack` omits crates in `Cargo.toml`: `open` (behind `services::opener`), `libc` (unix only, in `services::files`) and the dev-dependency `flate2`.
+- `ADR-003:92` says local-network links "that aren't Markdown still go to the system browser". They are now refused outright (`LocalNetworkFromWeb`), and nothing but mail leaves.
+- `ARCHITECTURE.md:Conventions` says non-test code stays under about 300 lines. Three files are over: `ui/document.rs` (451), `ui/focus.rs` (347) and `ui/app.rs` (333).
+
+#### GAP — medium
+- `VECTOR.md:Ship Criteria` leaves two boxes unticked that are done: "The reader can set typeface, text size, spacing and a light or dark palette, and the choices persist" (phases 2c and 4) and "Builds and passes CI on Linux. macOS and Windows build in CI" (four-OS matrix, green on `main`).
+- `VECTOR.md:Ship Criteria` has two boxes that are genuinely open: "Renders the markdownWeb examples 0–8 and the scripting.com archive…" and "Opening a typical post takes under 250 ms… no stutter". The second has no measurement on record, and the first depends on the open "Leading images and tall images" question.
 
 #### GAP — low
-- `VECTOR.md:Ship Criteria` has "Builds and passes CI on Linux. macOS and Windows build in CI" unchecked, but `ci.yml` already builds a four-OS matrix (Ubuntu x64 and ARM64, macOS, Windows). It can probably be ticked once the first run on `main` is green.
-- `VECTOR.md:Ship Criteria` "Renders the markdownWeb examples 0–8 …" is unchecked. Phase 3 AC 8 (screenshots) is the open piece. This is accurate, so no change is needed until the screenshots are read.
-- `ARCHITECTURE.md:Conventions` has no naming table (file types, casing, examples). It only says "Rust defaults". That's enough for Rust, but `invest-architecture` has no declared rule for feature files, ADRs, plans or corpus files.
-- `ARCHITECTURE.md:Layers` says `services` is the only layer touching `std::net`, but `session/network.rs` imports `IpAddr`, `Ipv4Addr` and `Ipv6Addr`. These are value types used to refuse local-network targets, not I/O. The rule should say "performing I/O". `layout/golden.rs` reads `std::fs` inside tests, which is also fine in practice but unmentioned.
-- `Cargo.toml` names the package `mdbrowser`, while the repo, `VECTOR.md` and the docs say `mdbrowser-native`. Worth a decision, but not blocking.
+- `ARCHITECTURE.md:Layers` (Session) doesn't mention the leave-the-app confirmation (`State.leaving`, `ConfirmLeaving`, `StayHere`). `Last Updated` still reads 2026-10-30.
+- `ARCHITECTURE.md:Layers` (Services) says `services` is the only layer touching `std::net`, but `session/network.rs` imports `IpAddr` and friends as value types. The rule should say "performing I/O". Carried over from the last audit.
+- `Cargo.toml` names the package `mdbrowser`, while the repo, `VECTOR.md` and `CLAUDE.md` say `mdbrowser-native`. Carried over; the binary name matches the README, so this is a naming decision, not a bug.
 
 #### PLACEHOLDER — info
-- None. No template text remains in any doctrine file.
+- None. `layout/golden.rs` and `theme/chrome_text.rs` read `std::fs` inside tests only, which is fine in practice but not mentioned in the I/O rule.
 
 ### What checked out
-- **VECTOR.md** is complete and specific: problem, audience, value proposition, direction (phases 1–5), "What This Is Not", five principles, constraints, Definition of Done, ship criteria, six assumptions, open questions. Phase 3 is recorded as built and ADR-006 is cited.
-- **ARCHITECTURE.md** layer rules match the code. No `use crate::ui` or `use crate::services` appears in `model`, `layout`, `session` or `theme`. `model` has no `crate::` imports outside itself. Only `ui` uses `content`. I/O (`std::fs`, `std::process`, `std::thread`) is confined to `services`, apart from the items above.
-- **Stack** matches `Cargo.toml` for every declared crate. ADR-001 to ADR-006 are all `accepted`, and every ADR referenced in ARCHITECTURE.md exists.
-- **CLAUDE.md** points at real paths (`~/projects/mdbrowser`, `~/projects/mdbrowser-spike`, `vector/research/…`), its command list matches `ci.yml`, and it doesn't contradict ARCHITECTURE.md.
-- **Persona vs. depth:** the global instruction is "default to concise" and ARCHITECTURE.md is a reference spec, not teaching text. No mismatch.
-- **Constraints vs. stack:** "no HTML, DOM or webview" holds. The dependency list has none. HTTP is `ureq` without cookies, as ADR-003 requires.
+- Every path in `ARCHITECTURE.md:Project Structure` exists, and `src/` holds exactly the declared layers. `tests/` and `DESIGN.md`, flagged last time, are now declared.
+- Import direction holds: no `ui` or `services` imports in `model`, `layout`, `session` or `theme`, and only `ui` uses `content`.
+- No `unsafe` in the source; the three grep hits are the word "unsafe" in the mail-link checks in `services/opener.rs`.
+- No colour literals outside `theme` apart from one test fixture (`layout/stops.rs`).
+- The stack table matches `Cargo.toml` (`open`, `libc` and `flate2` are now listed), and ADR-001 to ADR-008 exist and are referenced.
+- `CLAUDE.md` matches `ci.yml` and does not contradict `ARCHITECTURE.md`.
+- The previous run's high contradiction (the corpus is no longer "not yet in") is fixed.
 
 ### Summary
-- Critical: 0 | High: 1 | Medium: 5 | Low: 5 | Info: 0
-- Doctrine health: GAPS FOUND. Nothing blocks `invest-architecture`; the one high finding is a stale table row.
+- Critical: 0 | High: 3 | Medium: 4 | Low: 3 | Info: 1
+- Doctrine health: GAPS FOUND. Nothing blocks `invest-architecture`, but the doctrine describes the link behaviour from before PR #17.
 
 ### Recommended Actions
-1. `VECTOR.md:Research Status` — change "Community examples" from "Not yet in the corpus" to point at `corpus/markdownweb/` and `corpus/examples.md`.
-2. `ARCHITECTURE.md:Project Structure` — add `tests/` (`acceptance/`, `support/`), `DESIGN.md` and `vector/audits/`, and add `open`, `libc` and `flate2` to the Stack table.
-3. `ARCHITECTURE.md:Conventions` — decide the 300-line rule: scope it to non-test code, or split `services/web/mod.rs` and `model/mod.rs` first (the two largest with real logic).
-
-### Resolved after this run
-Actions 1 and 2 were applied the same day: the Research Status row, the project tree (`tests/`, `DESIGN.md`, `audits/`) and the Stack table (`open`, `libc`, `flate2`). Action 3 was decided by gBRETT: the 300-line rule now counts non-test code only. `session/images/planner.rs`, the one file still over, was brought to 297 lines of non-test code by moving its two test-only helpers (`check`, `shown_bytes`) into `planner_tests.rs`.
+1. Update the link wording to match PR #17 in `VECTOR.md` (What This Is Not, Direction 2d, Direction 3), `README.md` (the two bullets and the `Ctrl+Shift+O` row) and `ADR-003:92`. Add an amendment note to `ADR-005` for the removed banner. Record the change as a short ADR via `invest-adr`: web links are tried in-app and only mail leaves, after confirmation.
+2. Tick the two finished Ship Criteria, and decide how the open ones will be closed: read the markdownWeb screenshots, measure the 250 ms open, and settle the leading-image question.
+3. Decide whether to split `ui/document.rs`, `ui/focus.rs` and `ui/app.rs`, or reword the 300-line rule.

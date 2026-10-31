@@ -11,15 +11,15 @@ Writers own the words. Readers own the presentation. The document chooses nothin
 - Opens local Markdown by path, `~/` path or `file://` URL, and follows links between `.md` files.
 - Opens Markdown on the web by `http://` or `https://` address. It asks the site for Markdown first, so some sites serve it even at addresses without `.md`: try `https://andrewshell.org/`. Redirects are followed, and the address bar shows where the page ended up.
 - Follows links between `.md` pages across sites, and from local files to the web. A web page can never open files on your computer, or addresses on your local network.
-- A web page that turns out not to be Markdown can be handed to your web browser with **Open in browser**.
+- A link to a web page is tried in the app first. If the page isn't Markdown, mdbrowser looks for its Markdown version, and if there is none it says so and offers **Open in browser**. A page found that way shows no banner: the address bar says where you are, and Ctrl+Shift+O opens the address you asked for in your web browser.
 - Renders CommonMark plus GitHub tables, task lists and strikethrough. In-page `#anchors` use GitHub heading slugs.
 - Takes the window title from front matter `title`, then the first heading, then the file name.
 - Back, forward, reload, and a History panel that persists across restarts.
 - Four bundled reading faces: Literata (default), Source Serif 4, iA Writer Quattro and Inter. Code is set in JetBrains Mono.
 - A **Settings** panel (Ctrl+, or Cmd+,) holds the reading font, text size (12 to 32 px in steps of 2), spacing (Compact, Comfortable or Spacious), Web images, Appearance (System, Light, Dark or Custom) and a Home page, with a button that puts size and spacing back. System follows the operating system. Custom takes page, text and link colours as `#rgb` or `#rrggbb`, and refuses a set whose text or links fall below WCAG AA contrast (4.5:1) on the page. Home (the toolbar button or Alt+Home) opens the home page, or a built-in welcome page when none is set, and the app opens it on launch unless you give an address.
-- Reads the shared Web of Markdown front matter: a byline under the title from `author`, `pubDate` and the `source` site name, a `description`, a **Listen** line for an `enclosure` (it opens in your system's player), and **Previous** and **Next** links from `urlPrev` and `urlNext`. Other keys, and the `image`, `inlineImage` and `metaImage` fields, are ignored.
+- Reads the shared Web of Markdown front matter: a byline under the title from `author`, `pubDate` and the `source` site name, a `description`, a **Listen** line for an `enclosure` (a link like any other: it isn't Markdown, so you are offered **Open in browser**), and **Previous** and **Next** links from `urlPrev` and `urlNext`. Other keys, and the `image`, `inlineImage` and `metaImage` fields, are ignored.
 - Select text with the mouse and copy it with Ctrl+C.
-- Other `http` and `https` links, and `mailto` links, open in your system's handler. Other schemes are blocked.
+- A `mailto` link is the one kind that leaves the app. mdbrowser says where it goes and asks first (**Open** or **Stay here**). Other schemes are blocked.
 - Raw HTML in a document is stripped, never interpreted: the tags go and the text between them stays.
 - Draws Markdown images (`![description](src)`) from files and the web: PNG, JPEG, GIF (its first frame) and WebP. An image is never shown larger than it is, and is scaled down to fit the text. An image that can't be shown leaves its description and a note saying why; one that failed to load can be clicked to try again.
 - The **Web images** setting (in Settings, Ctrl+, or Cmd+,) chooses whether images from the web load automatically, on click, or not at all. Images in local files always load. Ctrl+Shift+I (Cmd+Shift+I on macOS) loads the current page's images whatever the setting.
@@ -58,7 +58,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Show or hide Settings | Ctrl+, | Cmd+, |
 | Previous / next post | Ctrl+[ / Ctrl+] | Cmd+[ / Cmd+] |
 | Open the home page | Alt+Home | Option+Home |
-| Open a page that isn't Markdown in your browser | Ctrl+Shift+O | Cmd+Shift+O |
+| Open the original of a page found by fallback, or a page that isn't Markdown, in your browser | Ctrl+Shift+O | Cmd+Shift+O |
 | Load this page's images | Ctrl+Shift+I | Cmd+Shift+I |
 | Larger / smaller / default text size | Ctrl+= / Ctrl+- / Ctrl+0 | Cmd+= / Cmd+- / Cmd+0 |
 | Select all / copy | Ctrl+A / Ctrl+C | Cmd+A / Cmd+C |

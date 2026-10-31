@@ -56,6 +56,8 @@ On a successful response whose type isn't Markdown: (1) the `Link: <…>; rel="a
 
 The trigger is only a type mismatch on a success response. A 404, a timeout or a bad body never starts a fallback, so failures keep their meaning. Fallbacks use the original `Origin`, the same limits and the same type checks, and never chain. A `Link` alternate on another host is ignored, so a page can't redirect the reader's fetch elsewhere. The reader's address bar and History hold the Markdown URL actually shown. Option C is left for later: HTML scanning needs an ADR of its own, and `llms.txt` stays an explicit choice.
 
+**Amended 2026-10-31.** The notice naming the original address is gone: after a successful fallback the address bar already says where the reader is, and "this site doesn't serve Markdown at …" was inaccurate. The session still records the address asked for, and Ctrl/Cmd+Shift+O opens it in the system browser. The same fallback now runs for links followed from a page, not only for typed addresses, so a same-site link such as `/post` finds `/post.md` and `/llms.txt` opens in the app. A page with no Markdown version still ends in the error and its Open in browser button.
+
 ## Consequences
 
 **Positive:**
@@ -65,7 +67,7 @@ The trigger is only a type mismatch on a success response. A 404, a timeout or a
 **Negative:**
 - A site that serves Markdown only through `<link rel="alternate">` in its HTML is not covered yet.
 - A failed type mismatch costs up to five requests before the error appears: the page, the `Link` alternate, two siblings and the `llms.txt` probe, all within one shared deadline.
-- Back, Reload and History use the Markdown URL, so the original HTML address isn't kept except in the notice and Open in browser.
+- Back, Reload and History use the Markdown URL, so the original HTML address isn't kept except for Open in browser (Ctrl/Cmd+Shift+O).
 
 **Neutral:**
 - No setting to turn fallbacks off yet. If it's wanted, it belongs in the Settings panel.
