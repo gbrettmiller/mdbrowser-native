@@ -33,15 +33,13 @@ pub fn error<'a>(code: ErrorCode, state: &State, theme: &theme::Theme) -> Elemen
         .into()
 }
 
-/// Over a page that was found in place of the address asked for: names that
-/// address, and offers the system browser for it.
-pub fn fallback_banner(status: &Status) -> Option<Element<'_, Message>> {
-    let Status::Ready(shown) = status else { return None };
-    let original = shown.fallback_from.as_deref()?;
+/// Over the page when a link would leave the app: says where it goes, and lets the reader choose.
+pub fn leaving(address: Option<&str>) -> Option<Element<'_, Message>> {
     Some(
         row![
-            text(content::found_instead(original)).width(Fill),
-            button(content::OPEN_IN_BROWSER, Some(Message::Session(Event::OpenInBrowser))),
+            text(content::leaving(address?)).width(Fill),
+            button(content::LEAVE_AND_OPEN, Some(Message::Session(Event::ConfirmLeaving))),
+            button(content::STAY_HERE, Some(Message::Session(Event::StayHere))),
         ]
         .spacing(8)
         .padding([4, 8])
@@ -92,17 +90,6 @@ mod tests {
     use super::*;
     use crate::model::parse;
     use crate::session::Shown;
-
-    #[test]
-    fn the_banner_shows_only_for_a_page_found_instead() {
-        let shown = |fallback_from| {
-            Status::Ready(Arc::new(Shown { document: Arc::new(parse("# Hi")), title: "Hi".into(), fallback_from }))
-        };
-        assert!(fallback_banner(&shown(Some("https://x.org/post".into()))).is_some());
-        for status in [shown(None), Status::Idle, Status::Loading] {
-            assert!(fallback_banner(&status).is_none());
-        }
-    }
 
     #[test]
     fn the_title_shows_only_with_a_document() {

@@ -168,9 +168,12 @@ pub const PREVIOUS: &str = "← Previous";
 pub const NEXT: &str = "Next →";
 pub const TRY_LLMS_TXT: &str = "Try this site's llms.txt";
 
-/// The banner over a page whose Markdown version was found instead of `original`.
-pub fn found_instead(original: &str) -> String {
-    format!("This site doesn't serve Markdown at {original}. Showing the Markdown version instead.")
+pub const LEAVE_AND_OPEN: &str = "Open";
+pub const STAY_HERE: &str = "Stay here";
+
+/// The question over a page when a link would leave mdbrowser for the system.
+pub fn leaving(address: &str) -> String {
+    format!("This link leaves mdbrowser and opens in your system's own app: {address}")
 }
 
 #[cfg(test)]
@@ -259,13 +262,6 @@ mod tests {
         }
         let messages: Vec<_> = WEB_ERRORS.iter().filter_map(|code| web_error(*code)).map(|(m, _)| m).collect();
         distinct_and_non_empty(&messages);
-    }
-
-    #[test]
-    fn the_fallback_banner_names_the_original_address() {
-        let banner = found_instead("https://x.org/post");
-        assert!(banner.contains("https://x.org/post"));
-        distinct_and_non_empty(&[&banner, TRY_LLMS_TXT, OPEN_IN_BROWSER]);
     }
 
     #[test]

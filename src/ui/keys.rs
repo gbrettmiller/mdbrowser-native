@@ -86,7 +86,7 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         Key::Character("[") if primary => Command::Session(Event::Neighbour(Neighbour::Previous)),
         Key::Character("]") if primary => Command::Session(Event::Neighbour(Neighbour::Next)),
         Key::Named(Named::Home) if alt => Command::Session(Event::Home),
-        // The only keyboard route to the button; the session ignores it unless offered.
+        // Opens the original of a page found by fallback, or an error's offer; the session ignores it otherwise.
         Key::Character("o" | "O") if primary && shift => Command::Session(Event::OpenInBrowser),
         // The keyboard route to every image note's click, and to images that are off.
         Key::Character("i" | "I") if primary && shift => Command::Session(Event::LoadPageImages),

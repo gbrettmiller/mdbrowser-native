@@ -10,7 +10,7 @@ mod page;
 
 use super::address::{decode, normalise, scheme_of, web_target};
 use super::href::{as_browsers_read, local_target};
-use super::location::{Location, Target, WEB_SCHEMES, is_markdown, is_markdown_name, without_credentials};
+use super::location::{Location, Target, WEB_SCHEMES, is_markdown};
 
 const MAIL_SCHEME: &str = "mailto";
 
@@ -20,7 +20,7 @@ pub enum Link {
     Navigate(Target),
     /// An anchor in the current document.
     Scroll(String),
-    /// A web page that isn't Markdown, or mail: hand to the system.
+    /// Mail: hand to the system.
     External(String),
     /// A web page pointing at the reader's disk or network shares: refused.
     LocalFromWeb,
@@ -44,19 +44,12 @@ pub fn classify(href: &str, current: &Location) -> Link {
     }
 }
 
-/// For the system browser: the href as written, unless it carries credentials.
-fn external(reference: &str, url: Url) -> Link {
-    let spoofable = !url.username().is_empty() || url.password().is_some();
-    Link::External(if spoofable { without_credentials(url).to_string() } else { reference.to_string() })
-}
-
 /// The built-in page links to the web and mail by absolute address, and nowhere else.
 fn from_welcome(reference: &str) -> Link {
     match scheme_of(reference).as_deref() {
         Some(MAIL_SCHEME) => Link::External(reference.to_string()),
         Some(scheme) if WEB_SCHEMES.contains(&scheme) => match Url::parse(reference) {
-            Ok(url) if is_markdown_name(url.path()) => Link::Navigate(web_target(url)),
-            Ok(url) => external(reference, url),
+            Ok(url) => Link::Navigate(web_target(url)),
             Err(_) => Link::Unsupported,
         },
         _ => Link::Unsupported,
@@ -67,8 +60,7 @@ fn from_file(reference: &str, current: &Location) -> Link {
     match scheme_of(reference).as_deref() {
         Some(MAIL_SCHEME) => Link::External(reference.to_string()),
         Some(scheme) if WEB_SCHEMES.contains(&scheme) => match Url::parse(reference) {
-            Ok(url) if is_markdown_name(url.path()) => Link::Navigate(web_target(url)),
-            Ok(url) => external(reference, url),
+            Ok(url) => Link::Navigate(web_target(url)),
             Err(_) => Link::Unsupported,
         },
         _ => match local_target(reference, current) {
@@ -133,10 +125,11 @@ mod tests {
     }
 
     #[test]
-    fn other_web_and_mail_links_leave_the_app() {
-        for href in ["https://example.com", "http://x.org/a.txt", "mailto:a@b.co", "HTTPS://EXAMPLE.COM"] {
-            assert_eq!(classify(href, &here()), Link::External(href.into()), "{href}");
-        }
+    fn other_web_links_open_in_the_app_and_mail_leaves_it() {
+        assert_eq!(classify("mailto:a@b.co", &here()), Link::External("mailto:a@b.co".into()));
+        assert_eq!(classify("https://example.com", &here()), on_the_web("https://example.com/", None));
+        assert_eq!(classify("http://x.org/a.txt", &here()), on_the_web("http://x.org/a.txt", None));
+        assert_eq!(classify("HTTPS://EXAMPLE.COM", &here()), on_the_web("https://example.com/", None));
     }
 
     #[test]

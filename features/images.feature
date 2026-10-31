@@ -184,20 +184,22 @@ Feature: Images
     And web images are set to "off"
 
   Scenario: A linked image follows its link
-    Given the site serves "/post.md" containing "[![red](img/red.png)](https://example.com/)"
+    Given the site serves "/post.md" containing "[![red](img/red.png)](mailto:a@b.co)"
     And I am viewing the URL of "/post.md"
     When I click the image "red"
-    Then the system opened "https://example.com/"
+    And I agree to leave
+    Then the system opened "mailto:a@b.co"
 
   Scenario: A linked image waiting for a click
     Given I set web images to "on click"
-    And the site serves "/post.md" containing "[![red](img/red.png)](https://example.com/)"
+    And the site serves "/post.md" containing "[![red](img/red.png)](mailto:a@b.co)"
     And I am viewing the URL of "/post.md"
     When I click the note under "red"
     Then the image "red" is shown at 40 by 20
     And nothing is opened externally
     When I click the description "red"
-    Then the system opened "https://example.com/"
+    And I agree to leave
+    Then the system opened "mailto:a@b.co"
 
   Scenario: At most four images load at once
     Given the site serves "/gallery.md" with images "/img/slow-1.png" to "/img/slow-6.png"

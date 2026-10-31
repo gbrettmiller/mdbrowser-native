@@ -12,9 +12,9 @@ Feature: Markdown fallbacks
   #   /folder/       text/html     /folder/index.md text/markdown "# Folder Index"
   #   /old           302 to /article                       /ghost.md    text/markdown "# Ghost" (no /ghost)
   #
-  # The banner's wording and layout are drawn by the iced view, which these steps cannot
-  # see: they check what the session reports (`fallback_from`). Check the banner by eye
-  # with scripts/shoot.sh.
+  # A page found by fallback shows no banner: the address bar already says where it is.
+  # The session still records the address asked for (`fallback_from`), and Ctrl/Cmd+Shift+O
+  # opens it in the system browser.
 
   Scenario: The .md sibling is shown, and the reader is told
     When I enter the URL of "/article"
@@ -80,3 +80,30 @@ Feature: Markdown fallbacks
     Then I see the error "notFound"
     And I am not offered the site's llms.txt
     And the site was not asked for "/ghost.md"
+
+  Scenario: A followed link to a page on the same site finds its Markdown
+    Given I am viewing the URL of "/index.md"
+    When I follow "/article"
+    Then I see the document titled "Article In Markdown"
+    And the address shows the URL of "/article.md"
+    And nothing is opened externally
+
+  Scenario: A followed link to a folder finds its index
+    Given I am viewing the URL of "/index.md"
+    When I follow "/folder/"
+    Then I see the document titled "Folder Index"
+    And the address shows the URL of "/folder/index.md"
+
+  Scenario: A followed link to the site's llms.txt opens in the app
+    Given the site has an llms.txt
+    And I am viewing the URL of "/index.md"
+    When I follow "/llms.txt"
+    Then I see the document titled "Site Index"
+    And the address shows the URL of "/llms.txt"
+    And nothing is opened externally
+
+  Scenario: A followed link to a same-site page with no Markdown offers the system browser
+    Given I am viewing the URL of "/index.md"
+    When I follow "/bare"
+    Then I see the error "notMarkdown"
+    And nothing is opened externally

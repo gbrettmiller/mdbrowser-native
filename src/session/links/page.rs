@@ -6,10 +6,10 @@ use url::Url;
 use super::{Link, MAIL_SCHEME};
 use crate::session::address::{scheme_of, web_target};
 use crate::session::href::{OnPage, join_on_page};
-use crate::session::location::{is_markdown_name, without_credentials};
 use crate::session::network::crosses_into_local_network;
 
-/// Resolved as a browser would against the page's URL (`href::join_on_page`).
+/// Resolved as a browser would against the page's URL (`href::join_on_page`). Any web link is tried
+/// in the app, which finds its Markdown (ADR-005) or offers the system browser; only mail leaves.
 pub(super) fn classify(reference: &str, page: &Url) -> Link {
     if scheme_of(reference).as_deref() == Some(MAIL_SCHEME) {
         return Link::External(reference.to_string());
@@ -17,7 +17,6 @@ pub(super) fn classify(reference: &str, page: &Url) -> Link {
     match join_on_page(reference, page) {
         OnPage::Disk => Link::LocalFromWeb,
         OnPage::Unsupported => Link::Unsupported,
-        OnPage::Web(url) if !is_markdown_name(url.path()) => Link::External(without_credentials(url).to_string()),
         OnPage::Web(url) if crosses_into_local_network(page, &url) => Link::LocalNetworkFromWeb,
         OnPage::Web(url) => Link::Navigate(web_target(url)),
     }
@@ -67,10 +66,23 @@ mod tests {
     }
 
     #[test]
-    fn other_links_on_a_page_leave_the_app_as_full_urls() {
-        assert_eq!(from_page("page.html"), Link::External("https://x.org/docs/a/page.html".into()));
-        assert_eq!(from_page("/"), Link::External("https://x.org/".into()));
-        assert_eq!(from_page("https://e.com/about"), Link::External("https://e.com/about".into()));
+    fn other_web_pages_open_in_the_app_to_find_their_markdown() {
+        for (href, url) in [
+            ("page.html", "https://x.org/docs/a/page.html"),
+            ("/", "https://x.org/"),
+            ("/fail", "https://x.org/fail"),
+            ("/llms.txt", "https://x.org/llms.txt"),
+            ("https://x.org/about#team", "https://x.org/about"),
+            ("https://u:p@x.org/about", "https://x.org/about"),
+            ("https://e.com/about", "https://e.com/about"),
+            ("//other.host/", "https://other.host/"),
+        ] {
+            assert_eq!(from_page(href), on_the_web(url, href.split_once('#').map(|(_, f)| f)), "{href}");
+        }
+    }
+
+    #[test]
+    fn only_mail_on_a_page_leaves_the_app() {
         assert_eq!(from_page("mailto:a@b.co"), Link::External("mailto:a@b.co".into()));
     }
 
@@ -119,6 +131,8 @@ mod tests {
     #[test]
     fn a_public_page_cannot_open_the_local_network_in_the_app() {
         for href in [
+            "http://localhost:8080/",
+            "http://127.0.0.1/page",
             "http://127.0.0.1/x.md",
             "//2130706433/x.md",
             "//0x7f.1/x.md",
@@ -136,8 +150,6 @@ mod tests {
         for href in ["//router/x.md", "//printer.local/x.md", "//nas.lan/x.md", "//100.100.100.100/x.md"] {
             assert_eq!(from_page(href), Link::LocalNetworkFromWeb, "{href:?}");
         }
-        // The system browser applies its own rules; only in-app fetching is refused.
-        assert_eq!(from_page("http://localhost:8080/"), Link::External("http://localhost:8080/".into()));
     }
 
     #[test]
@@ -149,11 +161,12 @@ mod tests {
     }
 
     #[test]
-    fn credentials_never_reach_the_system_browser() {
+    fn credentials_never_reach_the_address_bar_or_the_system() {
         let spoof = "https://yourbank.com@evil.example/login";
-        assert_eq!(from_page(spoof), Link::External("https://evil.example/login".into()));
-        assert_eq!(classify(spoof, &here()), Link::External("https://evil.example/login".into()));
-        assert_eq!(classify("https://u:p@e.com/a", &here()), Link::External("https://e.com/a".into()));
+        assert_eq!(from_page(spoof), on_the_web("https://evil.example/login", None));
+        assert_eq!(classify(spoof, &here()), on_the_web("https://evil.example/login", None));
+        assert_eq!(classify("https://u:p@e.com/a", &here()), on_the_web("https://e.com/a", None));
+        assert_eq!(classify("mailto:u:p@e.com", &here()), Link::External("mailto:u:p@e.com".into()));
     }
 
     /// Whatever a page links to: in-app links are plain http(s) with no credentials,

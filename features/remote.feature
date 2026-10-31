@@ -164,15 +164,13 @@ Feature: Browse remote Markdown
     When I go back
     Then I see the document titled "Remote Home"
 
-  Scenario Outline: Non-Markdown links leave the app
+  Scenario: Mail leaves the app, once the reader agrees
     Given I am viewing the URL of "/index.md"
-    When I follow "<href>"
-    Then the system opened "<href>"
+    When I follow "mailto:a@b.co"
+    Then I am asked before leaving for "mailto:a@b.co"
+    When I agree to leave
+    Then the system opened "mailto:a@b.co"
     And I am still viewing the URL of "/index.md"
-    Examples:
-      | href                      |
-      | https://example.com/about |
-      | mailto:a@b.co             |
 
   Scenario Outline: A remote page can't open local files
     Given a file "secret.md" containing "# Secret"
@@ -200,11 +198,12 @@ Feature: Browse remote Markdown
     When I follow the URL of "/index.md"
     Then I see the document titled "Remote Home"
 
-  Scenario: A local file's non-Markdown web link goes to the system browser
-    Given a file "web.md" linking to "https://example.com/"
+  Scenario: A local file's mail link asks before going to the system
+    Given a file "web.md" linking to "mailto:a@b.co"
     And I am viewing "web.md"
-    When I follow "https://example.com/"
-    Then the system opened "https://example.com/"
+    When I follow "mailto:a@b.co"
+    And I agree to leave
+    Then the system opened "mailto:a@b.co"
 
   Scenario: Back and forward between files and pages
     Given a file "links.md" linking to the URL of "/index.md"

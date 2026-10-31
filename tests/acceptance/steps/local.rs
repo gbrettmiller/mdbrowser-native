@@ -209,6 +209,27 @@ fn opened(w: &mut Browser, url: String) {
     assert_eq!(w.opened, [url]);
 }
 
+#[when("I agree to leave")]
+fn agree_to_leave(w: &mut Browser) {
+    assert!(w.state().leaving.is_some(), "nothing asked");
+    w.send(Event::ConfirmLeaving);
+}
+
+#[when("I choose to stay")]
+fn choose_to_stay(w: &mut Browser) {
+    w.send(Event::StayHere);
+}
+
+#[then(expr = "I am asked before leaving for {string}")]
+fn asked_before_leaving(w: &mut Browser, url: String) {
+    assert_eq!(w.state().leaving.as_deref(), Some(url.as_str()));
+}
+
+#[then("I am not asked before leaving")]
+fn not_asked_before_leaving(w: &mut Browser) {
+    assert_eq!(w.state().leaving, None);
+}
+
 #[then("nothing is opened externally")]
 fn nothing_opened(w: &mut Browser) {
     assert!(w.opened.is_empty(), "opened {:?}", w.opened);

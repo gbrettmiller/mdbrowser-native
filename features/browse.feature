@@ -76,7 +76,8 @@ Feature: Browse local Markdown files
   Scenario: Opener failure shows a notice
     Given the system opener fails
     And I am viewing "index.md"
-    When I follow "https://example.com"
+    When I follow "mailto:a@b.co"
+    And I agree to leave
     Then I am told "Couldn't open this link."
     And I am still viewing "index.md"
 
@@ -112,15 +113,25 @@ Feature: Browse local Markdown files
     And nothing is opened externally
     And I am told "Can't open this kind of link yet"
 
-  Scenario Outline: External links leave the app
+  Scenario Outline: Mail leaves the app, once the reader agrees
     Given I am viewing "index.md"
     When I follow "<href>"
+    Then I am asked before leaving for "<href>"
+    And nothing is opened externally
+    When I agree to leave
     Then "<href>" is opened externally
     And I am still viewing "index.md"
     Examples:
-      | href                |
-      | https://example.com |
-      | mailto:a@b.co       |
+      | href          |
+      | mailto:a@b.co |
+
+  Scenario: The reader can stay instead of leaving
+    Given I am viewing "index.md"
+    When I follow "mailto:a@b.co"
+    And I choose to stay
+    Then nothing is opened externally
+    And I am not asked before leaving
+    And I am still viewing "index.md"
 
   Scenario Outline: Other schemes never reach the opener
     Given I am viewing "index.md"
