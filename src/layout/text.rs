@@ -91,7 +91,7 @@ impl Flow<'_> {
                     self.fill(bounds.x - 2.0, top + 3.0, bounds.width + 4.0, run.line_height - 6.0, background);
                 }
                 if span.link.is_some() {
-                    self.fill(bounds.x, baseline + 3.0, bounds.width, 1.0, Color { a: 0.45, ..color });
+                    self.fill(bounds.x, baseline + 3.0, bounds.width, 1.0, self.theme.underline(color));
                 }
                 if span.style.strike {
                     self.fill(bounds.x, baseline - ink.size * 0.3, bounds.width, 1.0, color);
