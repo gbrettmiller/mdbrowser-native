@@ -113,7 +113,7 @@ impl App {
             relayout_scheduled: false,
         };
         let restore = app.dispatch(Event::Restore { visits, settings });
-        let argument = std::env::args().nth(1).map(|argument| files::from_command_line(&argument));
+        let argument = files::launch_address_from_environment();
         let focus = if argument.is_none() { operation::focus(ADDRESS_ID) } else { Task::none() };
         let open = Task::batch([app.dispatch(Event::Launch(argument)), focus]);
         let system = iced::system::theme().map(Message::SystemMode);

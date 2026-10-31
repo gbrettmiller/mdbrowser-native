@@ -76,9 +76,31 @@ pub fn from_command_line(argument: &str) -> String {
     std::path::absolute(argument).map_or_else(|_| argument.to_string(), |path| path.display().to_string())
 }
 
+/// The address to open at launch: the first argument after the program's name, if any.
+pub fn launch_address(args: impl IntoIterator<Item = String>) -> Option<String> {
+    args.into_iter().nth(1).map(|argument| from_command_line(&argument))
+}
+
+/// The address the program was started with.
+pub fn launch_address_from_environment() -> Option<String> {
+    launch_address(std::env::args())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_address_to_open_is_the_first_argument_after_the_program() {
+        let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert_eq!(launch_address(args(&["mdbrowser"])), None);
+        assert_eq!(
+            launch_address(args(&["mdbrowser", "https://a.co/x.md", "ignored"])),
+            Some("https://a.co/x.md".into())
+        );
+        let path = launch_address(args(&["mdbrowser", "notes/a.md"])).unwrap();
+        assert!(std::path::Path::new(&path).is_absolute(), "{path}");
+    }
 
     #[test]
     fn capped_reads_say_why_they_stop() {

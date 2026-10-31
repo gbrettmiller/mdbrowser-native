@@ -133,6 +133,11 @@ impl Theme {
     pub const fn ring(&self) -> Color {
         self.link
     }
+
+    /// The rule under a link: its colour, fainter than the text so a page of links stays calm.
+    pub const fn underline(&self, link: Color) -> Color {
+        Color { a: LINK_UNDERLINE_ALPHA, ..link }
+    }
 }
 
 const fn rgb(r: u8, g: u8, b: u8) -> Color {
@@ -178,6 +183,7 @@ const DARK: Theme = Theme {
 
 /// The narrowest text column, however narrow the window.
 const MIN_COLUMN: f32 = 80.0;
+const LINK_UNDERLINE_ALPHA: f32 = 0.45;
 
 impl Theme {
     /// The text column's width in a window `window` wide: the measure, less the
@@ -241,6 +247,16 @@ mod tests {
 
     fn look(font: ReadingFont, palette: Palette) -> Look {
         Look { font, palette, ..Look::default() }
+    }
+
+    #[test]
+    fn a_link_underline_is_the_links_colour_made_fainter() {
+        for palette in [Palette::Light, Palette::Dark] {
+            let theme = tokens(palette);
+            let underline = theme.underline(theme.link);
+            assert_eq!((underline.r, underline.g, underline.b), (theme.link.r, theme.link.g, theme.link.b));
+            assert!(underline.a > 0.0 && underline.a < 1.0, "{}", underline.a);
+        }
     }
 
     #[test]
