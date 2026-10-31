@@ -12,9 +12,9 @@ Feature: Markdown fallbacks
   #   /folder/       text/html     /folder/index.md text/markdown "# Folder Index"
   #   /old           302 to /article                       /ghost.md    text/markdown "# Ghost" (no /ghost)
   #
-  # The banner's wording and layout are drawn by the iced view, which these steps cannot
-  # see: they check what the session reports (`fallback_from`). Check the banner by eye
-  # with scripts/shoot.sh.
+  # A page found by fallback shows no banner: the address bar already says where it is.
+  # The session still records the address asked for (`fallback_from`), and Ctrl/Cmd+Shift+O
+  # opens it in the system browser.
 
   Scenario: The .md sibling is shown, and the reader is told
     When I enter the URL of "/article"
