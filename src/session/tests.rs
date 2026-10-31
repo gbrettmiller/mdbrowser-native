@@ -810,3 +810,43 @@ fn a_neighbour_that_is_not_there_does_nothing() {
     assert!(effects.iter().all(|effect| !matches!(effect, Effect::Load { .. })), "{effects:?}");
     assert!(matches!(state.status, Status::Ready(_)));
 }
+
+fn viewing_x_org() -> State {
+    run([Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")]).0
+}
+
+#[test]
+fn a_link_out_of_the_app_waits_for_the_reader_to_agree() {
+    let (state, effects) = step(viewing_x_org(), Event::Follow("mailto:a@b.co".into()));
+    assert_eq!(state.leaving.as_deref(), Some("mailto:a@b.co"));
+    assert!(effects.is_empty());
+    let (state, effects) = step(state, Event::ConfirmLeaving);
+    assert_eq!(effects, [Effect::OpenExternal("mailto:a@b.co".into())]);
+    assert_eq!(state.leaving, None);
+}
+
+#[test]
+fn staying_drops_the_link_out_of_the_app() {
+    let (state, _) = step(viewing_x_org(), Event::Follow("mailto:a@b.co".into()));
+    let (state, effects) = step(state, Event::StayHere);
+    assert_eq!((state.leaving, effects), (None, Vec::new()));
+}
+
+#[test]
+fn agreeing_to_nothing_opens_nothing() {
+    let (_, effects) = step(viewing_x_org(), Event::ConfirmLeaving);
+    assert!(effects.is_empty());
+}
+
+#[test]
+fn a_newer_link_out_replaces_the_one_waiting_and_going_elsewhere_drops_it() {
+    let (state, _) = run([
+        Event::Enter("https://x.org/a.md".into()),
+        fetched(1, "https://x.org/a.md", "# A"),
+        Event::Follow("mailto:one@b.co".into()),
+        Event::Follow("mailto:two@b.co".into()),
+    ]);
+    assert_eq!(state.leaving.as_deref(), Some("mailto:two@b.co"));
+    let (state, _) = step(state, Event::Follow("/b.md".into()));
+    assert_eq!(state.leaving, None);
+}

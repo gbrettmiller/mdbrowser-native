@@ -44,6 +44,11 @@ pub fn step(state: State, event: Event) -> Step {
             Some(url) => (state, vec![Effect::OpenExternal(url)]),
             None => none(state),
         },
+        Event::ConfirmLeaving => match state.leaving.clone() {
+            Some(url) => (State { leaving: None, ..state }, vec![Effect::OpenExternal(url)]),
+            None => none(state),
+        },
+        Event::StayHere => none(State { leaving: None, ..state }),
         Event::OpenLlmsTxt => match state.llms_offer() {
             Some(url) => open_offer(state, &url),
             None => none(state),
@@ -114,7 +119,7 @@ fn move_by(state: State, mover: fn(Navigation) -> Navigation) -> Step {
 /// and leaves the page's images: their queued loads are dropped.
 fn enter(state: State, entry: Entry) -> Step {
     let request_id = state.request_id + 1;
-    let state = State { images: state.images.leave_page(), ..state };
+    let state = State { images: state.images.leave_page(), leaving: None, ..state };
     match entry.target {
         Some(target) => {
             let state = State { request_id, pending: Some(request_id), status: Status::Loading, ..state };
@@ -170,7 +175,7 @@ fn follow(state: State, href: &str) -> Step {
             navigate_to(state, Entry { input: target.location.address(), target: Some(target), origin })
         }
         Link::Scroll(fragment) => none(State { fragment: Some(fragment), ..state }),
-        Link::External(url) => (state, vec![Effect::OpenExternal(url)]),
+        Link::External(url) => none(State { leaving: Some(url), ..state }),
         Link::LocalFromWeb => notice(state, NoticeKind::LocalFromWeb),
         Link::LocalNetworkFromWeb => notice(state, NoticeKind::LocalNetworkFromWeb),
         Link::Unsupported => notice(state, NoticeKind::UnsupportedLink),

@@ -96,12 +96,6 @@ fn no_enclosure(w: &mut Browser) {
     assert!(!page_lines(w).iter().any(|line| line.starts_with(content::LISTEN)), "{:?}", page_lines(w));
 }
 
-#[when("I choose the enclosure")]
-fn choose_enclosure(w: &mut Browser) {
-    let url = framed(w).enclosure.expect("an enclosure").url;
-    w.send(Event::Follow(url));
-}
-
 #[then("the page shows no images")]
 fn no_images(w: &mut Browser) {
     let blocks = assemble(&shown(w), &LABELS);

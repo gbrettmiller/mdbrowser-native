@@ -49,6 +49,20 @@ pub fn fallback_banner(status: &Status) -> Option<Element<'_, Message>> {
     )
 }
 
+/// Over the page when a link would leave the app: says where it goes, and lets the reader choose.
+pub fn leaving(address: Option<&str>) -> Option<Element<'_, Message>> {
+    Some(
+        row![
+            text(content::leaving(address?)).width(Fill),
+            button(content::LEAVE_AND_OPEN, Some(Message::Session(Event::ConfirmLeaving))),
+            button(content::STAY_HERE, Some(Message::Session(Event::StayHere))),
+        ]
+        .spacing(8)
+        .padding([4, 8])
+        .into(),
+    )
+}
+
 pub fn notices(notices: &[Notice]) -> Element<'_, Message> {
     column(notices.iter().map(|notice| {
         row![

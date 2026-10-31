@@ -140,6 +140,10 @@ pub enum Event {
     OpenerFailed,
     /// Hand the current page to the system browser (see `State::browser_offer`).
     OpenInBrowser,
+    /// The reader agreed to the link out of the app that `State::leaving` holds.
+    ConfirmLeaving,
+    /// The reader chose to stay instead.
+    StayHere,
     /// Open the site's `llms.txt` offered on the error (see `State::llms_offer`), as the
     /// failed page's origin would.
     OpenLlmsTxt,
@@ -202,6 +206,8 @@ pub struct State {
     pub visits: Vec<Visit>,
     pub notices: Vec<Notice>,
     pub notice_seq: u64,
+    /// A link out of the app (system browser or mail) waiting for the reader to agree.
+    pub leaving: Option<String>,
     pub settings: Settings,
     /// What the operating system reports for light or dark, if anything.
     pub system_palette: Option<Palette>,
@@ -226,6 +232,7 @@ impl State {
             visits: Vec::new(),
             notices: Vec::new(),
             notice_seq: 0,
+            leaving: None,
             settings: Settings::default(),
             system_palette: None,
             images: images::Images::new(),

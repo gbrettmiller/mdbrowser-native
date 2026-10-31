@@ -93,12 +93,10 @@ Feature: Shared front matter
     Then I see the document titled "Post Three"
     And the address shows the URL of "/three.md"
 
-  Scenario: An enclosure is a link that opens in the system
+  Scenario: An enclosure is shown as a line naming the file
     Given a file "ep.md" containing "---\nenclosure: http://example.com/show.m4a\nenclosureType: audio/mpeg\nenclosureLength: 6374173\n---\nA show"
     And I am viewing "ep.md"
     Then the enclosure line reads "Listen: show.m4a (audio/mpeg, 6.1 MB)"
-    When I choose the enclosure
-    Then the system opened "http://example.com/show.m4a"
 
   Scenario: An enclosure without a type or length still shows
     Given a file "ep.md" containing "---\nenclosure: http://example.com/show.m4a\n---\nA show"

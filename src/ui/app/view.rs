@@ -68,6 +68,7 @@ impl App {
         column![toolbar::toolbar(state, &self.draft)]
             .push(body::title_line(&state.status).map(|title| body::title_bar(title, &reader)))
             .push(body::fallback_banner(&state.status))
+            .push(body::leaving(state.leaving.as_deref()))
             .push(body::notices(&state.notices))
             .push(content)
             .push(container(text(status).size(chrome_text::NOTE)).padding([2, 8]))
