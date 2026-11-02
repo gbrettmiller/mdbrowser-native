@@ -55,7 +55,7 @@ fi
 
 cd "$(dirname "$0")/.."
 mkdir -p "$out"
-bin=target/release/tern
+bin=target/release/mdbrowser
 
 window_geometry() {
   hyprctl clients -j | python3 -c "
@@ -101,7 +101,7 @@ for font in $fonts; do
     name="$(basename "${doc:-welcome}" .md)-$font-$look-$size-$spacing"
     [ -n "$keys" ] && name="$name-${keys// /-}"
     [ -n "$size_of" ] && name="$name-$size_of"
-    TERN_DATA_DIR=$data "$bin" ${doc:+"$doc"} >"$out/$name.log" 2>&1 &
+    MDBROWSER_DATA_DIR=$data "$bin" ${doc:+"$doc"} >"$out/$name.log" 2>&1 &
     pid=$!
     geometry=""
     for _ in $(seq 1 40); do

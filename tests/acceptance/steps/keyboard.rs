@@ -4,12 +4,12 @@ use std::fs;
 
 use cucumber::{given, then, when};
 use iced::keyboard::{Key, Modifiers, key::Named};
-use tern::layout::{Direction, Page, Reach, Target, reach};
-use tern::session::Event;
-use tern::ui::app::MIN_WINDOW;
-use tern::ui::keys;
-use tern::ui::panels::{self, Panel};
-use tern::ui::viewport::Viewport;
+use mdbrowser::layout::{Direction, Page, Reach, Target, reach};
+use mdbrowser::session::Event;
+use mdbrowser::ui::app::MIN_WINDOW;
+use mdbrowser::ui::keys;
+use mdbrowser::ui::panels::{self, Panel};
+use mdbrowser::ui::viewport::Viewport;
 
 use super::reader::{WIDTH, look, page_at};
 use crate::world::Browser;
@@ -56,7 +56,7 @@ fn page(w: &Browser) -> Page {
 
 /// The line step and page step the theme gives at the reader's settings.
 fn line(w: &Browser) -> f32 {
-    let theme = tern::theme::reading(look(w));
+    let theme = mdbrowser::theme::reading(look(w));
     theme.body_size * theme.line_ratio
 }
 

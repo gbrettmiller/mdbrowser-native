@@ -1,11 +1,11 @@
 //! Steps for features/reader-controls.feature: text size, spacing and custom colours.
 
 use cucumber::{given, then, when};
-use tern::content;
-use tern::layout::{self, Page};
-use tern::session::{Event, NoticeKind, Status, TextStep};
-use tern::theme::colours::{hex, parse_hex};
-use tern::theme::{self, Colours, Look, Palette, Spacing, TextSize, Which};
+use mdbrowser::content;
+use mdbrowser::layout::{self, Page};
+use mdbrowser::session::{Event, NoticeKind, Status, TextStep};
+use mdbrowser::theme::colours::{hex, parse_hex};
+use mdbrowser::theme::{self, Colours, Look, Palette, Spacing, TextSize, Which};
 
 use crate::world::Browser;
 

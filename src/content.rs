@@ -137,7 +137,7 @@ pub fn font_name(font: ReadingFont) -> &'static str {
     }
 }
 
-pub const APP_NAME: &str = "Tern";
+pub const APP_NAME: &str = "mdBrowser";
 pub const BACK: &str = "←";
 pub const FORWARD: &str = "→";
 pub const RELOAD: &str = "Reload";
@@ -171,9 +171,9 @@ pub const TRY_LLMS_TXT: &str = "Try this site's llms.txt";
 pub const LEAVE_AND_OPEN: &str = "Open";
 pub const STAY_HERE: &str = "Stay here";
 
-/// The question over a page when a link would leave Tern for the system.
+/// The question over a page when a link would leave mdBrowser for the system.
 pub fn leaving(address: &str) -> String {
-    format!("This link leaves Tern and opens in your system's own app: {address}")
+    format!("This link leaves mdBrowser and opens in your system's own app: {address}")
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@
 # Read this before CLAUDE.md. Read CLAUDE.md before writing code.
 vector_version: "0.1"
 project:
-  name: "Tern"
+  name: "mdbrowser-native"
   description: "A desktop browser for the Web of Markdown that parses .md into a document tree and draws it natively, with no HTML, DOM or webview anywhere."
   stage: "development"  # discovery | definition | development | delivery | maintenance
   started: "2026-10-28"
@@ -98,7 +98,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 - ~~HTML in documents: strip it or show it literally?~~ Resolved by ADR-002 (2026-10-29): strip tags, comments and declarations, and keep the text between them, matching markdownWeb.
 - **Image semantics.** What exactly do `image`, `inlineImage` and `metaImage` mean, and where should each appear? They are undocumented, so ask in markdownWeb issue #1. Until it is answered they are parsed and draw nothing beyond the body's own images (ADR-006): in the corpus `image` and `inlineImage` repeat a body image, and `metaImage` is in no body.
 - ~~Remote images: load, click-to-load, or block?~~ Resolved in phase 2b (2026-10-29): load automatically by default, with "on click" and "off" in the Web images menu.
-- **Leading images and tall images.** scripting.com floats a paragraph's leading image to the right; Tern stacks it above the text, so posts read differently from the source site. This is the open item against the ship criterion "renders the scripting.com archive". A very tall image can also fill the window above a post's first line. Float layout, a maximum image height, or both?
+- **Leading images and tall images.** scripting.com floats a paragraph's leading image to the right; mdBrowser stacks it above the text, so posts read differently from the source site. This is the open item against the ship criterion "renders the scripting.com archive". A very tall image can also fill the window above a post's first line. Float layout, a maximum image height, or both?
 - **Marking plain `http`.** The address bar shows the full URL with its scheme, but nothing labels an `http` page as not secure. Is a label worth adding?
 - **Certificate failures.** A bad certificate shows as `unreachable`, the same as a site that is down. Should it get its own error, so an intercepted connection is visible?
 - ~~Enclosures: link out or play?~~ Resolved by ADR-006 (2026-10-30): a link line, not a player. Playing in the browser would need its own ADR.

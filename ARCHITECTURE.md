@@ -95,6 +95,6 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `tests/` — `acceptance/` (the cucumber runner, steps and a local test web server) and `support/` (the shared HTTP test helper)
 - `DESIGN.md` — documents the reader stylesheet in `src/theme/`; the code wins when they disagree
 - `corpus/` — sample Markdown documents for golden tests and manual checks
-- `scripts/shoot.sh` — screenshots documents in each font and appearance, and at chosen text sizes (`-s`), spacings (`-p`) and custom colours (`-c page,text,link`) (Hyprland + grim); with no document it shoots the welcome page. It uses a scratch store via `TERN_DATA_DIR`, which redirects History and settings away from the real data directory.
+- `scripts/shoot.sh` — screenshots documents in each font and appearance, and at chosen text sizes (`-s`), spacings (`-p`) and custom colours (`-c page,text,link`) (Hyprland + grim); with no document it shoots the welcome page. It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
 - `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`, `audits/` (the latest `invest-doctrine` and `invest-architecture` reports)
 - `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check
