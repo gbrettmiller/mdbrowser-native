@@ -29,12 +29,12 @@ impl Store {
         Store { dir: dir.into(), next_ticket: AtomicU64::new(0), written: Mutex::new(HashMap::new()) }
     }
 
-    /// `$TERN_DATA_DIR` if set (tests, screenshots), else
-    /// `$XDG_DATA_HOME/tern` or the platform equivalent.
+    /// `$MDBROWSER_DATA_DIR` if set (tests, screenshots), else
+    /// `$XDG_DATA_HOME/mdbrowser` or the platform equivalent.
     pub fn default_location() -> Option<Self> {
-        match std::env::var_os("TERN_DATA_DIR") {
+        match std::env::var_os("MDBROWSER_DATA_DIR") {
             Some(dir) => Some(Store::at(dir)),
-            None => dirs::data_dir().map(|dir| Store::at(dir.join("tern"))),
+            None => dirs::data_dir().map(|dir| Store::at(dir.join("mdbrowser"))),
         }
     }
 
@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn visits_and_settings_round_trip() {
         let dir = tempfile::tempdir().unwrap();
-        let store = Store::at(dir.path().join("tern"));
+        let store = Store::at(dir.path().join("mdbrowser"));
         store.save_visits(store.ticket(), &[visit("/a.md"), visit("/b.md")]).unwrap();
         store.save_settings(store.ticket(), Settings { font: ReadingFont::Quattro, ..Settings::default() }).unwrap();
         assert_eq!(store.load_visits(), vec![visit("/a.md"), visit("/b.md")]);

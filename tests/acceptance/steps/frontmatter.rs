@@ -3,9 +3,9 @@
 
 use cucumber::{then, when};
 
-use tern::content;
-use tern::model::{Block, Document, Frame, Labels, assemble, frame};
-use tern::session::{Event, Neighbour, Status};
+use mdbrowser::content;
+use mdbrowser::model::{Block, Document, Frame, Labels, assemble, frame};
+use mdbrowser::session::{Event, Neighbour, Status};
 
 use crate::world::Browser;
 

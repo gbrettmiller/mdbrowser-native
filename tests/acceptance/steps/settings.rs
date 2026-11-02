@@ -3,9 +3,9 @@
 use std::fs;
 
 use cucumber::{given, then, when};
-use tern::content;
-use tern::session::{Event, Status};
-use tern::theme::Appearance;
+use mdbrowser::content;
+use mdbrowser::session::{Event, Status};
+use mdbrowser::theme::Appearance;
 
 use crate::world::Browser;
 
@@ -14,7 +14,7 @@ fn appearance_named(name: &str) -> Appearance {
 }
 
 fn write_settings(w: &Browser, json: &str) {
-    let path = w.home.path().join(".tern/settings.json");
+    let path = w.home.path().join(".mdbrowser/settings.json");
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, json).unwrap();
 }

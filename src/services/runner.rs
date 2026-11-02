@@ -28,7 +28,7 @@ fn in_background(
             let ticket = store.ticket();
             Task::perform(background::run_blocking(move || save(&store, ticket)), |result| {
                 if let Err(error) = result {
-                    eprintln!("tern: couldn't save: {error}");
+                    eprintln!("mdbrowser: couldn't save: {error}");
                 }
                 None
             })
@@ -73,7 +73,7 @@ pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
         }
         Effect::OpenExternal(url) => Task::perform(background::run_blocking(move || opener::open(&url)), |result| {
             result.err().map(|error| {
-                eprintln!("tern: {error}");
+                eprintln!("mdbrowser: {error}");
                 Event::OpenerFailed
             })
         }),

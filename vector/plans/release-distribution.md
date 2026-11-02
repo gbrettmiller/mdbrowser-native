@@ -1,11 +1,11 @@
-> **Status: ready to start (2026-10-30).** Phases 1–5 have merged (the last was keyboard access, PR #14). Revised from the earlier 2026-10-30 draft to treat Tern (formerly mdbrowser) as a Web of Markdown browser, not a local file viewer: the web is the primary path and local files are secondary. Windows and Linux keep their `.md` association from the earlier draft; macOS association stays deferred. Stage 1 (cross-platform CI and platform fixes) and the welcome page already exist. The ADR is ADR-009.
+> **Status: tabled (2026-11-02).** Previously ready to start (2026-10-30). Phases 1–5 have merged (the last was keyboard access, PR #14). Revised from the earlier 2026-10-30 draft to treat mdbrowser as a Web of Markdown browser, not a local file viewer: the web is the primary path and local files are secondary. Windows and Linux keep their `.md` association from the earlier draft; macOS association stays deferred. Stage 1 (cross-platform CI and platform fixes) and the welcome page already exist. The ADR is ADR-009.
 
-# Tern — Downloadable releases for Linux, Windows and macOS
+# mdbrowser-native — Downloadable releases for Linux, Windows and macOS
 
 ## Context
-Today Tern can only be used by cloning the repo and running `cargo run`. The goal is for non-technical people to download an app for Linux, Windows or macOS, double-click it, and start reading the Web of Markdown. People who want to build from source still can.
+Today mdbrowser can only be used by cloning the repo and running `cargo run`. The goal is for non-technical people to download an app for Linux, Windows or macOS, double-click it, and start reading the Web of Markdown. People who want to build from source still can.
 
-Tern is a browser for the web, so v0.1 is judged by how well it reads remote Markdown. Local files are supported: type or paste a path in the address bar, or use "Open with" on Windows and Linux. The app registers for `.md` but never takes over as the default.
+mdbrowser is a browser for the web, so v0.1 is judged by how well it reads remote Markdown. Local files are supported: type or paste a path in the address bar, or use "Open with" on Windows and Linux. The app registers for `.md` but never takes over as the default.
 
 Decisions already made:
 - **Unsigned first:** a download page with clear "how to open it" steps for each OS. Signing can be added later without redesigning the pipeline.
@@ -20,7 +20,7 @@ Decisions already made:
 - **CI** runs fmt once, then clippy → test → release build on `ubuntu-22.04`, `ubuntu-24.04-arm`, `macos-latest` and `windows-latest`, behind one required `ci` check. Ubuntu 22.04 keeps the glibc floor at 2.35.
 - **No console window on Windows:** `src/main.rs` sets `windows_subsystem = "windows"` in release builds.
 - **Welcome page and Home:** a launch with no argument opens the home page, or the built-in `assets/welcome.md` (Alt+Home, or the Home button). It already links to the markdownWeb proposal and the scripting.com archive.
-- **Command-line argument:** `tern <path-or-url>` already works through `files::from_command_line`. File association builds on it.
+- **Command-line argument:** `mdbrowser <path-or-url>` already works through `files::from_command_line`. File association builds on it.
 - **README:** per-platform prerequisites, a keyboard table with a macOS column, and the data folders.
 - **Line endings:** text is checked out as LF on every platform.
 
@@ -35,9 +35,9 @@ Three stages. Each is its own branch and PR into the protected `main`. I commit 
 
 ### Stage 1: Release-ready binary (`feat/release-ready`)
 1. **`--version` flag:** prints the version and exits before any window opens. Release CI uses it to smoke-test each packaged binary. The parsing is a pure function in `services::files`, next to `from_command_line`, with unit tests for `--version`, `-V`, a path, a URL and no argument. A `windows_subsystem = "windows"` build has no console to print to (attaching to the parent console needs `unsafe`, which ARCHITECTURE.md forbids without an ADR), so the Windows smoke test checks the exit code only. Record this in ADR-009.
-2. **Open-with arguments:** confirm that `tern %f` (Linux) and `tern.exe "%1"` (Windows) both reach `from_command_line` unchanged, including paths with spaces and non-ASCII names. Add acceptance scenarios if any step is missing.
+2. **Open-with arguments:** confirm that `mdbrowser %f` (Linux) and `mdbrowser.exe "%1"` (Windows) both reach `from_command_line` unchanged, including paths with spaces and non-ASCII names. Add acceptance scenarios if any step is missing.
 3. **App identity:**
-   - product name `Tern`, binary `tern`, identifier `com.gbrettmiller.tern`, version from `Cargo.toml`
+   - product name `mdbrowser`, identifier `com.gbrettmiller.mdbrowser`, version from `Cargo.toml`
    - an app icon: one source SVG in `assets/icon/`, rasterised to PNG, `.ico` and `.icns` by `scripts/icons.sh`, with the outputs committed. The design goes through `/impeccable`, and DESIGN.md documents it.
 4. **Licence notices:** `cargo-about` generates `THIRD-PARTY-NOTICES.html` covering the crate licences and the five OFL font licences (`about.toml`, `about.hbs`). Every bundle ships it alongside `LICENSE*`. CI fails if a dependency's licence isn't on the allow-list.
 5. **Welcome page for the web:** rewrite `assets/welcome.md` so it opens with the Web of Markdown: what it is, and links to live Markdown sites (the markdownWeb proposal and examples, the scripting.com archive). Opening a local file gets one short line ("type or paste a path in the address bar"), not a section. The existing Home, keyboard and appearance sections stay. Strings stay in `content`. Update the acceptance scenario in `features/` that covers the welcome page if its wording is asserted.
@@ -53,7 +53,7 @@ Three stages. Each is its own branch and PR into the protected `main`. I commit 
    - **Windows:** an NSIS installer that installs for the current user only, so no admin prompt, with a Start menu entry. It registers `.md` and `.markdown` under "Open with", without taking over the default app.
    - **macOS:** a `.app` inside a `.dmg`. The universal binary is built for `aarch64` and `x86_64` and joined with `lipo` before packaging. No document types are declared yet.
    - **Linux:**
-     - a `.deb` for Debian-family distributions (Debian, Ubuntu, Mint, Pop!_OS). It installs a `.desktop` file (`MimeType=text/markdown`, `Exec=tern %f`).
+     - a `.deb` for Debian-family distributions (Debian, Ubuntu, Mint, Pop!_OS). It installs a `.desktop` file (`MimeType=text/markdown`, `Exec=mdbrowser %f`).
      - an AppImage for every other distribution, including Arch, Fedora and openSUSE. An AppImage registers nothing by itself, so "Open with" works only if the user integrates it (for example with AppImageLauncher). File association is a `.deb` and Windows feature.
      - both are built for x64 and ARM64.
 3. **`.github/workflows/release.yml`**, triggered by a `v*` tag:
@@ -82,7 +82,7 @@ Each of these can be added later without redesigning anything. The README and VE
 - **Drag-and-drop onto the window:** small; iced reports `FileDropped`.
 - **File dialog:** needs a new dependency and an ADR.
 - **Code signing and notarisation.**
-- **Other Linux packages:** an AUR package (`tern-bin`), Flatpak, RPM.
+- **Other Linux packages:** an AUR package (`mdbrowser-bin`), Flatpak, RPM.
 
 ## Critical files
 - `.github/workflows/ci.yml` (kept in sync) and a new `.github/workflows/release.yml`

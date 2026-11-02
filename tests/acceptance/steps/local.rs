@@ -5,12 +5,12 @@ use std::fs;
 
 use cucumber::{given, then, when};
 use iced::advanced::graphics::text::font_system;
-use tern::content;
-use tern::layout;
-use tern::session::location::Location;
-use tern::session::visits::Visit;
-use tern::session::{Event, Status};
-use tern::theme::{self, ReadingFont, fonts};
+use mdbrowser::content;
+use mdbrowser::layout;
+use mdbrowser::session::location::Location;
+use mdbrowser::session::visits::Visit;
+use mdbrowser::session::{Event, Status};
+use mdbrowser::theme::{self, ReadingFont, fonts};
 
 use crate::world::Browser;
 
@@ -319,7 +319,7 @@ fn choose_font(w: &mut Browser, name: String) {
 
 #[given(expr = "the stored reading font is {string}")]
 fn stored_font(w: &mut Browser, key: String) {
-    let path = w.home.path().join(".tern/settings.json");
+    let path = w.home.path().join(".mdbrowser/settings.json");
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, format!(r#"{{"font":"{key}"}}"#)).unwrap();
 }

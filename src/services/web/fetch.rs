@@ -15,7 +15,7 @@ use super::Limits;
 use crate::session::network::is_local_ip;
 use crate::session::web::{self, FetchError, MAX_REDIRECTS, Origin, StatusClass, Want};
 
-const USER_AGENT: &str = concat!("tern/", env!("CARGO_PKG_VERSION"));
+const USER_AGENT: &str = concat!("mdbrowser/", env!("CARGO_PKG_VERSION"));
 
 /// One GET per hop, each a fresh request carrying only `Accept`: no cookies, and
 /// no credentials beyond those typed for the first host (`next_hop` strips them).
