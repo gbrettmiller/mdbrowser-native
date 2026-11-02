@@ -1,6 +1,6 @@
 # Welcome
 
-mdbrowser reads Markdown. Type the path or web address of a Markdown file in the address bar above, or pass one on the command line.
+Tern reads Markdown. Type the path or web address of a Markdown file in the address bar above, or pass one on the command line.
 
 ## Somewhere to start
 

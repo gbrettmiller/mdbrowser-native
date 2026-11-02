@@ -4,9 +4,9 @@ use std::fs;
 use std::net::TcpListener;
 
 use cucumber::{given, then, when};
-use mdbrowser::content;
-use mdbrowser::session::location::Location;
-use mdbrowser::session::{Event, Status};
+use tern::content;
+use tern::session::location::Location;
+use tern::session::{Event, Status};
 
 use super::local::see_error;
 use super::{enter, shown_title, unescape};

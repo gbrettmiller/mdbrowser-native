@@ -1,4 +1,4 @@
-//! mdbrowser: a browser for the web of Markdown. See ARCHITECTURE.md for the layers.
+//! Tern: a browser for the web of Markdown. See ARCHITECTURE.md for the layers.
 
 pub mod content;
 pub mod layout;

@@ -6,14 +6,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use mdbrowser::services::store::Store;
-use mdbrowser::services::web::Limits;
-use mdbrowser::services::{images, runner};
-use mdbrowser::session::location::Location;
-use mdbrowser::session::visits::Visit;
-use mdbrowser::session::web::Origin;
-use mdbrowser::session::{Effect, Event, State, step};
 use tempfile::TempDir;
+use tern::services::store::Store;
+use tern::services::web::Limits;
+use tern::services::{images, runner};
+use tern::session::location::Location;
+use tern::session::visits::Visit;
+use tern::session::web::Origin;
+use tern::session::{Effect, Event, State, step};
 use url::Url;
 
 use crate::fixtures;
@@ -125,7 +125,7 @@ pub struct Browser {
     pub store: Store,
     clock: u64,
     /// The reader's colours before the last one was set, for "is what it was".
-    pub colours_before: Option<mdbrowser::theme::Colours>,
+    pub colours_before: Option<tern::theme::Colours>,
     pub keys: Keys,
 }
 
@@ -135,11 +135,11 @@ pub struct Browser {
 pub struct Keys {
     pub focus: Option<usize>,
     /// Which way focus last left the page, if it did.
-    pub left: Option<mdbrowser::layout::Direction>,
+    pub left: Option<tern::layout::Direction>,
     pub page_focused: bool,
     pub scroll: f32,
     pub window: (f32, f32),
-    pub panels: mdbrowser::ui::panels::Open,
+    pub panels: tern::ui::panels::Open,
 }
 
 impl Default for Keys {
@@ -163,7 +163,7 @@ impl Browser {
         fs::write(home.path().join("notes/a.md"), NOTE_A).unwrap();
         fs::write(home.path().join("data.txt"), "not markdown").unwrap();
         let state = State::new(home.path());
-        let store = Store::at(home.path().join(".mdbrowser"));
+        let store = Store::at(home.path().join(".tern"));
         let routes = Arc::new(Mutex::new(routes()));
         let served = Arc::clone(&routes);
         let flaky_seen = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -329,7 +329,7 @@ impl Browser {
     /// The session's image cache, with room for `bytes` of pixels.
     pub fn set_image_budget(&mut self, bytes: u64) {
         let state = self.state.take().expect("state");
-        self.state = Some(State { images: mdbrowser::session::images::Images::with_budget(bytes), ..state });
+        self.state = Some(State { images: tern::session::images::Images::with_budget(bytes), ..state });
     }
 
     pub fn hold(&mut self, name: &str) {

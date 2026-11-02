@@ -1,4 +1,4 @@
-# mdbrowser-native
+# Tern (repository: mdbrowser-native until it is renamed)
 
 A browser for the web of Markdown, written in Rust with iced. It parses `.md` into a tree and draws it with its own layout engine, with no HTML, DOM or webview.
 

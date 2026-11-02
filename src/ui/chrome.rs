@@ -15,8 +15,8 @@ pub fn theme(palette: Palette) -> iced::Theme {
     static LIGHT: OnceLock<iced::Theme> = OnceLock::new();
     static DARK: OnceLock<iced::Theme> = OnceLock::new();
     match palette {
-        Palette::Light => LIGHT.get_or_init(|| build("mdbrowser light", palette, ChromePalette::LIGHT)).clone(),
-        Palette::Dark => DARK.get_or_init(|| build("mdbrowser dark", palette, ChromePalette::DARK)).clone(),
+        Palette::Light => LIGHT.get_or_init(|| build("tern light", palette, ChromePalette::LIGHT)).clone(),
+        Palette::Dark => DARK.get_or_init(|| build("tern dark", palette, ChromePalette::DARK)).clone(),
         Palette::Custom(colours) => custom(colours, palette),
     }
 }
@@ -33,7 +33,7 @@ fn custom(colours: Colours, palette: Palette) -> iced::Theme {
             let tokens = theme::tokens(palette);
             let dark = tokens.background.r + tokens.background.g + tokens.background.b < 1.5;
             let stock = if dark { ChromePalette::DARK } else { ChromePalette::LIGHT };
-            let theme = build("mdbrowser custom", palette, stock);
+            let theme = build("tern custom", palette, stock);
             *latest = Some((colours, theme.clone()));
             theme
         }

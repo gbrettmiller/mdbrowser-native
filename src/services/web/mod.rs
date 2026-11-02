@@ -134,7 +134,7 @@ mod tests {
         assert_eq!(fetched.url.as_str(), server.url("/a.md"));
         let headers = &server.requests()[0].headers;
         assert_eq!(headers["accept"], ACCEPT);
-        assert!(headers["user-agent"].starts_with("mdbrowser/"), "{headers:?}");
+        assert!(headers["user-agent"].starts_with("tern/"), "{headers:?}");
     }
 
     #[test]
