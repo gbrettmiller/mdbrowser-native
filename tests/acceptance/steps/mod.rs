@@ -10,7 +10,7 @@ mod reader;
 mod remote;
 mod settings;
 
-use mdbrowser::session::{Event, Status};
+use tern::session::{Event, Status};
 
 use crate::world::Browser;
 

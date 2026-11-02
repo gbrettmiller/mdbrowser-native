@@ -3,12 +3,12 @@
 use std::fs;
 
 use cucumber::{given, then, when};
-use mdbrowser::content;
-use mdbrowser::layout::{self, Page};
-use mdbrowser::model::Block;
-use mdbrowser::session::images::{ImageLoading, Note, View};
-use mdbrowser::session::{Event, Status};
-use mdbrowser::{theme, ui};
+use tern::content;
+use tern::layout::{self, Page};
+use tern::model::Block;
+use tern::session::images::{ImageLoading, Note, View};
+use tern::session::{Event, Status};
+use tern::{theme, ui};
 
 use super::unescape;
 use crate::fixtures;
@@ -274,7 +274,7 @@ fn click_image(w: &mut Browser, alt: String) {
 #[when(expr = "I click the description {string}")]
 fn click_description(w: &mut Browser, alt: String) {
     let page = laid_page(w);
-    let description = mdbrowser::model::image_description(&alt);
+    let description = tern::model::image_description(&alt);
     let fragment = page.fragments.iter().find(|f| f.text == description).expect("a description");
     let link = fragment.link.clone().expect("the description is linked");
     w.send(Event::Follow(link));

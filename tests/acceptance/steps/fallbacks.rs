@@ -2,7 +2,7 @@
 
 use cucumber::{given, then, when};
 
-use mdbrowser::session::{Event, Status};
+use tern::session::{Event, Status};
 
 use crate::http::Reply;
 use crate::world::Browser;

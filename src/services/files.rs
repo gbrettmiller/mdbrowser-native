@@ -93,12 +93,9 @@ mod tests {
     #[test]
     fn the_address_to_open_is_the_first_argument_after_the_program() {
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        assert_eq!(launch_address(args(&["mdbrowser"])), None);
-        assert_eq!(
-            launch_address(args(&["mdbrowser", "https://a.co/x.md", "ignored"])),
-            Some("https://a.co/x.md".into())
-        );
-        let path = launch_address(args(&["mdbrowser", "notes/a.md"])).unwrap();
+        assert_eq!(launch_address(args(&["tern"])), None);
+        assert_eq!(launch_address(args(&["tern", "https://a.co/x.md", "ignored"])), Some("https://a.co/x.md".into()));
+        let path = launch_address(args(&["tern", "notes/a.md"])).unwrap();
         assert!(std::path::Path::new(&path).is_absolute(), "{path}");
     }
 
