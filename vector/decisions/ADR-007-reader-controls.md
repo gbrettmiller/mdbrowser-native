@@ -82,3 +82,7 @@ We refuse rather than warn because the panel that fixes a bad palette is drawn i
 
 - ADR-001: Native rendering with our own layout engine (the layout is ours, so size and spacing apply uniformly).
 - ADR-006: Shared front matter (the byline and neighbour blocks are ordinary blocks, so they follow the controls).
+
+## Amendment (2026-11-03): applying colours
+
+- **Applying a colour:** a typed colour applies on Enter or Tab (Shift+Tab too). iced 0.14 has no blur event, so clicking away does not apply it; a hint under the fields says so.

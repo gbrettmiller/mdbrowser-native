@@ -157,6 +157,8 @@ pub const SMALLER_TEXT: &str = "A−";
 pub const LARGER_TEXT: &str = "A+";
 pub const COLOURS_LABEL: &str = "Custom colours";
 /// What a colour field accepts, as its placeholder says.
+/// Under the colour fields: how a typed colour is applied.
+pub const COLOURS_HINT: &str = "Press Enter or Tab to apply a colour.";
 pub const COLOUR_PLACEHOLDER: &str = "#rgb or #rrggbb";
 pub const SPACING_LABEL: &str = "Spacing";
 pub const RESET_READER_CONTROLS: &str = "Reset size and spacing";
@@ -203,6 +205,7 @@ mod tests {
     fn the_reader_controls_are_labelled() {
         distinct_and_non_empty(&Spacing::ALL.map(spacing));
         distinct_and_non_empty(&Which::ALL.map(colour_name));
+        assert!(COLOURS_HINT.contains("Enter") && COLOURS_HINT.contains("Tab"));
         assert!(COLOUR_PLACEHOLDER.contains("#rgb") && COLOUR_PLACEHOLDER.contains("#rrggbb"));
         distinct_and_non_empty(&[TEXT_SIZE_LABEL, SPACING_LABEL, SMALLER_TEXT, LARGER_TEXT, RESET_READER_CONTROLS]);
         assert_eq!(text_size(TextSize::default()), "18");
