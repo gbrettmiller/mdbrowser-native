@@ -941,3 +941,82 @@ fn the_welcome_page_has_a_source_too() {
     ]);
     assert_eq!(source_of(&state).as_deref(), Some("# Welcome"));
 }
+
+fn in_source(events: impl IntoIterator<Item = Event>) -> State {
+    let (state, _) = run(events);
+    let (state, _) = step(state, Event::ToggleSource);
+    assert!(source_of(&state).is_some(), "in the source view");
+    state
+}
+
+#[test]
+fn every_way_of_going_elsewhere_returns_to_the_page() {
+    let open = || {
+        in_source([
+            Event::Enter(native("/d/a.md")),
+            loaded(1, "/d/a.md", "[b](b.md)\n\n# A"),
+            Event::Enter(native("/d/c.md")),
+            loaded(2, "/d/c.md", "# C"),
+            Event::Back,
+            loaded(3, "/d/a.md", "[b](b.md)\n\n# A"),
+        ])
+    };
+    for (name, event) in [
+        ("a typed address", Event::Enter(native("/d/b.md"))),
+        ("a followed link", Event::Follow("b.md".into())),
+        ("Home", Event::Home),
+        ("Forward", Event::Forward),
+        ("a History entry", Event::OpenHistory(native("/d/b.md"))),
+    ] {
+        let (state, _) = step(open(), event);
+        assert_eq!(state.view, PageView::Page, "{name}");
+    }
+    let (state, _) = run([
+        Event::Enter(native("/d/a.md")),
+        loaded(1, "/d/a.md", "# A"),
+        Event::Enter(native("/d/b.md")),
+        loaded(2, "/d/b.md", "# B"),
+        Event::ToggleSource,
+        Event::Back,
+    ]);
+    assert_eq!(state.view, PageView::Page, "Back");
+}
+
+#[test]
+fn reload_keeps_the_source_view_and_shows_the_new_text() {
+    let state = in_source([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# Old")]);
+    let (state, effects) = step(state, Event::Reload);
+    assert!(matches!(&effects[..], [Effect::Load { request_id: 2, .. }]));
+    let (state, _) = step(state, loaded(2, "/d/a.md", "# New\n"));
+    assert_eq!(source_of(&state).as_deref(), Some("# New\n"));
+}
+
+#[test]
+fn reload_after_a_fallback_find_reloads_the_markdown_that_was_found() {
+    let state = in_source([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "# Old"),
+    ]);
+    let (state, effects) = step(state, Event::Reload);
+    assert!(
+        matches!(&effects[..], [Effect::Load { location, .. }] if *location == web("https://x.org/post.md")),
+        "the entry settled on the Markdown found, so that is what is fetched again: {effects:?}"
+    );
+    let (state, _) = step(state, fetched(2, "https://x.org/post.md", "# New"));
+    assert_eq!(source_of(&state).as_deref(), Some("# New"));
+}
+
+#[test]
+fn a_failed_reload_shows_the_error_and_leaves_the_source_view() {
+    let state = in_source([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
+    let (state, _) = step(state, Event::Reload);
+    let (state, _) = step(state, Event::Loaded { request_id: 2, result: Err(ErrorCode::NotFound), now: 1 });
+    assert_eq!((state.status, state.view), (Status::Failed(ErrorCode::NotFound), PageView::Page));
+}
+
+#[test]
+fn back_with_nowhere_to_go_keeps_the_source_view() {
+    let state = in_source([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
+    let (state, _) = step(state, Event::Back);
+    assert!(source_of(&state).is_some());
+}

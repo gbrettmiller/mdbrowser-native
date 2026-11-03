@@ -17,6 +17,14 @@ pub enum View {
 }
 
 impl View {
+    /// The same view of a page freshly fetched: the source is redrawn from `source`.
+    pub fn refreshed(&self, source: &str) -> View {
+        match self {
+            View::Page => View::Page,
+            View::Source(_) => View::Source(Arc::new(source_document(source))),
+        }
+    }
+
     /// The other view of `shown`.
     pub fn toggled(&self, shown: &Shown) -> View {
         match self {
