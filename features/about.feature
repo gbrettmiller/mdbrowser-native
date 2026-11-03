@@ -24,3 +24,8 @@ Feature: About
   Scenario: An unknown about address is an error
     When I enter "about:nothing"
     Then the error shows the address "about:nothing"
+
+  Scenario: About shows the version and platform
+    When I enter "about:mdbrowser"
+    Then the page shows the version from Cargo.toml
+    And the page shows this platform

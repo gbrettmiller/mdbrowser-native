@@ -93,6 +93,7 @@ fn has_llms_txt(requested: &Url, limits: &Limits, origin: Origin) -> bool {
 mod tests {
     use std::io::Write;
     use std::net::TcpListener;
+    use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
 
     use flate2::Compression;
@@ -494,5 +495,27 @@ mod tests {
         assert_eq!(source(&typed), Ok("b".into()));
         assert!(origin.requests()[0].headers.contains_key("authorization"), "the typed host gets them");
         assert!(!target.requests()[0].headers.contains_key("authorization"));
+    }
+
+    /// The About page says the app makes no request the reader did not cause, and has no
+    /// analytics or update check (ADR-013). This keeps that true: HTTP is only used here.
+    #[test]
+    fn only_the_web_service_uses_the_http_client() {
+        fn rust_files(dir: &Path) -> Vec<PathBuf> {
+            std::fs::read_dir(dir)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .flat_map(|path| if path.is_dir() { rust_files(&path) } else { vec![path] })
+                .filter(|path| path.extension().is_some_and(|ext| ext == "rs"))
+                .collect()
+        }
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let web = src.join("services").join("web");
+        let strays: Vec<_> = rust_files(&src)
+            .into_iter()
+            .filter(|path| !path.starts_with(&web))
+            .filter(|path| std::fs::read_to_string(path).unwrap().contains("ureq"))
+            .collect();
+        assert!(strays.is_empty(), "the HTTP client is used outside services/web: {strays:?}");
     }
 }

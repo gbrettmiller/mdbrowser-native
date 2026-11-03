@@ -1,6 +1,7 @@
 //! The browsing session as a pure reducer: `step(state, event) → (state, effects)`.
 //! Effects are data; `services::runner` executes them and feeds results back as events.
 
+pub mod about;
 pub mod address;
 pub mod error;
 mod href;
