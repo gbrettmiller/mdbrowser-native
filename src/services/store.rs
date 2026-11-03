@@ -191,7 +191,7 @@ mod tests {
         std::fs::write(dir.path().join("settings.json"), r#"{"font":"inter","images":"off"}"#).unwrap();
         let older = store.load_settings();
         assert_eq!((older.appearance, older.home.as_str()), (Appearance::System, ""));
-        std::fs::write(dir.path().join("settings.json"), r#"{"appearance":"sepia","home":7}"#).unwrap();
+        std::fs::write(dir.path().join("settings.json"), r#"{"appearance":"mauve","home":7}"#).unwrap();
         let odd = store.load_settings();
         assert_eq!((odd.appearance, odd.home.as_str()), (Appearance::System, ""));
     }

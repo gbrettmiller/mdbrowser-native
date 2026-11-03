@@ -77,6 +77,13 @@ pub fn appearance(appearance: Appearance) -> &'static str {
         Appearance::System => "System",
         Appearance::Light => "Light",
         Appearance::Dark => "Dark",
+        Appearance::Sepia => "Sepia",
+        Appearance::PaperGreen => "Paper green",
+        Appearance::Rose => "Rose",
+        Appearance::Night => "Night",
+        Appearance::SolarizedDark => "Solarized dark",
+        Appearance::Nord => "Nord",
+        Appearance::HighContrast => "High contrast",
         Appearance::Custom => "Custom",
     }
 }

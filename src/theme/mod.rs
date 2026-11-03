@@ -56,12 +56,36 @@ pub enum Appearance {
     System,
     Light,
     Dark,
+    /// Ready-made colour sets, each readable at AA. Chosen like Light or Dark.
+    Sepia,
+    PaperGreen,
+    Rose,
+    Night,
+    SolarizedDark,
+    Nord,
+    HighContrast,
     /// The reader's own page, text and link colours.
     Custom,
 }
 
+const fn set(page: [u8; 3], text: [u8; 3], link: [u8; 3]) -> Option<Colours> {
+    Some(Colours { page, text, link })
+}
+
 impl Appearance {
-    pub const ALL: [Appearance; 4] = [Self::System, Self::Light, Self::Dark, Self::Custom];
+    pub const ALL: [Appearance; 11] = [
+        Self::System,
+        Self::Light,
+        Self::Dark,
+        Self::Sepia,
+        Self::PaperGreen,
+        Self::Rose,
+        Self::Night,
+        Self::SolarizedDark,
+        Self::Nord,
+        Self::HighContrast,
+        Self::Custom,
+    ];
 
     /// Stable identifier for settings files.
     pub const fn key(self) -> &'static str {
@@ -69,7 +93,28 @@ impl Appearance {
             Self::System => "system",
             Self::Light => "light",
             Self::Dark => "dark",
+            Self::Sepia => "sepia",
+            Self::PaperGreen => "paper-green",
+            Self::Rose => "rose",
+            Self::Night => "night",
+            Self::SolarizedDark => "solarized-dark",
+            Self::Nord => "nord",
+            Self::HighContrast => "high-contrast",
             Self::Custom => "custom",
+        }
+    }
+
+    /// The page, text and link colours of a ready-made set; `None` for the other appearances.
+    pub const fn preset(self) -> Option<Colours> {
+        match self {
+            Self::Sepia => set([0xfd, 0xf6, 0xe3], [0x33, 0x33, 0x33], [0x0b, 0x5f, 0xa5]),
+            Self::PaperGreen => set([0xe8, 0xf0, 0xe0], [0x1f, 0x2a, 0x1c], [0x1a, 0x5c, 0x2e]),
+            Self::Rose => set([0xff, 0xf1, 0xf2], [0x3b, 0x1d, 0x24], [0xa1, 0x17, 0x3a]),
+            Self::Night => set([0x1b, 0x1b, 0x1a], [0xe6, 0xe1, 0xd6], [0x7d, 0xb4, 0xff]),
+            Self::SolarizedDark => set([0x00, 0x2b, 0x36], [0xee, 0xe8, 0xd5], [0x6c, 0xb6, 0xe8]),
+            Self::Nord => set([0x2e, 0x34, 0x40], [0xec, 0xef, 0xf4], [0x88, 0xc0, 0xd0]),
+            Self::HighContrast => set([0x00, 0x00, 0x00], [0xff, 0xff, 0xff], [0xff, 0xff, 0x00]),
+            Self::System | Self::Light | Self::Dark | Self::Custom => None,
         }
     }
 
@@ -80,12 +125,16 @@ impl Appearance {
     /// The palette to draw with, given what the operating system reports (if anything)
     /// and the reader's own colours.
     pub const fn palette(self, system: Option<Palette>, custom: Colours) -> Palette {
+        if let Some(set) = self.preset() {
+            return Palette::Custom(set);
+        }
         match (self, system) {
             (Self::Light, _) => Palette::Light,
             (Self::Dark, _) => Palette::Dark,
             (Self::Custom, _) => Palette::Custom(custom),
             (Self::System, Some(palette)) => palette,
-            (Self::System, None) => Palette::Light,
+            // System with nothing reported; the presets returned above.
+            _ => Palette::Light,
         }
     }
 }
@@ -273,8 +322,24 @@ mod tests {
             assert_eq!(Appearance::from_key(appearance.key()), Some(appearance));
         }
         assert_eq!(Appearance::from_key("custom"), Some(Appearance::Custom));
-        assert_eq!(Appearance::from_key("sepia"), None);
+        assert_eq!(Appearance::from_key("mauve"), None);
         assert_eq!(Appearance::default(), Appearance::System);
+    }
+
+    #[test]
+    fn every_preset_is_readable_and_is_its_own_palette_whatever_the_os_says() {
+        let presets: Vec<_> = Appearance::ALL.into_iter().filter(|appearance| appearance.preset().is_some()).collect();
+        assert_eq!(presets.len(), 7);
+        for appearance in presets {
+            let set = appearance.preset().expect("a preset");
+            assert_eq!(colours::check(set), Ok(set), "{}", appearance.key());
+            for system in [None, Some(Palette::Light), Some(Palette::Dark)] {
+                assert_eq!(appearance.palette(system, Colours::default()), Palette::Custom(set));
+            }
+        }
+        for plain in [Appearance::System, Appearance::Light, Appearance::Dark, Appearance::Custom] {
+            assert_eq!(plain.preset(), None);
+        }
     }
 
     #[test]

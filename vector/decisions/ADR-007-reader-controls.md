@@ -83,6 +83,7 @@ We refuse rather than warn because the panel that fixes a bad palette is drawn i
 - ADR-001: Native rendering with our own layout engine (the layout is ours, so size and spacing apply uniformly).
 - ADR-006: Shared front matter (the byline and neighbour blocks are ordinary blocks, so they follow the controls).
 
-## Amendment (2026-11-03): applying colours
+## Amendment (2026-11-03): presets and applying colours
 
+- **Presets:** Sepia, Paper green, Rose, Night, Solarized dark, Nord and High contrast are Appearance choices beside Light, Dark and Custom. Each is a fixed page, text and link set that passes the same AA check and goes through the same derivation as Custom, so it needs no new palette kind. Choosing Custom afterwards starts from the preset in use, which also makes dark custom sets reachable field by field. The reader's saved Custom colours are not overwritten by choosing a preset.
 - **Applying a colour:** a typed colour applies on Enter or Tab (Shift+Tab too). iced 0.14 has no blur event, so clicking away does not apply it; a hint under the fields says so.
