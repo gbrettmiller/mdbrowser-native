@@ -91,7 +91,7 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         // The keyboard route to every image note's click, and to images that are off.
         Key::Character("i" | "I") if primary && shift => Command::Session(Event::LoadPageImages),
         // Toggles the page and its Markdown source; the session ignores it with no page shown.
-        Key::Character("u") if primary && !shift && !alt => Command::Session(Event::ToggleSource),
+        Key::Character("u" | "U") if primary && !shift && !alt => Command::Session(Event::ToggleSource),
         _ => return None,
     };
     Some(command)
@@ -110,6 +110,7 @@ mod tests {
         let toggle = Some(Command::Session(Event::ToggleSource));
         assert_eq!(command(Key::Character("u"), primary()), toggle);
         assert_eq!(command(Key::Character("u"), Modifiers::empty()), None, "bare u types into a field");
+        assert_eq!(command(Key::Character("U"), primary()), toggle, "Caps Lock");
         assert_eq!(command(Key::Character("u"), Modifiers::ALT), None);
         assert_eq!(command(Key::Character("U"), primary().union(Modifiers::SHIFT)), None);
     }
