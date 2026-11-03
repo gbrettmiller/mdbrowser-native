@@ -38,6 +38,10 @@ pub fn step(state: State, event: Event) -> Step {
             Some(entry) => enter(state, entry),
             None => none(state),
         },
+        Event::ToggleSource => match &state.status {
+            Status::Ready(shown) => none(State { view: state.view.toggled(shown), ..state }),
+            _ => none(state),
+        },
         Event::Loaded { request_id, result, now } => loaded(state, request_id, result, now),
         Event::OpenerFailed => notice(state, NoticeKind::OpenFailed),
         Event::OpenInBrowser => match state.browser_offer() {

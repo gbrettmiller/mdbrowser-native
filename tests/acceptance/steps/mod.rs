@@ -9,6 +9,7 @@ mod local;
 mod reader;
 mod remote;
 mod settings;
+mod source;
 
 use mdbrowser::session::{Event, Status};
 

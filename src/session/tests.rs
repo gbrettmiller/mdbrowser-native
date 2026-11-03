@@ -881,3 +881,63 @@ fn a_fallback_find_keeps_the_markdown_found() {
     ]);
     assert_eq!(&*shown(&state).source, "---\ntitle: P\n---\n# P");
 }
+
+use crate::session::view::View as PageView;
+
+fn source_of(state: &State) -> Option<String> {
+    match &state.view {
+        PageView::Source(document) => match document.blocks.as_slice() {
+            [crate::model::Block::Code { text, .. }] => Some(text.clone()),
+            other => panic!("the source is one code block, got {other:?}"),
+        },
+        PageView::Page => None,
+    }
+}
+
+#[test]
+fn toggling_shows_the_source_and_toggling_again_the_page() {
+    let (state, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "---\ntitle: T\n---\n# A")]);
+    assert_eq!(state.view, PageView::Page);
+    let (state, effects) = step(state, Event::ToggleSource);
+    assert_eq!(source_of(&state).as_deref(), Some("---\ntitle: T\n---\n# A"));
+    assert!(effects.is_empty(), "nothing is saved, loaded or recorded: {effects:?}");
+    let (state, effects) = step(state, Event::ToggleSource);
+    assert_eq!(state.view, PageView::Page);
+    assert!(effects.is_empty());
+}
+
+#[test]
+fn toggling_changes_nothing_but_the_view() {
+    let (before, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
+    let (after, _) = step(before.clone(), Event::ToggleSource);
+    assert_eq!((&after.settings, &after.visits, &after.nav), (&before.settings, &before.visits, &before.nav));
+    assert_eq!(after.status, before.status);
+}
+
+#[test]
+fn there_is_no_source_to_view_without_a_page() {
+    let (idle, _) = run([]);
+    let (loading, _) = run([Event::Enter(native("/d/a.md"))]);
+    let (failed, _) = run([
+        Event::Enter(native("/d/a.md")),
+        Event::Loaded { request_id: 1, result: Err(ErrorCode::NotFound), now: 1 },
+    ]);
+    for state in [idle, loading, failed] {
+        let (after, effects) = step(state.clone(), Event::ToggleSource);
+        assert_eq!((after.view, effects), (PageView::Page, vec![]));
+    }
+}
+
+#[test]
+fn the_welcome_page_has_a_source_too() {
+    let (state, _) = run([
+        Event::Home,
+        Event::Loaded {
+            request_id: 1,
+            result: Ok(Loaded { source: "# Welcome".into(), location: Location::Welcome, fallback_from: None }),
+            now: 1,
+        },
+        Event::ToggleSource,
+    ]);
+    assert_eq!(source_of(&state).as_deref(), Some("# Welcome"));
+}
