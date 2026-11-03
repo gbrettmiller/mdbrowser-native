@@ -267,7 +267,7 @@ Feature: Images
     Given an image file "big.png" of 4000 by 6000 pixels
     And a file "post.md" containing "![big](big.png)"
     When I view "post.md"
-    Then the image "big" is within the column and within the maximum image height
+    Then the image "big" is laid out at 360 by 540
 
   Scenario: The first line of text is not pushed out of the window
     Given an image file "skinny.png" of 200 by 3000 pixels

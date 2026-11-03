@@ -102,22 +102,14 @@ fn image_laid_out_at(w: &mut Browser, alt: String, width: f32, height: f32) {
     assert_eq!((bounds.width, bounds.height), (width, height));
 }
 
-#[then(expr = "the image {string} is within the column and within the maximum image height")]
-fn image_within_limits(w: &mut Browser, alt: String) {
-    let reader = theme::reading(super::reader::look(w));
-    let bounds = laid_image(w, &alt).bounds;
-    assert!(bounds.width <= reader.column_width(WIDTH).floor(), "{bounds:?} is wider than the column");
-    assert_eq!(bounds.height, reader.image_max_height().min(bounds.height), "{bounds:?} is over the maximum");
-    assert!(bounds.height <= reader.image_max_height());
-}
-
 #[then("the first line of text has its top at or above the image top plus the maximum image height plus one block gap")]
 fn first_line_below_the_image(w: &mut Browser) {
     let reader = theme::reading(super::reader::look(w));
     let page = laid_page(w);
     let image = page.images.first().expect("an image").bounds;
     let text = page.fragments.iter().find(|f| f.text == "The first line of text.").expect("the line of text");
-    let limit = image.y + reader.image_max_height() + reader.block_gap;
+    let (below, limit) = (image.y + image.height, image.y + reader.image_max_height() + reader.block_gap);
+    assert!(text.bounds.y >= below, "the text starts at {} inside the image, which ends at {below}", text.bounds.y);
     assert!(text.bounds.y <= limit, "the text starts at {} but should be at or above {limit}", text.bounds.y);
 }
 

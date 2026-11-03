@@ -43,7 +43,8 @@ pub fn no_images(_: &str) -> ImageView {
 pub(super) fn fit((own_width, own_height): (u32, u32), max_width: f32, max_height: f32) -> (f32, f32) {
     let (own_width, own_height) = (own_width as f32, own_height as f32);
     let scale = (max_width.floor() / own_width).min(max_height / own_height).min(1.0);
-    ((own_width * scale).round().max(1.0), (own_height * scale).round().max(1.0))
+    let side = |own: f32, cap: f32| (own * scale).round().min(cap).max(1.0);
+    (side(own_width, max_width.floor()), side(own_height, max_height))
 }
 
 impl Flow<'_> {
