@@ -150,7 +150,7 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
             } else {
                 visits::record(&state.visits, &location.address(), &title, now)
             };
-            let shown = Arc::new(Shown { document: Arc::new(document), title, fallback_from });
+            let shown = Arc::new(Shown { document: Arc::new(document), source: source.into(), title, fallback_from });
             let sources = shown.document.image_sources();
             let (images, loads) = state.images.open_page(&sources, &location, &state.home, state.settings.images);
             let origin = Origin::of(&location);

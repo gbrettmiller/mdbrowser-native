@@ -67,6 +67,8 @@ pub struct Loaded {
 #[derive(Debug, PartialEq)]
 pub struct Shown {
     pub document: Arc<Document>,
+    /// The Markdown as fetched, kept for the source view.
+    pub source: Arc<str>,
     pub title: String,
     /// The address the reader asked for, when this Markdown was found in its place.
     pub fallback_from: Option<String>,

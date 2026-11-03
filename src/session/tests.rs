@@ -865,3 +865,19 @@ fn a_preset_is_remembered_and_keeps_the_readers_own_colours() {
     assert_eq!(state.settings.custom, Some(Colours::default()), "the Custom set is not overwritten");
     assert!(effects.iter().any(|effect| matches!(effect, Effect::PersistSettings(_))));
 }
+
+#[test]
+fn the_shown_page_keeps_the_source_exactly_as_fetched() {
+    let source = "---\ntitle: T\n---\r\n# A\n\n  indented\n";
+    let (state, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", source)]);
+    assert_eq!(&*shown(&state).source, source);
+}
+
+#[test]
+fn a_fallback_find_keeps_the_markdown_found() {
+    let (state, _) = run([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "---\ntitle: P\n---\n# P"),
+    ]);
+    assert_eq!(&*shown(&state).source, "---\ntitle: P\n---\n# P");
+}

@@ -93,7 +93,8 @@ mod tests {
 
     #[test]
     fn the_title_shows_only_with_a_document() {
-        let shown = Shown { document: Arc::new(parse("# Hi")), title: "Hi".into(), fallback_from: None };
+        let shown =
+            Shown { document: Arc::new(parse("# Hi")), source: "# Hi".into(), title: "Hi".into(), fallback_from: None };
         assert_eq!(title_line(&Status::Ready(Arc::new(shown))), Some("Hi"));
         for status in [Status::Idle, Status::Loading, Status::Failed(ErrorCode::NotFound)] {
             assert_eq!(title_line(&status), None);
