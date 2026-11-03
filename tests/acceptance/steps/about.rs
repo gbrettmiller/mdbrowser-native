@@ -1,8 +1,10 @@
 //! Steps for features/about.feature.
 
-use cucumber::then;
+use cucumber::{then, when};
+use mdbrowser::session::Event;
 use mdbrowser::session::{Status, about::Facts};
 
+use super::keyboard::send_command;
 use crate::world::Browser;
 
 #[then(expr = "the address bar shows {string}")]
@@ -30,4 +32,9 @@ fn shows_version(w: &mut Browser) {
 #[then("the page shows this platform")]
 fn shows_platform(w: &mut Browser) {
     assert!(about_text(w).contains(&Facts::this_build().platform));
+}
+
+#[when("I choose About in Settings")]
+fn choose_about_in_settings(w: &mut Browser) {
+    send_command(w, Event::About);
 }

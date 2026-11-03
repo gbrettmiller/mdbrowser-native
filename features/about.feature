@@ -29,3 +29,42 @@ Feature: About
     When I enter "about:mdbrowser"
     Then the page shows the version from Cargo.toml
     And the page shows this platform
+
+  Scenario: Open About from Settings
+    Given the Settings panel is open
+    When I choose About in Settings
+    Then I see the document titled "About mdBrowser"
+    And the address bar shows "about:mdbrowser"
+    And the Settings panel is closed
+
+  Scenario Outline: Open About from the keyboard
+    When I press "<chord>"
+    Then I see the document titled "About mdBrowser"
+    Examples:
+      | chord  |
+      | F1     |
+      | Ctrl+? |
+
+  Scenario: F1 works from the address bar
+    Given the focus is on the address bar
+    When I press "F1"
+    Then I see the document titled "About mdBrowser"
+
+  Scenario: F1 on About does nothing more
+    Given I pressed "F1"
+    When I press "F1"
+    And I go back
+    Then I see the document titled "Post"
+
+  Scenario: About is not in History, and Back and Forward work
+    Given I pressed "F1"
+    Then the History panel is closed
+    And History does not list "About mdBrowser"
+    When I go back
+    Then I see the document titled "Post"
+    When I go forward
+    Then I see the document titled "About mdBrowser"
+
+  Scenario: About starts no request
+    When I press "F1"
+    Then the site was not asked for "/"

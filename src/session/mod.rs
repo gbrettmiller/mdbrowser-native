@@ -171,6 +171,8 @@ pub enum Event {
     ChooseHome(String),
     /// Open the home page, or the welcome page when none is set.
     Home,
+    /// Open the About page (ADR-013). Nothing more when it is already the current page.
+    About,
     /// The app started, with the address given on the command line if any. That
     /// address wins; otherwise the home page opens.
     Launch(Option<String>),

@@ -164,6 +164,12 @@ pub fn source_tooltip(mac: bool) -> String {
     format!("View Markdown source ({}+U)", if mac { "Cmd" } else { "Ctrl" })
 }
 
+/// The Settings panel's button that opens the About page, and its tooltip, which names both chords.
+pub const ABOUT: &str = "About mdBrowser";
+pub fn about_tooltip(mac: bool) -> String {
+    format!("Version, licence and help (F1 or {}+?)", if mac { "Cmd" } else { "Ctrl" })
+}
+
 /// The line above the source of a page.
 pub fn source_of(title: &str) -> String {
     format!("Source of {title}")
@@ -229,6 +235,9 @@ mod tests {
         assert_eq!((SOURCE, PAGE), ("Source", "Page"));
         assert_eq!(source_tooltip(false), "View Markdown source (Ctrl+U)");
         assert_eq!(source_tooltip(true), "View Markdown source (Cmd+U)");
+        assert_eq!(ABOUT, "About mdBrowser");
+        assert_eq!(about_tooltip(false), "Version, licence and help (F1 or Ctrl+?)");
+        assert_eq!(about_tooltip(true), "Version, licence and help (F1 or Cmd+?)");
         assert!(COLOUR_PLACEHOLDER.contains("#rgb") && COLOUR_PLACEHOLDER.contains("#rrggbb"));
         distinct_and_non_empty(&[TEXT_SIZE_LABEL, SPACING_LABEL, SMALLER_TEXT, LARGER_TEXT, RESET_READER_CONTROLS]);
         assert_eq!(text_size(TextSize::default()), "18");
