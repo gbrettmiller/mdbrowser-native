@@ -4,7 +4,7 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 5 (keyboard access), local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page, a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), an offer of the site's `llms.txt`, and a source view of any page (Ctrl+U). Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 5 (keyboard access), local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page and About page (F1), a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), an offer of the site's `llms.txt`, and a source view of any page (Ctrl+U). Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## What it does today
 
@@ -56,6 +56,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Focus the address bar | Ctrl+L | Cmd+L |
 | Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
 | Show or hide Settings | Ctrl+, | Cmd+, |
+| About mdBrowser: version, licence, what the app sends, shortcuts, FAQ | F1 or Ctrl+? | F1 or Cmd+? (F1 may need Fn) |
 | Previous / next post | Ctrl+[ / Ctrl+] | Cmd+[ / Cmd+] |
 | Open the home page | Alt+Home | Option+Home |
 | Open the original of a page found by fallback, or a page that isn't Markdown, in your browser | Ctrl+Shift+O | Cmd+Shift+O |

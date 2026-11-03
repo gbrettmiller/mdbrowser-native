@@ -250,6 +250,7 @@ mod tests {
         for label in [SETTINGS, HOME_PAGE_LABEL, HOME] {
             assert!(source.contains(label), "the welcome page should mention {label}");
         }
+        assert!(source.contains("[About mdBrowser](about:mdbrowser)"), "the welcome page links to About");
     }
 
     #[test]

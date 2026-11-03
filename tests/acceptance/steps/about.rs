@@ -34,6 +34,14 @@ fn shows_platform(w: &mut Browser) {
     assert!(about_text(w).contains(&Facts::this_build().platform));
 }
 
+#[when("I follow the welcome page's About link")]
+fn follow_welcome_about_link(w: &mut Browser) {
+    let source = include_str!("../../../assets/welcome.md");
+    let link = "(about:mdbrowser)";
+    assert!(source.contains(link), "the welcome page has an About link");
+    w.send(Event::Follow(link.trim_matches(['(', ')']).to_string()));
+}
+
 #[when("I choose About in Settings")]
 fn choose_about_in_settings(w: &mut Browser) {
     send_command(w, Event::About);

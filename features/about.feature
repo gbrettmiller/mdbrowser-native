@@ -68,3 +68,9 @@ Feature: About
   Scenario: About starts no request
     When I press "F1"
     Then the site was not asked for "/"
+
+  Scenario: Open About from the welcome page
+    When the app starts with no address given
+    Then I see the welcome page
+    When I follow the welcome page's About link
+    Then I see the document titled "About mdBrowser"

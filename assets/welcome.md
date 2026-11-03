@@ -18,3 +18,7 @@ Press **Tab** to move to the first link on a page, and again for the next; **Shi
 ## Choose how it looks
 
 Settings also holds the reading font, the text size (or Ctrl+= and Ctrl+-, with Ctrl+0 to go back; Cmd instead of Ctrl on macOS), the spacing, whether web images load, and a light, dark, system or custom palette. Choose Custom to type your own page, text and link colours. Documents never choose their own style: how they look is up to you.
+
+## About this app
+
+[About mdBrowser](about:mdbrowser) has the version, the licence, what the app sends and stores, the keyboard shortcuts and a short FAQ. You can also press **F1** at any time (or Ctrl+?, Cmd+? on macOS), or use the button at the top of Settings.

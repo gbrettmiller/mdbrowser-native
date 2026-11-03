@@ -78,6 +78,8 @@ Fetch settings, all owned by `services::web` and passed as `Limits`:
 - Bodies are capped at 16 MiB, counted after gzip decompression. A body in an encoding the client didn't decode is unreadable.
 - No cookie store.
 - `Accept` comes from `session::web::ACCEPT` and prefers `text/markdown`.
+- `User-Agent` is `mdbrowser/<version>`, fixed. A request carries these two headers (plus what the client itself adds for connection and encoding), never `Referer`, cookies or credentials beyond those typed for the first host. Corrected 2026-11-03: this ADR and the code comment once said "only `Accept`", and the User-Agent was always sent; the About page (ADR-013) states it.
+- A proxy set in the environment (`HTTP_PROXY`, `HTTPS_PROXY`) is used, through `Proxy::try_from_env`.
 
 ## Consequences
 
