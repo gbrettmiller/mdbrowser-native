@@ -90,6 +90,8 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         Key::Character("o" | "O") if primary && shift => Command::Session(Event::OpenInBrowser),
         // The keyboard route to every image note's click, and to images that are off.
         Key::Character("i" | "I") if primary && shift => Command::Session(Event::LoadPageImages),
+        // Toggles the page and its Markdown source; the session ignores it with no page shown.
+        Key::Character("u") if primary && !shift && !alt => Command::Session(Event::ToggleSource),
         _ => return None,
     };
     Some(command)
@@ -101,6 +103,44 @@ mod tests {
 
     const fn primary() -> Modifiers {
         if cfg!(target_os = "macos") { Modifiers::LOGO } else { Modifiers::CTRL }
+    }
+
+    #[test]
+    fn ctrl_or_cmd_u_toggles_the_source_and_nothing_else_does() {
+        let toggle = Some(Command::Session(Event::ToggleSource));
+        assert_eq!(command(Key::Character("u"), primary()), toggle);
+        assert_eq!(command(Key::Character("u"), Modifiers::empty()), None, "bare u types into a field");
+        assert_eq!(command(Key::Character("u"), Modifiers::ALT), None);
+        assert_eq!(command(Key::Character("U"), primary().union(Modifiers::SHIFT)), None);
+    }
+
+    #[test]
+    fn every_earlier_chord_is_unchanged() {
+        let session = |event| Some(Command::Session(event));
+        let shifted = primary().union(Modifiers::SHIFT);
+        let table = [
+            (command(Key::Character("r"), primary()), session(Event::Reload)),
+            (command(Key::Named(Named::F5), Modifiers::empty()), session(Event::Reload)),
+            (command(Key::Character("l"), primary()), Some(Command::FocusAddress)),
+            (command(Key::Character("h"), primary()), Some(Command::ToggleHistory)),
+            (command(Key::Character(","), primary()), Some(Command::ToggleSettings)),
+            (command(Key::Character("="), primary()), session(Event::StepTextSize(TextStep::Larger))),
+            (command(Key::Character("-"), primary()), session(Event::StepTextSize(TextStep::Smaller))),
+            (command(Key::Character("0"), primary()), session(Event::StepTextSize(TextStep::Reset))),
+            (command(Key::Character("["), primary()), session(Event::Neighbour(Neighbour::Previous))),
+            (command(Key::Character("]"), primary()), session(Event::Neighbour(Neighbour::Next))),
+            (command(Key::Named(Named::ArrowLeft), Modifiers::ALT), session(Event::Back)),
+            (command(Key::Named(Named::ArrowRight), Modifiers::ALT), session(Event::Forward)),
+            (command(Key::Named(Named::Home), Modifiers::ALT), session(Event::Home)),
+            (command(Key::Character("O"), shifted), session(Event::OpenInBrowser)),
+            (command(Key::Character("I"), shifted), session(Event::LoadPageImages)),
+            (command(Key::Named(Named::Escape), Modifiers::empty()), Some(Command::ClosePanel)),
+            (command(Key::Named(Named::Tab), Modifiers::empty()), Some(Command::FocusNext)),
+            (command(Key::Named(Named::Tab), Modifiers::SHIFT), Some(Command::FocusPrevious)),
+        ];
+        for (actual, expected) in table {
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]

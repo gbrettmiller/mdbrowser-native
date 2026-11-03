@@ -13,12 +13,12 @@ use super::document;
 use super::focus;
 use super::keys::{self, Command, Scroll};
 use super::pages::{Pages, SETTLE};
-use super::panels::{self, Open, Panel};
+use super::panels::{self, Escaped, Open, Panel, escaped};
 use super::settings::ColourDrafts;
 use super::viewport::Viewport;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
-use crate::session::{self, Event, Shown, State, Status};
+use crate::session::{self, Event, Shown, State, Status, View};
 use crate::theme::{self, Appearance, Palette, Which, fonts};
 
 mod scroll;
@@ -307,8 +307,11 @@ impl App {
     /// Esc: closes the Settings panel, or else History, and puts the keyboard back on the page.
     /// With none open it still does, so Esc after typing in the address bar returns to the page.
     fn close_panel(&mut self) -> Task<Message> {
-        self.panels = self.panels.after_escape();
-        operation::focus(PAGE_ID)
+        let in_source = matches!(self.session().view, View::Source(_));
+        let Escaped { panels, leave_source } = escaped(self.panels, in_source);
+        self.panels = panels;
+        let focus = operation::focus(PAGE_ID);
+        if leave_source { self.dispatch(Event::ToggleSource).chain(focus) } else { focus }
     }
 
     fn subscription(&self) -> Subscription<Message> {

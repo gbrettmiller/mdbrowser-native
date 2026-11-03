@@ -101,3 +101,47 @@ Feature: View the Markdown source
     Then back is disabled
     And History holds 1 entries
     And the saved settings are the session's
+
+  Scenario: Ctrl+U toggles the source view
+    Given I am viewing "index.md"
+    When I press "Ctrl+U"
+    Then I see the source view
+    When I press "Ctrl+U"
+    Then I see the rendered page
+
+  Scenario: Esc leaves the source view when no panel is open
+    Given I am viewing "index.md"
+    And I viewed the source
+    When I press "Escape"
+    Then I see the rendered page
+
+  Scenario: Esc closes a panel before it leaves the source view
+    Given I am viewing "index.md"
+    And I viewed the source
+    And the Settings panel is open
+    When I press "Escape"
+    Then the Settings panel is closed
+    And I see the source view
+    When I press "Escape"
+    Then I see the rendered page
+
+  Scenario: Esc on a page changes nothing
+    Given I am viewing "index.md"
+    When I press "Escape"
+    Then I see the rendered page
+
+  Scenario: Ctrl+U with no page shown does nothing
+    Given I entered the absolute path of "missing.md" and see the error "notFound"
+    When I press "Ctrl+U"
+    Then I am not in the source view
+
+  Scenario: The button names the other view
+    Given I am viewing "index.md"
+    Then the source button reads "Source"
+    And the source button is enabled
+    When I view the source
+    Then the source button reads "Page"
+
+  Scenario: The button is disabled when there is no page
+    Given I entered the absolute path of "missing.md" and see the error "notFound"
+    Then the source button is disabled

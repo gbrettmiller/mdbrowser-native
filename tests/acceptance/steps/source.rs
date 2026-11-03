@@ -5,6 +5,7 @@ use std::fs;
 use cucumber::{given, then, when};
 use mdbrowser::model::Block;
 use mdbrowser::session::{Event, Status, View};
+use mdbrowser::ui::toolbar::source_button;
 
 use crate::world::Browser;
 
@@ -87,4 +88,19 @@ fn crlf_file_with_bom(w: &mut Browser, name: String) {
 #[then("the saved settings are the session's")]
 fn saved_settings_match(w: &mut Browser) {
     assert_eq!(w.store.load_settings(), w.state().settings);
+}
+
+#[then(expr = "the source button reads {string}")]
+fn button_reads(w: &mut Browser, label: String) {
+    assert_eq!(source_button(w.state()).0, label);
+}
+
+#[then("the source button is enabled")]
+fn button_enabled(w: &mut Browser) {
+    assert!(source_button(w.state()).1);
+}
+
+#[then("the source button is disabled")]
+fn button_disabled(w: &mut Browser) {
+    assert!(!source_button(w.state()).1);
 }
