@@ -92,6 +92,12 @@ impl ColourDrafts {
         &self.0[which.index()]
     }
 
+    /// The first field whose draft differs from the saved colours: typed, not yet applied.
+    pub fn pending(&self, saved: Colours) -> Option<Which> {
+        let shown = ColourDrafts::of(saved);
+        Which::ALL.into_iter().find(|&which| self.get(which) != shown.get(which))
+    }
+
     /// The drafts with `which` as the reader typed it.
     pub fn typed(mut self, which: Which, text: String) -> Self {
         self.0[which.index()] = text;
@@ -99,7 +105,7 @@ impl ColourDrafts {
     }
 }
 
-/// The three hex fields, each applied on Enter. They show only for the Custom appearance.
+/// The three hex fields, each applied on Enter or Tab. They show only for the Custom appearance.
 fn colour_fields<'a>(drafts: &'a ColourDrafts) -> Element<'a, Message> {
     let field = |which| -> Element<'a, Message> {
         column![
@@ -111,7 +117,11 @@ fn colour_fields<'a>(drafts: &'a ColourDrafts) -> Element<'a, Message> {
         .spacing(4)
         .into()
     };
-    column![text(content::COLOURS_LABEL).size(chrome_text::LABEL)].extend(Which::ALL.map(field)).spacing(8).into()
+    column![text(content::COLOURS_LABEL).size(chrome_text::LABEL)]
+        .extend(Which::ALL.map(field))
+        .push(text(content::COLOURS_HINT).size(chrome_text::LABEL))
+        .spacing(8)
+        .into()
 }
 
 pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDrafts) -> Element<'a, Message> {
@@ -178,5 +188,17 @@ mod tests {
         for other in [Which::Page, Which::Link] {
             assert_eq!(typed.get(other), drafts.get(other));
         }
+    }
+
+    #[test]
+    fn a_draft_is_pending_only_when_it_differs_from_the_saved_colours() {
+        let saved = Colours::default();
+        let drafts = ColourDrafts::of(saved);
+        assert_eq!(drafts.pending(saved), None);
+        assert_eq!(drafts.clone().typed(Which::Link, "#123".into()).pending(saved), Some(Which::Link));
+        assert_eq!(
+            drafts.typed(Which::Page, "#fff".into()).typed(Which::Text, "#000".into()).pending(saved),
+            Some(Which::Page)
+        );
     }
 }

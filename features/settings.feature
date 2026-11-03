@@ -22,6 +22,8 @@ Feature: Settings and home page
       | Light      |
       | Dark       |
       | System     |
+      | Sepia      |
+      | Night      |
 
   Scenario: The appearance survives a restart
     Given I chose the appearance "Dark"
@@ -29,7 +31,7 @@ Feature: Settings and home page
     Then the appearance is "Dark"
 
   Scenario: An unknown stored appearance falls back to the system
-    Given the stored appearance is "sepia"
+    Given the stored appearance is "mauve"
     When I restart the app
     Then the appearance is "System"
 

@@ -19,7 +19,7 @@ use super::viewport::Viewport;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
 use crate::session::{self, Event, Shown, State, Status};
-use crate::theme::{self, Palette, Which, fonts};
+use crate::theme::{self, Appearance, Palette, Which, fonts};
 
 mod scroll;
 mod view;
@@ -250,12 +250,31 @@ impl App {
             }
             Some(Command::Scroll(by)) => self.shortcut_scroll(by),
             Some(Command::ClosePanel) => self.close_panel(),
-            Some(Command::FocusNext) => operation::focus_next().chain(focus::reveal_focused(PAGE_ID)),
+            Some(Command::FocusNext) => {
+                let applied = self.apply_pending_colour();
+                applied.chain(operation::focus_next()).chain(focus::reveal_focused(PAGE_ID))
+            }
             Some(Command::FocusPrevious) => {
-                operation::focus_previous().chain(self.enter_page_from_behind()).chain(focus::reveal_focused(PAGE_ID))
+                let applied = self.apply_pending_colour();
+                applied
+                    .chain(operation::focus_previous())
+                    .chain(self.enter_page_from_behind())
+                    .chain(focus::reveal_focused(PAGE_ID))
             }
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),
             Some(Command::ToggleSettings) => self.update(Message::ToggleSettings),
+            None => Task::none(),
+        }
+    }
+
+    /// Tab leaves a colour field: a typed colour is applied as if Enter had been pressed.
+    fn apply_pending_colour(&mut self) -> Task<Message> {
+        let settings = &self.session().settings;
+        if !self.panels.settings || settings.appearance != Appearance::Custom {
+            return Task::none();
+        }
+        match self.colour_drafts.pending(settings.colours()) {
+            Some(which) => self.update(Message::SubmitColour(which)),
             None => Task::none(),
         }
     }

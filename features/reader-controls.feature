@@ -62,6 +62,11 @@ Feature: Reader controls
     When I choose the appearance "Custom"
     Then the custom page colour is the dark page colour
 
+  Scenario: Custom colours start from a preset when one is in use
+    Given I chose the appearance "Night"
+    When I choose the appearance "Custom"
+    Then the custom page colour is the "Night" page colour
+
   Scenario Outline: A custom colour is accepted as hex
     Given I chose the appearance "Custom"
     When I set the custom "<which>" colour to "<value>"

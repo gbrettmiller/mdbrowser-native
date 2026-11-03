@@ -850,3 +850,18 @@ fn a_newer_link_out_replaces_the_one_waiting_and_going_elsewhere_drops_it() {
     let (state, _) = step(state, Event::Follow("/b.md".into()));
     assert_eq!(state.leaving, None);
 }
+
+#[test]
+fn choosing_custom_after_a_preset_starts_from_that_preset() {
+    let (state, _) = run([Event::ChooseAppearance(Appearance::Night), Event::ChooseAppearance(Appearance::Custom)]);
+    assert_eq!(state.settings.custom, Appearance::Night.preset());
+}
+
+#[test]
+fn a_preset_is_remembered_and_keeps_the_readers_own_colours() {
+    let (state, effects) =
+        run([Event::ChooseAppearance(Appearance::Custom), Event::ChooseAppearance(Appearance::Nord)]);
+    assert_eq!(state.palette(), Palette::Custom(Appearance::Nord.preset().expect("a preset")));
+    assert_eq!(state.settings.custom, Some(Colours::default()), "the Custom set is not overwritten");
+    assert!(effects.iter().any(|effect| matches!(effect, Effect::PersistSettings(_))));
+}

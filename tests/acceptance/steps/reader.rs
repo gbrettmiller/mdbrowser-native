@@ -5,7 +5,7 @@ use mdbrowser::content;
 use mdbrowser::layout::{self, Page};
 use mdbrowser::session::{Event, NoticeKind, Status, TextStep};
 use mdbrowser::theme::colours::{hex, parse_hex};
-use mdbrowser::theme::{self, Colours, Look, Palette, Spacing, TextSize, Which};
+use mdbrowser::theme::{self, Appearance, Colours, Look, Palette, Spacing, TextSize, Which};
 
 use crate::world::Browser;
 
@@ -133,6 +133,12 @@ fn colour_unchanged(w: &mut Browser, which: String) {
 #[then("the custom page colour is the dark page colour")]
 fn page_is_dark_page(w: &mut Browser) {
     assert_eq!(w.state().settings.colours().page, Colours::of(Palette::Dark).page);
+}
+
+#[then(expr = "the custom page colour is the {string} page colour")]
+fn page_is_preset_page(w: &mut Browser, name: String) {
+    let preset = Appearance::ALL.into_iter().find(|a| content::appearance(*a) == name).and_then(Appearance::preset);
+    assert_eq!(Some(w.state().settings.colours().page), preset.map(|set| set.page));
 }
 
 #[then(expr = "I am told that the {word} colour is too close to the page colour")]
