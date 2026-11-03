@@ -138,6 +138,8 @@ pub struct Keys {
     pub left: Option<mdbrowser::layout::Direction>,
     pub page_focused: bool,
     pub scroll: f32,
+    /// How far the view that is not shown (page or source) was scrolled.
+    pub other_scroll: f32,
     pub window: (f32, f32),
     pub panels: mdbrowser::ui::panels::Open,
 }
@@ -149,6 +151,7 @@ impl Default for Keys {
             left: None,
             page_focused: true,
             scroll: 0.0,
+            other_scroll: 0.0,
             window: (1000.0, 600.0),
             panels: Default::default(),
         }
@@ -233,9 +236,27 @@ impl Browser {
         self.path(name).display().to_string()
     }
 
+    /// Which page is shown and whether as source, as the app compares them to place the scroll.
+    fn shown_view(&self) -> (Option<usize>, bool) {
+        let state = self.state();
+        let page = match &state.status {
+            mdbrowser::session::Status::Ready(shown) => Some(std::sync::Arc::as_ptr(shown) as usize),
+            _ => None,
+        };
+        (page, matches!(state.view, mdbrowser::session::View::Source(_)))
+    }
+
     pub fn send(&mut self, event: Event) {
+        let (page, in_source) = self.shown_view();
         let (state, effects) = step(self.state.take().expect("state"), event);
         self.state = Some(state);
+        // What the app's viewport does: a new page starts at the top, a switch of view swaps places.
+        let (now_page, now_source) = self.shown_view();
+        if now_page.is_some() && now_page != page {
+            (self.keys.scroll, self.keys.other_scroll) = (0.0, 0.0);
+        } else if now_page.is_some() && now_source != in_source {
+            std::mem::swap(&mut self.keys.scroll, &mut self.keys.other_scroll);
+        }
         effects.into_iter().for_each(|effect| self.run(effect));
     }
 

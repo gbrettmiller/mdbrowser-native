@@ -169,3 +169,44 @@ Feature: View the Markdown source
       | PageDown | scrolled one page down |
       | Down     | scrolled one line down |
       | End      | at the end             |
+
+  Scenario: The page keeps its place while the source is shown
+    Given a document "long.md" that is 120 paragraphs long
+    And I am viewing "long.md"
+    And the window is 600 pixels tall
+    And I pressed "PageDown"
+    When I view the source
+    Then the page is at the top
+    When I press "End"
+    And I view the page
+    Then the page is scrolled one page down
+
+  Scenario: The source keeps its place while the page is shown
+    Given a document "long.md" that is 120 paragraphs long
+    And I am viewing "long.md"
+    And the window is 600 pixels tall
+    And I viewed the source
+    And I pressed "PageDown"
+    When I view the page
+    And I view the source
+    Then the page is scrolled one page down
+
+  Scenario: Reload shows the source from the top
+    Given a document "long.md" that is 120 paragraphs long
+    And I am viewing "long.md"
+    And the window is 600 pixels tall
+    And I viewed the source
+    And I pressed "PageDown"
+    When I reload
+    Then I see the source view
+    And the page is at the top
+
+  Scenario: Leaving a page forgets where its source was
+    Given a document "long.md" that is 120 paragraphs long
+    And I am viewing "long.md"
+    And the window is 600 pixels tall
+    And I viewed the source
+    And I pressed "PageDown"
+    When I view the page
+    And I follow "index.md"
+    Then the page is at the top
