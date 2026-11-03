@@ -7,7 +7,7 @@
 # Appearance keys: system, light, dark. With no document, shoots the welcome page.
 # -s: text sizes in pixels (12 to 32, even). -p: compact, comfortable, spacious.
 # -c: custom page,text,link colours as hex; shoots the Custom appearance (ignores -a).
-# -k: keys to press before the shot, in order: tab, stab (Shift+Tab), settings, history, esc.
+# -k: keys to press before the shot, in order: tab, stab (Shift+Tab), settings, history, source (Ctrl+U), esc.
 #     "tab" puts the focus ring on the first link; "settings tab" focuses a control in the panel.
 # -w: float the window at WxH first (620x360 is the smallest the app allows).
 set -euo pipefail
@@ -41,7 +41,7 @@ for size in $sizes; do
 done
 [[ -z $size_of || $size_of =~ ^[0-9]+x[0-9]+$ ]] || die "bad -w '$size_of' (want WxH)"
 for key in $keys; do
-  case $key in tab | stab | settings | history | esc) ;; *) die "bad key '$key'" ;; esac
+  case $key in tab | stab | settings | history | source | esc) ;; *) die "bad key '$key'" ;; esac
 done
 for spacing in $spacings; do
   case $spacing in compact | comfortable | spacious) ;; *) die "bad spacing '$spacing'" ;; esac
@@ -70,6 +70,7 @@ press() {
     stab) wtype -M shift -k Tab -m shift ;;
     settings) wtype -M ctrl , -m ctrl ;;
     history) wtype -M ctrl h -m ctrl ;;
+    source) wtype -M ctrl u -m ctrl ;;
     esc) wtype -k Escape ;;
   esac
 }
