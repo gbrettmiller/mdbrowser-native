@@ -109,6 +109,7 @@ fn focus_on_address(w: &mut Browser) {
 }
 
 #[when(expr = "I press {string}")]
+#[given(expr = "I pressed {string}")]
 fn press(w: &mut Browser, chord: String) {
     if let Some(letter) = chord.strip_prefix("Ctrl+") {
         let command = keys::command(Key::Character(&letter.to_lowercase()), Modifiers::COMMAND);

@@ -98,7 +98,15 @@ impl App {
         view_changed: bool,
     ) -> Task<Message> {
         let Some(shown) = self.shown() else { return Task::none() };
-        let is_new = view_changed || !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
+        let is_new = !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
+        if view_changed && !is_new {
+            // The same page, in its other view: each keeps its own place.
+            let y = self.viewport.swap_view();
+            return Task::batch([
+                operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
+                operation::focus(PAGE_ID),
+            ]);
+        }
         if is_new {
             self.viewport.new_page(self.session().images.generation());
         }

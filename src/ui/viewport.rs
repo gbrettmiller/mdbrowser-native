@@ -38,6 +38,8 @@ pub struct Viewport {
     /// An `ImagesArrived` relayout is scheduled.
     images_pending: bool,
     scroll_y: Cell<f32>,
+    /// The offset of the view that is not shown (the page while in the source, and back).
+    other_y: Cell<f32>,
     /// An anchor the view was scrolled to, and where: re-applied as images arrive,
     /// until the reader scrolls away.
     anchor_held: Option<(String, f32)>,
@@ -54,6 +56,7 @@ impl Viewport {
             applied_images: Cell::new(0),
             images_pending: false,
             scroll_y: Cell::new(0.0),
+            other_y: Cell::new(0.0),
             anchor_held: None,
         }
     }
@@ -111,6 +114,15 @@ impl Viewport {
         self.applied_images.set(image_generation);
         self.anchor_held = None;
         self.scroll_y.set(0.0);
+        self.other_y.set(0.0);
+    }
+
+    /// The reader switched between the page and its source: remembers this view's offset and
+    /// returns the other view's, which is now the current one.
+    pub fn swap_view(&self) -> f32 {
+        let shown = self.other_y.replace(self.scroll_y.get());
+        self.scroll_y.set(shown);
+        shown
     }
 
     /// The view was scrolled to `anchor` at `y`: hold it there as images arrive.
@@ -210,6 +222,28 @@ mod tests {
     use crate::layout::{self, ImageView, layout};
     use crate::model::parse;
     use crate::theme::{Look, TextSize, fonts, reading};
+
+    #[test]
+    fn each_view_keeps_its_own_offset_across_swaps() {
+        let mut viewport = Viewport::new(600.0, 400.0);
+        viewport.scrolled(300.0);
+        assert_eq!(viewport.swap_view(), 0.0, "the source was never scrolled");
+        viewport.scrolled(80.0);
+        assert_eq!(viewport.swap_view(), 300.0);
+        assert_eq!(viewport.swap_view(), 80.0);
+        assert_eq!(viewport.swap_view(), 300.0);
+    }
+
+    #[test]
+    fn a_new_page_forgets_both_offsets() {
+        let mut viewport = Viewport::new(600.0, 400.0);
+        viewport.scrolled(300.0);
+        viewport.swap_view();
+        viewport.scrolled(80.0);
+        viewport.new_page(0);
+        assert_eq!(viewport.swap_view(), 0.0);
+        assert_eq!(viewport.swap_view(), 0.0);
+    }
 
     const POST: &str = "![a](a.png)\n\n# Intro\n\nText.\n\n# Later\n\nMore.";
 
