@@ -103,6 +103,54 @@ fn spec_timing() {
     }
 }
 
+/// The source view of the largest document we ship costs about what its rendered page costs.
+/// Layout is linear in the text (measured: 28 µs a line), so splitting the source into chunks
+/// would not make it faster; the budget is parity, not a fixed number of milliseconds.
+#[test]
+#[ignore = "timing, alone: cargo test --release -- --ignored --test-threads=1 --nocapture"]
+fn source_timing() {
+    use crate::layout::{layout, no_images};
+    use crate::model::{parse, source_document};
+    use crate::theme::reading;
+    let text = include_str!("../../corpus/spec.md");
+    let (source, rendered) = (source_document(text).blocks, parse(text).blocks);
+    let theme = reading(crate::theme::Look::default());
+    crate::theme::fonts::install();
+    let best = |blocks: &[crate::model::Block], width: f32| {
+        (0..3)
+            .map(|_| {
+                let started = std::time::Instant::now();
+                layout(blocks, &theme, width, &no_images);
+                started.elapsed()
+            })
+            .min()
+            .expect("three runs")
+    };
+    for width in [720.0, 540.0, 360.0] {
+        let (as_source, as_page) = (best(&source, width), best(&rendered, width));
+        println!("spec.md @{width}: source {as_source:?}, page {as_page:?}");
+        assert!(as_source.as_secs_f64() <= 1.5 * as_page.as_secs_f64(), "@{width}: {as_source:?} vs {as_page:?}");
+    }
+}
+
+#[test]
+fn a_long_source_is_as_tall_as_its_lines_and_copies_whole() {
+    use crate::layout::{Caret, layout, no_images};
+    use crate::model::source_document;
+    use crate::theme::reading;
+    let source: String = (1..=2000).map(|n| format!("line {n}\n")).collect();
+    let theme = reading(crate::theme::Look::default());
+    crate::theme::fonts::install();
+    let page = layout(&source_document(&source).blocks, &theme, WIDTH, &no_images);
+    let line = theme.body_size * theme.mono_scale * theme.line_ratio;
+    let each = page.height / 2000.0;
+    assert!((each - line).abs() < 0.1 * line, "{each} a line vs {line}");
+    let last = page.fragments.len() - 1;
+    let all = page
+        .selected_text(Caret { fragment: 0, byte: 0 }, Caret { fragment: last, byte: page.fragments[last].text.len() });
+    assert_eq!(all, source.trim_end_matches('\n'));
+}
+
 fn framed_page(source: &str) -> Page {
     framed_page_looking(source, crate::theme::Look::default())
 }

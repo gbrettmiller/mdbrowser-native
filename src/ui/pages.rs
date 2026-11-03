@@ -204,4 +204,28 @@ mod tests {
         let (after, settling) = get(&mut pages, &doc, 300.0, 0, start + SETTLE + Duration::from_millis(20));
         assert!(!Arc::ptr_eq(&wide, &after) && !settling);
     }
+
+    #[test]
+    fn a_source_document_that_costs_much_waits_for_the_width_like_any_page() {
+        fonts::install();
+        let source = Arc::new(crate::model::source_document(&"a line of the source\n".repeat(500)));
+        let (start, mut pages) = (Instant::now(), Pages::new(Duration::ZERO));
+        let (wide, _) = get(&mut pages, &source, 500.0, 0, start);
+        let (during, settling) = get(&mut pages, &source, 300.0, 0, start + Duration::from_millis(10));
+        assert!(Arc::ptr_eq(&wide, &during) && settling);
+        let (after, settling) = get(&mut pages, &source, 300.0, 0, start + SETTLE + Duration::from_millis(20));
+        assert!(!Arc::ptr_eq(&wide, &after) && !settling);
+    }
+
+    #[test]
+    fn toggling_between_a_page_and_its_source_lays_out_the_one_shown() {
+        let (page, start) = (document(), Instant::now());
+        let source = Arc::new(crate::model::source_document("# Title\n\nSome words to wrap."));
+        let mut pages = Pages::new(Duration::MAX);
+        let (as_page, _) = get(&mut pages, &page, 500.0, 0, start);
+        let (as_source, _) = get(&mut pages, &source, 500.0, 0, start);
+        assert!(!Arc::ptr_eq(&as_page, &as_source));
+        let (again, _) = get(&mut pages, &page, 500.0, 0, start);
+        assert_eq!(again.height, as_page.height);
+    }
 }
