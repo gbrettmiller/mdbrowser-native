@@ -63,6 +63,8 @@ pub enum Joint {
     Wrap,
     /// Hard break or a new block.
     Break,
+    /// Hard break after empty lines: this many newlines in all (two or more).
+    Lines(usize),
 }
 
 /// A shown image's box, for painting and clicks.
@@ -294,6 +296,20 @@ pub(crate) mod tests {
     fn copy_all(p: &Page) -> String {
         let last = p.fragments.len() - 1;
         p.selected_text(Caret { fragment: 0, byte: 0 }, Caret { fragment: last, byte: p.fragments[last].text.len() })
+    }
+
+    #[test]
+    fn copying_the_source_view_gives_back_the_source_wrapped_or_not() {
+        let source = "---\ntitle: T\n---\n\n# H\n\n    indented  spaces\n\n\nlong line ".to_string()
+            + &"word ".repeat(80)
+            + "\nend\n";
+        let blocks = crate::model::source_document(&source).blocks;
+        fonts::install();
+        for width in [300.0, WIDTH, 1200.0] {
+            let p = layout(&blocks, &reading(Look::default()), width, &no_images);
+            assert!(p.fragments.iter().all(|f| f.font == reading(Look::default()).mono_font));
+            assert_eq!(copy_all(&p), source.trim_end_matches('\n'), "at {width}");
+        }
     }
 
     #[test]

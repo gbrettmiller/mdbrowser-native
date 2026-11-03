@@ -7,6 +7,9 @@ use mdbrowser::model::Block;
 use mdbrowser::session::{Event, Status, View};
 use mdbrowser::ui::toolbar::source_button;
 
+use mdbrowser::theme::{Look, TextSize};
+
+use super::reader::{look, page_at};
 use crate::world::Browser;
 
 use super::unescape;
@@ -103,4 +106,20 @@ fn button_enabled(w: &mut Browser) {
 #[then("the source button is disabled")]
 fn button_disabled(w: &mut Browser) {
     assert!(!source_button(w.state()).1);
+}
+
+#[then("the source is set in the monospace font on the code background")]
+fn set_in_mono(w: &mut Browser) {
+    let page = page_at(w, look(w));
+    let theme = mdbrowser::theme::reading(look(w));
+    assert!(!page.fragments.is_empty());
+    assert!(page.fragments.iter().all(|f| f.font == theme.mono_font && f.color == theme.code_ink));
+    assert!(page.fills.iter().any(|f| f.color == theme.code_background), "no code background");
+}
+
+#[then("the source is set at a larger size")]
+fn set_larger(w: &mut Browser) {
+    let default = Look { size: TextSize::default(), ..look(w) };
+    let size = |page: &mdbrowser::layout::Page| page.fragments[0].size;
+    assert!(size(&page_at(w, look(w))) > size(&page_at(w, default)));
 }

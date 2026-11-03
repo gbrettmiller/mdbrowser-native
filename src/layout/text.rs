@@ -65,11 +65,17 @@ impl Flow<'_> {
         let mut height = 0.0;
         let mut previous_line = None;
         for run in buffer.layout_runs() {
+            // Code wraps inside words, so a wrap there is no gap; text wraps at spaces.
+            let wrapped = if wrap == ct::Wrap::Glyph { Joint::Flush } else { Joint::Wrap };
             let mut joint = match previous_line {
-                Some(line) if line == run.line_i => Joint::Wrap,
+                Some(line) if line == run.line_i => wrapped,
+                Some(line) if run.line_i > line + 1 => Joint::Lines(run.line_i - line),
                 _ => Joint::Break,
             };
-            previous_line = Some(run.line_i);
+            // An empty line shapes nothing to copy, but the next line must know it was there.
+            if !run.glyphs.is_empty() {
+                previous_line = Some(run.line_i);
+            }
             let top = self.y + run.line_top;
             let baseline = self.y + run.line_y;
             for glyphs in run.glyphs.chunk_by(|a, b| a.metadata == b.metadata) {

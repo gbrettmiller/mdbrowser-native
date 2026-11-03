@@ -47,10 +47,10 @@ impl App {
             return Task::none();
         };
         let width = self.viewport.width();
-        let (before, _) = self.page(&shown.document, width);
+        let (before, _) = self.page(&self.displayed(&shown), width);
         let generation = self.session().images.generation();
         let gutter = theme::reading(self.look()).gutter;
-        let (after, _) = self.page_at(&shown.document, width, generation);
+        let (after, _) = self.page_at(&self.displayed(&shown), width, generation);
         scroll_task(self.viewport.images_arrived(&before, &after, gutter, generation))
     }
 
@@ -67,7 +67,7 @@ impl App {
             return Task::none();
         }
         let generation = self.viewport.applied_images();
-        let (after, _) = self.page_at(&shown.document, self.viewport.width(), generation);
+        let (after, _) = self.page_at(&self.displayed(&shown), self.viewport.width(), generation);
         scroll_task(self.viewport.relaid(&before, &after, theme::reading(self.look()).gutter))
     }
 
@@ -85,7 +85,7 @@ impl App {
     /// Scrolls the page by a key: a screen, a line, or to an end.
     pub(super) fn key_scroll(&mut self, by: Scroll) -> Task<Message> {
         let Some(shown) = self.shown() else { return Task::none() };
-        let (page, _) = self.page(&shown.document, self.viewport.width());
+        let (page, _) = self.page(&self.displayed(&shown), self.viewport.width());
         scroll_task(self.viewport.key_scroll(by, page.height, self.line()))
     }
 
@@ -95,9 +95,10 @@ impl App {
         &mut self,
         before: Option<Arc<Shown>>,
         fragment_before: Option<String>,
+        view_changed: bool,
     ) -> Task<Message> {
         let Some(shown) = self.shown() else { return Task::none() };
-        let is_new = !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
+        let is_new = view_changed || !before.is_some_and(|before| Arc::ptr_eq(&before, &shown));
         if is_new {
             self.viewport.new_page(self.session().images.generation());
         }
@@ -121,14 +122,14 @@ impl App {
         if self.session().fragment.as_ref() != Some(&fragment) {
             return Task::none(); // superseded or already handled
         }
-        if !self.viewport.ready_for_anchor(&shown.document) {
+        if !self.viewport.ready_for_anchor(&self.displayed(&shown)) {
             return if attempt < ANCHOR_ATTEMPTS {
                 Task::perform(background::after(ANCHOR_RETRY), move |_| Message::ResolveAnchor(fragment, attempt + 1))
             } else {
                 self.dispatch(Event::FragmentHandled)
             };
         }
-        let (page, _) = self.page(&shown.document, self.viewport.width());
+        let (page, _) = self.page(&self.displayed(&shown), self.viewport.width());
         let scroll = match page.scroll_offset_for(&fragment, theme::reading(self.look()).gutter) {
             Some(y) => {
                 self.viewport.hold_anchor(fragment.clone(), y);

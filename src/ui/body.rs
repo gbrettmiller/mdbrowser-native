@@ -1,6 +1,8 @@
 //! Everything the document area can show besides a document: welcome, loading,
 //! errors, and the notices above it.
 
+use std::borrow::Cow;
+
 use iced::widget::{column, container, row, text};
 use iced::{Element, Fill};
 
@@ -62,14 +64,15 @@ pub fn notices(notices: &[Notice]) -> Element<'_, Message> {
 
 /// The document's title, for windows that have no title bar to show it: only
 /// when a document is on screen.
-pub fn title_line(status: &Status) -> Option<&str> {
+pub fn title_line(status: &Status, in_source: bool) -> Option<Cow<'_, str>> {
     match status {
-        Status::Ready(shown) => Some(shown.title.as_str()),
+        Status::Ready(shown) if in_source => Some(content::source_of(&shown.title).into()),
+        Status::Ready(shown) => Some(shown.title.as_str().into()),
         _ => None,
     }
 }
 
-pub fn title_bar<'a>(title: &'a str, theme: &theme::Theme) -> Element<'a, Message> {
+pub fn title_bar<'a>(title: Cow<'a, str>, theme: &theme::Theme) -> Element<'a, Message> {
     let muted = theme.muted;
     container(
         text(title)
@@ -95,9 +98,11 @@ mod tests {
     fn the_title_shows_only_with_a_document() {
         let shown =
             Shown { document: Arc::new(parse("# Hi")), source: "# Hi".into(), title: "Hi".into(), fallback_from: None };
-        assert_eq!(title_line(&Status::Ready(Arc::new(shown))), Some("Hi"));
+        let ready = Status::Ready(Arc::new(shown));
+        assert_eq!(title_line(&ready, false).as_deref(), Some("Hi"));
+        assert_eq!(title_line(&ready, true).as_deref(), Some("Source of Hi"));
         for status in [Status::Idle, Status::Loading, Status::Failed(ErrorCode::NotFound)] {
-            assert_eq!(title_line(&status), None);
+            assert_eq!(title_line(&status, true), None);
         }
     }
 }

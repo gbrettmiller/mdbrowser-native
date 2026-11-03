@@ -145,3 +145,27 @@ Feature: View the Markdown source
   Scenario: The button is disabled when there is no page
     Given I entered the absolute path of "missing.md" and see the error "notFound"
     Then the source button is disabled
+
+  Scenario: The source is set in the monospace font on the code background
+    Given I am viewing "index.md"
+    When I view the source
+    Then the source is set in the monospace font on the code background
+
+  Scenario: The reader's text size applies to the source
+    Given I am viewing "index.md"
+    And I viewed the source
+    When I make the text larger 2 times
+    Then the source is set at a larger size
+
+  Scenario Outline: Scroll keys scroll the source view
+    Given a document "long.md" that is 120 paragraphs long
+    And I am viewing "long.md"
+    And I viewed the source
+    And the window is 600 pixels tall
+    When I press "<key>"
+    Then the page is <by>
+    Examples:
+      | key      | by                     |
+      | PageDown | scrolled one page down |
+      | Down     | scrolled one line down |
+      | End      | at the end             |

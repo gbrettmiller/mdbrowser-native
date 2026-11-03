@@ -3,7 +3,7 @@
 use cucumber::{given, then, when};
 use mdbrowser::content;
 use mdbrowser::layout::{self, Page};
-use mdbrowser::session::{Event, NoticeKind, Status, TextStep};
+use mdbrowser::session::{Event, NoticeKind, Status, TextStep, View};
 use mdbrowser::theme::colours::{hex, parse_hex};
 use mdbrowser::theme::{self, Appearance, Colours, Look, Palette, Spacing, TextSize, Which};
 
@@ -22,8 +22,13 @@ fn colour_named(name: &str) -> Which {
 /// The open document laid out at `look`, with no images.
 pub(super) fn page_at(w: &Browser, look: Look) -> Page {
     let Status::Ready(shown) = &w.state().status else { panic!("no document: {:?}", w.state().status) };
+    // What is on screen: the page, or its source.
+    let document = match &w.state().view {
+        View::Source(source) => source,
+        View::Page => &shown.document,
+    };
     theme::fonts::install();
-    layout::layout(&shown.document.blocks, &theme::reading(look), WIDTH, &layout::no_images)
+    layout::layout(&document.blocks, &theme::reading(look), WIDTH, &layout::no_images)
 }
 
 /// How the reader has the page now.
