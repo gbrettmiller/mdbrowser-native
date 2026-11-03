@@ -232,6 +232,10 @@ const DARK: Theme = Theme {
 
 /// The narrowest text column, however narrow the window.
 const MIN_COLUMN: f32 = 80.0;
+
+/// A shown image is never taller than this many times the text size, so a tall one cannot fill
+/// the window above a post's first line (ADR-012). 30 times the default 18 px is 540 px.
+const IMAGE_MAX_HEIGHT_RATIO: f32 = 30.0;
 const LINK_UNDERLINE_ALPHA: f32 = 0.45;
 
 impl Theme {
@@ -239,6 +243,11 @@ impl Theme {
     /// gutters when the window is narrow.
     pub fn column_width(&self, window: f32) -> f32 {
         (window - 2.0 * self.gutter).min(self.measure).max(MIN_COLUMN)
+    }
+
+    /// The tallest a shown image is laid out: it follows the reader's text size, like line height.
+    pub fn image_max_height(&self) -> f32 {
+        IMAGE_MAX_HEIGHT_RATIO * self.body_size
     }
 }
 
@@ -451,6 +460,25 @@ mod tests {
     fn the_default_look_is_exactly_the_fixed_light_theme() {
         assert_eq!(reading(Look::default()), Theme { body_font: Font::with_name("Literata"), ..LIGHT });
         assert_eq!(reading(Look { palette: Palette::Dark, ..Look::default() }), DARK);
+    }
+
+    #[test]
+    fn the_maximum_image_height_is_thirty_times_the_text_size() {
+        for px in (12..=32).step_by(2) {
+            let look = Look { size: TextSize::from_px(px).unwrap(), ..Look::default() };
+            assert_eq!(reading(look).image_max_height(), 30.0 * px as f32);
+        }
+        assert_eq!(reading(Look::default()).image_max_height(), 540.0);
+        assert!(reading(Look::default()).image_max_height() >= 480.0, "a 640 by 480 image is not capped");
+    }
+
+    #[test]
+    fn the_maximum_image_height_is_geometry_so_no_palette_changes_it() {
+        let base = reading(Look::default()).image_max_height();
+        for appearance in Appearance::ALL {
+            let palette = appearance.preset().map_or(Palette::Dark, Palette::Custom);
+            assert_eq!(reading(Look { palette, ..Look::default() }).image_max_height(), base);
+        }
     }
 
     #[test]
