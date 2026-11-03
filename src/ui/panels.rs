@@ -45,6 +45,19 @@ impl Open {
     }
 }
 
+/// What Esc does: the panels afterwards, and whether the source view is left.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Escaped {
+    pub panels: Open,
+    pub leave_source: bool,
+}
+
+/// Esc closes a panel first, so the source view is left only when none is open.
+pub const fn escaped(open: Open, in_source: bool) -> Escaped {
+    let panels = open.after_escape();
+    Escaped { panels, leave_source: in_source && !open.history && !open.settings }
+}
+
 const fn other(panel: Panel) -> Panel {
     match panel {
         Panel::History => Panel::Settings,
@@ -114,6 +127,22 @@ mod tests {
         assert_eq!(both.after_escape().after_escape(), Open::default());
         assert_eq!(Open { history: false, settings: true }.after_escape(), Open::default());
         assert_eq!(Open::default().after_escape(), Open::default());
+    }
+
+    #[test]
+    fn escape_closes_a_panel_before_it_leaves_the_source_view() {
+        let settings = Open { history: false, settings: true };
+        let both = Open { history: true, settings: true };
+        let none = Open::default();
+        for in_source in [false, true] {
+            assert_eq!(escaped(settings, in_source), Escaped { panels: none, leave_source: false });
+            assert_eq!(
+                escaped(both, in_source),
+                Escaped { panels: Open { history: true, settings: false }, leave_source: false }
+            );
+        }
+        assert_eq!(escaped(none, true), Escaped { panels: none, leave_source: true });
+        assert_eq!(escaped(none, false), Escaped { panels: none, leave_source: false });
     }
 
     #[test]

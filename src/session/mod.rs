@@ -10,10 +10,12 @@ pub mod location;
 pub mod navigation;
 pub mod network;
 mod reducer;
+pub mod view;
 pub mod visits;
 pub mod web;
 
 pub use reducer::step;
+pub use view::View;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -67,6 +69,8 @@ pub struct Loaded {
 #[derive(Debug, PartialEq)]
 pub struct Shown {
     pub document: Arc<Document>,
+    /// The Markdown as fetched, kept for the source view.
+    pub source: Arc<str>,
     pub title: String,
     /// The address the reader asked for, when this Markdown was found in its place.
     pub fallback_from: Option<String>,
@@ -132,6 +136,8 @@ pub enum Event {
     Back,
     Forward,
     Reload,
+    /// Switch between the page and its Markdown source; nothing happens without a page.
+    ToggleSource,
     Loaded {
         request_id: u64,
         result: Result<Loaded, ErrorCode>,
@@ -201,6 +207,8 @@ pub struct State {
     pub request_id: u64,
     pub pending: Option<u64>,
     pub status: Status,
+    /// The page drawn, or the Markdown it was made from.
+    pub view: View,
     /// Anchor waiting to be scrolled to once the page is laid out.
     pub fragment: Option<String>,
     pub visits: Vec<Visit>,
@@ -228,6 +236,7 @@ impl State {
             request_id: 0,
             pending: None,
             status: Status::Idle,
+            view: View::Page,
             fragment: None,
             visits: Vec::new(),
             notices: Vec::new(),

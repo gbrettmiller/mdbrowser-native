@@ -11,5 +11,5 @@ pub mod keys;
 pub mod pages;
 pub mod panels;
 mod settings;
-mod toolbar;
+pub mod toolbar;
 pub mod viewport;

@@ -865,3 +865,158 @@ fn a_preset_is_remembered_and_keeps_the_readers_own_colours() {
     assert_eq!(state.settings.custom, Some(Colours::default()), "the Custom set is not overwritten");
     assert!(effects.iter().any(|effect| matches!(effect, Effect::PersistSettings(_))));
 }
+
+#[test]
+fn the_shown_page_keeps_the_source_exactly_as_fetched() {
+    let source = "---\ntitle: T\n---\r\n# A\n\n  indented\n";
+    let (state, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", source)]);
+    assert_eq!(&*shown(&state).source, source);
+}
+
+#[test]
+fn a_fallback_find_keeps_the_markdown_found() {
+    let (state, _) = run([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "---\ntitle: P\n---\n# P"),
+    ]);
+    assert_eq!(&*shown(&state).source, "---\ntitle: P\n---\n# P");
+}
+
+use crate::session::view::View as PageView;
+
+fn source_of(state: &State) -> Option<String> {
+    match &state.view {
+        PageView::Source(document) => match document.blocks.as_slice() {
+            [crate::model::Block::Code { text, .. }] => Some(text.clone()),
+            other => panic!("the source is one code block, got {other:?}"),
+        },
+        PageView::Page => None,
+    }
+}
+
+#[test]
+fn toggling_shows_the_source_and_toggling_again_the_page() {
+    let (state, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "---\ntitle: T\n---\n# A")]);
+    assert_eq!(state.view, PageView::Page);
+    let (state, effects) = step(state, Event::ToggleSource);
+    assert_eq!(source_of(&state).as_deref(), Some("---\ntitle: T\n---\n# A"));
+    assert!(effects.is_empty(), "nothing is saved, loaded or recorded: {effects:?}");
+    let (state, effects) = step(state, Event::ToggleSource);
+    assert_eq!(state.view, PageView::Page);
+    assert!(effects.is_empty());
+}
+
+#[test]
+fn toggling_changes_nothing_but_the_view() {
+    let (before, _) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
+    let (after, _) = step(before.clone(), Event::ToggleSource);
+    assert_eq!((&after.settings, &after.visits, &after.nav), (&before.settings, &before.visits, &before.nav));
+    assert_eq!(after.status, before.status);
+}
+
+#[test]
+fn there_is_no_source_to_view_without_a_page() {
+    let (idle, _) = run([]);
+    let (loading, _) = run([Event::Enter(native("/d/a.md"))]);
+    let (failed, _) = run([
+        Event::Enter(native("/d/a.md")),
+        Event::Loaded { request_id: 1, result: Err(ErrorCode::NotFound), now: 1 },
+    ]);
+    for state in [idle, loading, failed] {
+        let (after, effects) = step(state.clone(), Event::ToggleSource);
+        assert_eq!((after.view, effects), (PageView::Page, vec![]));
+    }
+}
+
+#[test]
+fn the_welcome_page_has_a_source_too() {
+    let (state, _) = run([
+        Event::Home,
+        Event::Loaded {
+            request_id: 1,
+            result: Ok(Loaded { source: "# Welcome".into(), location: Location::Welcome, fallback_from: None }),
+            now: 1,
+        },
+        Event::ToggleSource,
+    ]);
+    assert_eq!(source_of(&state).as_deref(), Some("# Welcome"));
+}
+
+fn in_source(events: impl IntoIterator<Item = Event>) -> State {
+    let (state, _) = run(events);
+    let (state, _) = step(state, Event::ToggleSource);
+    assert!(source_of(&state).is_some(), "in the source view");
+    state
+}
+
+#[test]
+fn every_way_of_going_elsewhere_returns_to_the_page() {
+    let open = || {
+        in_source([
+            Event::Enter(native("/d/a.md")),
+            loaded(1, "/d/a.md", "[b](b.md)\n\n# A"),
+            Event::Enter(native("/d/c.md")),
+            loaded(2, "/d/c.md", "# C"),
+            Event::Back,
+            loaded(3, "/d/a.md", "[b](b.md)\n\n# A"),
+        ])
+    };
+    for (name, event) in [
+        ("a typed address", Event::Enter(native("/d/b.md"))),
+        ("a followed link", Event::Follow("b.md".into())),
+        ("Home", Event::Home),
+        ("Forward", Event::Forward),
+        ("a History entry", Event::OpenHistory(native("/d/b.md"))),
+    ] {
+        let (state, _) = step(open(), event);
+        assert_eq!(state.view, PageView::Page, "{name}");
+    }
+    let (state, _) = run([
+        Event::Enter(native("/d/a.md")),
+        loaded(1, "/d/a.md", "# A"),
+        Event::Enter(native("/d/b.md")),
+        loaded(2, "/d/b.md", "# B"),
+        Event::ToggleSource,
+        Event::Back,
+    ]);
+    assert_eq!(state.view, PageView::Page, "Back");
+}
+
+#[test]
+fn reload_keeps_the_source_view_and_shows_the_new_text() {
+    let state = in_source([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# Old")]);
+    let (state, effects) = step(state, Event::Reload);
+    assert!(matches!(&effects[..], [Effect::Load { request_id: 2, .. }]));
+    let (state, _) = step(state, loaded(2, "/d/a.md", "# New\n"));
+    assert_eq!(source_of(&state).as_deref(), Some("# New\n"));
+}
+
+#[test]
+fn reload_after_a_fallback_find_reloads_the_markdown_that_was_found() {
+    let state = in_source([
+        Event::Enter("https://x.org/post".into()),
+        found_instead(1, "https://x.org/post", "https://x.org/post.md", "# Old"),
+    ]);
+    let (state, effects) = step(state, Event::Reload);
+    assert!(
+        matches!(&effects[..], [Effect::Load { location, .. }] if *location == web("https://x.org/post.md")),
+        "the entry settled on the Markdown found, so that is what is fetched again: {effects:?}"
+    );
+    let (state, _) = step(state, fetched(2, "https://x.org/post.md", "# New"));
+    assert_eq!(source_of(&state).as_deref(), Some("# New"));
+}
+
+#[test]
+fn a_failed_reload_shows_the_error_and_leaves_the_source_view() {
+    let state = in_source([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
+    let (state, _) = step(state, Event::Reload);
+    let (state, _) = step(state, Event::Loaded { request_id: 2, result: Err(ErrorCode::NotFound), now: 1 });
+    assert_eq!((state.status, state.view), (Status::Failed(ErrorCode::NotFound), PageView::Page));
+}
+
+#[test]
+fn back_with_nowhere_to_go_keeps_the_source_view() {
+    let state = in_source([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
+    let (state, _) = step(state, Event::Back);
+    assert!(source_of(&state).is_some());
+}

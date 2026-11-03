@@ -10,7 +10,7 @@ use super::location::{Location, Target};
 use super::navigation::{Entry, Navigation};
 use super::visits;
 use super::web::Origin;
-use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status, TextStep};
+use super::{Effect, Event, Loaded, Notice, NoticeKind, Settings, Shown, State, Status, TextStep, View};
 use crate::model;
 use crate::theme::colours::{self, Unreadable};
 use crate::theme::{Appearance, Colours, Spacing, TextSize, Which};
@@ -37,6 +37,10 @@ pub fn step(state: State, event: Event) -> Step {
         Event::Reload => match state.nav.current().cloned() {
             Some(entry) => enter(state, entry),
             None => none(state),
+        },
+        Event::ToggleSource => match &state.status {
+            Status::Ready(shown) => none(State { view: state.view.toggled(shown), ..state }),
+            _ => none(state),
         },
         Event::Loaded { request_id, result, now } => loaded(state, request_id, result, now),
         Event::OpenerFailed => notice(state, NoticeKind::OpenFailed),
@@ -104,13 +108,13 @@ fn open_offer(state: State, url: &str) -> Step {
 
 fn navigate_to(state: State, entry: Entry) -> Step {
     let nav = state.nav.clone().push(entry.clone());
-    enter(State { nav, ..state }, entry)
+    enter(State { nav, view: View::Page, ..state }, entry)
 }
 
 fn move_by(state: State, mover: fn(Navigation) -> Navigation) -> Step {
     let nav = mover(state.nav.clone());
     match nav.current().cloned() {
-        Some(entry) if nav != state.nav => enter(State { nav, ..state }, entry),
+        Some(entry) if nav != state.nav => enter(State { nav, view: View::Page, ..state }, entry),
         _ => none(state),
     }
 }
@@ -133,7 +137,7 @@ fn enter(state: State, entry: Entry) -> Step {
 }
 
 fn failed(state: State, code: ErrorCode) -> State {
-    State { pending: None, status: Status::Failed(code), fragment: None, ..state }
+    State { pending: None, status: Status::Failed(code), view: View::Page, fragment: None, ..state }
 }
 
 /// A finished load for the current entry. A redirect settles the entry on the
@@ -143,6 +147,7 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
     let (Some(target), true) = (target, state.pending == Some(request_id)) else { return none(state) };
     match result {
         Ok(Loaded { source, location, fallback_from }) => {
+            let source: Arc<str> = source.into();
             let document = model::parse(&source);
             let title = document.title(&location.label());
             let visits = if location.is_welcome() {
@@ -150,13 +155,14 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
             } else {
                 visits::record(&state.visits, &location.address(), &title, now)
             };
-            let shown = Arc::new(Shown { document: Arc::new(document), title, fallback_from });
+            let shown = Arc::new(Shown { document: Arc::new(document), source, title, fallback_from });
             let sources = shown.document.image_sources();
             let (images, loads) = state.images.open_page(&sources, &location, &state.home, state.settings.images);
             let origin = Origin::of(&location);
             let nav = if location == target.location { state.nav } else { state.nav.settle(location) };
+            let view = state.view.refreshed(&shown.source);
             let status = Status::Ready(shown);
-            let state = State { nav, visits, images, pending: None, status, fragment: target.fragment, ..state };
+            let state = State { nav, visits, images, pending: None, status, view, fragment: target.fragment, ..state };
             let (state, mut effects) = persist_visits(state);
             effects.extend(loads.into_iter().map(|location| Effect::LoadImage { location, origin }));
             (state, effects)

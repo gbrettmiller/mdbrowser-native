@@ -153,9 +153,52 @@ pub fn parse(source: &str) -> Document {
     Document { blocks, front }
 }
 
+/// The Markdown as written, drawn as one code block: no front matter parsed away, no byline.
+/// Line endings are shown as `\n` and a leading byte order mark is dropped.
+pub fn source_document(source: &str) -> Document {
+    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
+    let text = source.replace("\r\n", "\n").replace('\r', "\n");
+    Document { blocks: vec![Block::Code { lang: None, text }], front: FrontMatter::default() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn source_text(source: &str) -> String {
+        match source_document(source).blocks.as_slice() {
+            [Block::Code { lang: None, text }] => text.clone(),
+            other => panic!("one plain code block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_source_is_one_code_block_with_no_front_matter_of_its_own() {
+        let document = source_document("# Hi\n\ntext");
+        assert_eq!(document.blocks, vec![Block::Code { lang: None, text: "# Hi\n\ntext".into() }]);
+        assert_eq!(document.front, FrontMatter::default());
+    }
+
+    #[test]
+    fn the_source_keeps_its_front_matter_as_text() {
+        let source = "---\ntitle: x\nauthor: y\n---\n# Body\n";
+        assert_eq!(source_text(source), source);
+        assert_eq!(source_document(source).title("fallback"), "fallback");
+    }
+
+    #[test]
+    fn line_endings_become_newlines_and_a_leading_bom_is_dropped() {
+        assert_eq!(source_text("a\r\nb\rc\nd"), "a\nb\nc\nd");
+        assert_eq!(source_text("\u{feff}# Hi"), "# Hi");
+        assert_eq!(source_text("a\u{feff}b"), "a\u{feff}b", "only a leading BOM goes");
+    }
+
+    #[test]
+    fn an_empty_source_is_one_empty_code_block_and_trailing_newlines_stay() {
+        assert_eq!(source_text(""), "");
+        assert_eq!(source_text("a\n\n\n"), "a\n\n\n");
+        assert_eq!(source_text("  indented\n\tTabbed"), "  indented\n\tTabbed");
+    }
 
     fn plain(text: &str) -> Span {
         Span { text: text.into(), style: Style::default(), link: None }

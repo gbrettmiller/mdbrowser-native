@@ -87,6 +87,7 @@ impl Page {
                 (Some(line), _) if line == f.line => " ",
                 (Some(_), Joint::Wrap) => " ",
                 (Some(_), Joint::Break) => "\n",
+                (Some(_), Joint::Lines(n)) => &"\n".repeat(n),
             };
             previous = Some(f.line);
             let separator = if separator == " " && text.ends_with(char::is_whitespace) { "" } else { separator };

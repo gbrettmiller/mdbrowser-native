@@ -13,12 +13,13 @@ use super::document;
 use super::focus;
 use super::keys::{self, Command, Scroll};
 use super::pages::{Pages, SETTLE};
-use super::panels::{self, Open, Panel};
+use super::panels::{self, Escaped, Open, Panel, escaped};
 use super::settings::ColourDrafts;
 use super::viewport::Viewport;
+use crate::model::Document;
 use crate::services::store::Store;
 use crate::services::{background, files, runner};
-use crate::session::{self, Event, Shown, State, Status};
+use crate::session::{self, Event, Shown, State, Status, View};
 use crate::theme::{self, Appearance, Palette, Which, fonts};
 
 mod scroll;
@@ -131,6 +132,14 @@ impl App {
         }
     }
 
+    /// The document on screen: the page, or its Markdown source.
+    pub(super) fn displayed(&self, shown: &Shown) -> Arc<Document> {
+        match &self.session().view {
+            View::Source(source) => source.clone(),
+            View::Page => shown.document.clone(),
+        }
+    }
+
     /// The palette in use: the reader's choice, or the OS's for System.
     pub(super) fn palette(&self) -> Palette {
         self.session().palette()
@@ -150,13 +159,14 @@ impl App {
     /// Steps the reducer, runs its effects, and keeps the view in step with it.
     fn dispatch(&mut self, event: Event) -> Task<Message> {
         let before = self.shown();
+        let source_before = matches!(self.session().view, View::Source(_));
         let fragment_before = self.session().fragment.clone();
         let previous_address = self.session().address();
         let home_before = self.session().settings.home.clone();
         let colours_before = self.session().settings.colours();
         let look_before = self.look();
         let page_before = if may_change_look(&event) {
-            self.shown().map(|shown| self.page(&shown.document, self.viewport.width()).0)
+            self.shown().map(|shown| self.page(&self.displayed(&shown), self.viewport.width()).0)
         } else {
             None
         };
@@ -174,7 +184,8 @@ impl App {
         let store = self.store.clone();
         let effects: Vec<_> =
             effects.into_iter().map(|effect| runner::run(effect, store.clone()).map(Message::Effect)).collect();
-        let scroll = self.scroll_after(before, fragment_before);
+        let scroll =
+            self.scroll_after(before, fragment_before, source_before != matches!(self.session().view, View::Source(_)));
         let images = self.schedule_images();
         let kept = self.keep_place(look_before, page_before);
         Task::batch(effects.into_iter().chain([scroll, images, kept]))
@@ -307,8 +318,11 @@ impl App {
     /// Esc: closes the Settings panel, or else History, and puts the keyboard back on the page.
     /// With none open it still does, so Esc after typing in the address bar returns to the page.
     fn close_panel(&mut self) -> Task<Message> {
-        self.panels = self.panels.after_escape();
-        operation::focus(PAGE_ID)
+        let in_source = matches!(self.session().view, View::Source(_));
+        let Escaped { panels, leave_source } = escaped(self.panels, in_source);
+        self.panels = panels;
+        let focus = operation::focus(PAGE_ID);
+        if leave_source { self.dispatch(Event::ToggleSource).chain(focus) } else { focus }
     }
 
     fn subscription(&self) -> Subscription<Message> {

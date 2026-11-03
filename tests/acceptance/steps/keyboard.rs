@@ -5,7 +5,7 @@ use std::fs;
 use cucumber::{given, then, when};
 use iced::keyboard::{Key, Modifiers, key::Named};
 use mdbrowser::layout::{Direction, Page, Reach, Target, reach};
-use mdbrowser::session::Event;
+use mdbrowser::session::{Event, View};
 use mdbrowser::ui::app::MIN_WINDOW;
 use mdbrowser::ui::keys;
 use mdbrowser::ui::panels::{self, Panel};
@@ -81,6 +81,7 @@ fn named(key: &str) -> Key {
         "End" => Named::End,
         "Up" => Named::ArrowUp,
         "Down" => Named::ArrowDown,
+        "Escape" => Named::Escape,
         other => panic!("no key named {other}"),
     })
 }
@@ -109,12 +110,20 @@ fn focus_on_address(w: &mut Browser) {
 
 #[when(expr = "I press {string}")]
 fn press(w: &mut Browser, chord: String) {
+    if let Some(letter) = chord.strip_prefix("Ctrl+") {
+        let command = keys::command(Key::Character(&letter.to_lowercase()), Modifiers::COMMAND);
+        if let Some(keys::Command::Session(event)) = command {
+            w.send(event);
+        }
+        return;
+    }
     let (shift, key) = chord.strip_prefix("Shift+").map_or((false, chord.as_str()), |key| (true, key));
     let modifiers = if shift { Modifiers::SHIFT } else { Modifiers::empty() };
     let key = named(key);
     match key {
         Key::Named(Named::Tab) => tab(w, if shift { Direction::Back } else { Direction::Forward }),
         Key::Named(Named::Enter) => enter(w),
+        Key::Named(Named::Escape) => escape(w),
         _ => {
             let Some(by) = keys::scroll(key.as_ref(), modifiers, w.keys.page_focused) else { return };
             let content = page(w).height;
@@ -123,6 +132,17 @@ fn press(w: &mut Browser, chord: String) {
                 w.keys.scroll = y;
             }
         }
+    }
+}
+
+/// Esc as the app handles it: a panel closes first, then the source view is left.
+fn escape(w: &mut Browser) {
+    let in_source = matches!(w.state().view, View::Source(_));
+    let panels::Escaped { panels, leave_source } = panels::escaped(w.keys.panels, in_source);
+    w.keys.panels = panels;
+    w.keys.page_focused = true;
+    if leave_source {
+        w.send(Event::ToggleSource);
     }
 }
 

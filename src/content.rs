@@ -155,6 +155,19 @@ pub const DISMISS: &str = "Dismiss";
 pub const OPEN_IN_BROWSER: &str = "Open in browser";
 pub const ADDRESS_PLACEHOLDER: &str = "Path or web address of a Markdown file, e.g. ~/notes/index.md";
 pub const HOME: &str = "Home";
+/// The toolbar button that shows the Markdown source, and the one that returns to the page.
+pub const SOURCE: &str = "Source";
+pub const PAGE: &str = "Page";
+
+/// The source button's tooltip, which names the chord.
+pub fn source_tooltip(mac: bool) -> String {
+    format!("View Markdown source ({}+U)", if mac { "Cmd" } else { "Ctrl" })
+}
+
+/// The line above the source of a page.
+pub fn source_of(title: &str) -> String {
+    format!("Source of {title}")
+}
 pub const SETTINGS: &str = "Settings";
 pub const FONT_LABEL: &str = "Font";
 pub const IMAGES_LABEL: &str = "Web images";
@@ -213,6 +226,9 @@ mod tests {
         distinct_and_non_empty(&Spacing::ALL.map(spacing));
         distinct_and_non_empty(&Which::ALL.map(colour_name));
         assert!(COLOURS_HINT.contains("Enter") && COLOURS_HINT.contains("Tab"));
+        assert_eq!((SOURCE, PAGE), ("Source", "Page"));
+        assert_eq!(source_tooltip(false), "View Markdown source (Ctrl+U)");
+        assert_eq!(source_tooltip(true), "View Markdown source (Cmd+U)");
         assert!(COLOUR_PLACEHOLDER.contains("#rgb") && COLOUR_PLACEHOLDER.contains("#rrggbb"));
         distinct_and_non_empty(&[TEXT_SIZE_LABEL, SPACING_LABEL, SMALLER_TEXT, LARGER_TEXT, RESET_READER_CONTROLS]);
         assert_eq!(text_size(TextSize::default()), "18");

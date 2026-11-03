@@ -428,6 +428,18 @@ mod tests {
     }
 
     #[test]
+    fn the_source_views_code_text_meets_aa_under_every_appearance() {
+        for appearance in Appearance::ALL {
+            for palette in [Palette::Light, Palette::Dark] {
+                let palette = appearance.preset().map_or(palette, Palette::Custom);
+                let t = reading(look(ReadingFont::Literata, palette));
+                let ratio = colours::contrast(t.code_ink, t.code_background);
+                assert!(ratio >= colours::AA, "{} {palette:?}: {ratio}", appearance.key());
+            }
+        }
+    }
+
+    #[test]
     fn reading_theme_swaps_only_the_body_face() {
         let theme = reading(look(ReadingFont::Inter, Palette::Light));
         assert_eq!(theme.body_font, Font::with_name("Inter"));

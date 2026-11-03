@@ -9,7 +9,7 @@ use iced::{Element, Fill};
 use super::{App, Message, PAGE_ID, SCROLL_ID, SCROLLBAR};
 use crate::content;
 use crate::session::location::Location;
-use crate::session::{Event, Shown, Status};
+use crate::session::{Event, Shown, Status, View};
 use crate::theme::{self, chrome_text};
 use crate::ui::document::{Document, Handlers};
 use crate::ui::{body, history, images, settings, toolbar};
@@ -24,11 +24,12 @@ impl App {
 
     fn document_view(&self, shown: Arc<Shown>) -> Element<'_, Message> {
         let reader = theme::reading(self.look());
+        let displayed = self.displayed(&shown);
         responsive(move |size| {
             let width = size.width - SCROLLBAR;
             self.viewport.sized(size.height);
-            let (page, settling) = self.page(&shown.document, width);
-            self.viewport.laid_out(&shown.document, width, settling);
+            let (page, settling) = self.page(&displayed, width);
+            self.viewport.laid_out(&displayed, width, settling);
             let pictures = images::pictures(&page, &self.session().images);
             let on = Handlers {
                 follow: Box::new(|href| Message::Session(Event::Follow(href))),
@@ -37,7 +38,7 @@ impl App {
                 reveal: Box::new(Message::Reveal),
                 scroll: Box::new(Message::Scroll),
             };
-            let document = Document::new(Arc::as_ptr(&shown.document) as usize, page, pictures, reader, on).id(PAGE_ID);
+            let document = Document::new(Arc::as_ptr(&displayed) as usize, page, pictures, reader, on).id(PAGE_ID);
             scrollable(document)
                 .id(SCROLL_ID)
                 .on_scroll(|viewport| Message::Scrolled(viewport.absolute_offset().y))
@@ -66,7 +67,10 @@ impl App {
         let content: Element<'_, Message> = panels.into();
         let status = self.hover.clone().unwrap_or_default();
         column![toolbar::toolbar(state, &self.draft)]
-            .push(body::title_line(&state.status).map(|title| body::title_bar(title, &reader)))
+            .push(
+                body::title_line(&state.status, matches!(state.view, View::Source(_)))
+                    .map(|title| body::title_bar(title, &reader)),
+            )
             .push(body::leaving(state.leaving.as_deref()))
             .push(body::notices(&state.notices))
             .push(content)
