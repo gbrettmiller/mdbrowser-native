@@ -119,4 +119,5 @@ Option A is the only one that keeps decoding off the render thread and bounded b
 
 - ADR-001: Render Markdown natively with our own layout engine. Images are boxes in our layout, drawn by the document widget.
 - ADR-002: Strip raw HTML from documents, keeping the text between tags. `<img>` never becomes an image.
+- ADR-012: Images stay stacked and are capped in height. Adds the maximum image height to the scaling rule above.
 - ADR-003: Fetch remote documents with ureq and handle URLs with the url crate. Images use the same fetch loop and refusals.

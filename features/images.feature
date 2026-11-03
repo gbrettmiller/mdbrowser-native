@@ -236,3 +236,56 @@ Feature: Images
     When I go back
     Then the image "red" is shown at 40 by 20
     And the site has seen 2 requests for "/img/red.png"
+
+  # Images stay stacked in the flow, never wider than the column and never taller than
+  # the maximum image height (30 times the text size), scaled down with the aspect ratio kept.
+
+  Scenario: A tall image is scaled down to the maximum image height
+    Given an image file "skinny.png" of 200 by 3000 pixels
+    And a file "post.md" containing "![skinny](skinny.png)\n\nThe first line of text."
+    When I view "post.md"
+    Then the image "skinny" is laid out at 36 by 540
+
+  Scenario Outline: The maximum image height is exact at the boundary
+    Given an image file "edge.png" of 100 by <natural> pixels
+    And a file "post.md" containing "![edge](edge.png)"
+    When I view "post.md"
+    Then the image "edge" is laid out at <width> by <height>
+    Examples:
+      | natural | width | height |
+      | 540     | 100   | 540    |
+      | 541     | 100   | 540    |
+      | 10000   | 5     | 540    |
+
+  Scenario: An image under the maximum is not changed
+    Given an image file "photo.png" of 640 by 480 pixels
+    And a file "post.md" containing "![photo](photo.png)"
+    When I view "post.md"
+    Then the image "photo" is laid out at 640 by 480
+
+  Scenario: An image that is both wide and tall fits both limits
+    Given an image file "big.png" of 4000 by 6000 pixels
+    And a file "post.md" containing "![big](big.png)"
+    When I view "post.md"
+    Then the image "big" is laid out at 360 by 540
+
+  Scenario: The first line of text is not pushed out of the window
+    Given an image file "skinny.png" of 200 by 3000 pixels
+    And a file "post.md" containing "![skinny](skinny.png)\n\nThe first line of text."
+    When I view "post.md"
+    Then the first line of text has its top at or above the image top plus the maximum image height plus one block gap
+
+  Scenario: Larger text raises the maximum image height
+    Given an image file "skinny.png" of 200 by 3000 pixels
+    And a file "post.md" containing "![skinny](skinny.png)"
+    And I viewed "post.md"
+    Then the image "skinny" is laid out at 36 by 540
+    When I make the text larger 3 times
+    Then the image "skinny" is laid out at 48 by 720
+
+  Scenario: A capped image is still one stop and one line of copied text
+    Given an image file "skinny.png" of 200 by 3000 pixels
+    And a file "post.md" containing "[![skinny](skinny.png)](other.md)"
+    When I view "post.md"
+    Then there is 1 link stop
+    And the document text is "[image: skinny]"
