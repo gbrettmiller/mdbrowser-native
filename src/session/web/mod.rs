@@ -65,7 +65,7 @@ impl Origin {
     pub fn of(current: &Location) -> Self {
         match current {
             Location::Web(url) if !is_local_network(url) => Origin::Public,
-            Location::Welcome => Origin::Public,
+            Location::Welcome | Location::About => Origin::Public,
             _ => Origin::Trusted,
         }
     }
@@ -172,6 +172,7 @@ mod tests {
     #[test]
     fn the_welcome_page_is_a_public_origin() {
         assert_eq!(Origin::of(&Location::Welcome), Origin::Public);
+        assert_eq!(Origin::of(&Location::About), Origin::Public);
         assert_eq!(Origin::of(&Location::file("/d/a.md")), Origin::Trusted);
     }
 

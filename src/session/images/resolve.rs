@@ -40,6 +40,7 @@ pub fn resolve(src: &str, current: &Location, home: &Path) -> Result<Location, R
         Location::File(_) => from_file(&reference, current, home),
         Location::Web(page) => from_page(&reference, page),
         Location::Welcome => from_welcome(&reference),
+        Location::About => Err(Refusal::Scheme),
     }
 }
 
@@ -97,6 +98,13 @@ mod tests {
     use crate::session::location::Location;
 
     const HOME: &str = "/home/r";
+
+    #[test]
+    fn the_about_page_shows_no_images() {
+        for src in ["https://example.com/x.png", "x.png", "/x.png"] {
+            assert_eq!(resolve(src, &Location::About, Path::new(HOME)), Err(Refusal::Scheme), "{src}");
+        }
+    }
 
     fn file_base() -> Location {
         Location::file(native("/docs/a/post.md"))
@@ -339,7 +347,7 @@ mod tests {
         for src in sources {
             match from_page(src) {
                 Ok(Location::File(path)) => panic!("{src:?} → file {path:?}"),
-                Ok(Location::Welcome) => panic!("{src:?} → welcome"),
+                Ok(Location::Welcome | Location::About) => panic!("{src:?} → a built-in page"),
                 Ok(Location::Web(url)) => {
                     assert!(!crate::session::network::is_local_network(&url), "{src:?} → {url}");
                     assert!(url.username().is_empty() && url.password().is_none(), "{src:?} → {url}");

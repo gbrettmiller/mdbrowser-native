@@ -150,10 +150,10 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
             let source: Arc<str> = source.into();
             let document = model::parse(&source);
             let title = document.title(&location.label());
-            let visits = if location.is_welcome() {
-                state.visits
-            } else {
+            let visits = if location.records_history() {
                 visits::record(&state.visits, &location.address(), &title, now)
+            } else {
+                state.visits
             };
             let shown = Arc::new(Shown { document: Arc::new(document), source, title, fallback_from });
             let sources = shown.document.image_sources();

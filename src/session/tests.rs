@@ -489,6 +489,18 @@ fn welcome_page_links_go_to_the_web_and_anchors_scroll() {
     assert_eq!((state.notices.len(), effects), (1, vec![]));
 }
 
+#[test]
+fn the_about_page_is_a_page_with_a_title_and_an_address_but_no_history_entry() {
+    let about = Event::Enter("about:mdbrowser".into());
+    let (state, effects) = run([about.clone()]);
+    assert_eq!(effects, vec![Effect::Load { request_id: 1, location: Location::About, origin: Origin::Trusted }]);
+    let (state, effects) = step(state, loaded_at(1, Location::About, "# About mdBrowser\n\nHello"));
+    let Status::Ready(shown) = &state.status else { panic!("{:?}", state.status) };
+    assert_eq!((shown.title.as_str(), state.address().as_str()), ("About mdBrowser", "about:mdbrowser"));
+    assert!(state.visits.is_empty(), "the about page is not a place to revisit");
+    assert!(effects.iter().all(|e| !matches!(e, Effect::LoadImage { .. })), "{effects:?}");
+}
+
 fn load_origins(effects: &[Effect]) -> Vec<Origin> {
     effects
         .iter()

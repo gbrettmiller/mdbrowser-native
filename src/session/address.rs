@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use url::Url;
 
 use super::error::ErrorCode;
-use super::location::{FILE_SCHEME, Location, Target, WEB_SCHEMES, is_markdown, without_credentials};
+use super::location::{ABOUT_SCHEME, FILE_SCHEME, Location, Target, WEB_SCHEMES, is_markdown, without_credentials};
 
 /// `scheme:` per RFC 3986, lowercased. Single letters are Windows drives, not schemes.
 pub(super) fn scheme_of(reference: &str) -> Option<String> {
@@ -116,6 +116,12 @@ fn parse_web_url(input: &str) -> Result<Target, ErrorCode> {
     Url::parse(input).map(web_target).map_err(|_| ErrorCode::NotAbsolute)
 }
 
+/// The About page's own address, in any letter case, or bare `about:`.
+pub(super) fn is_about(reference: &str) -> bool {
+    let rest = &reference[ABOUT_SCHEME.len() + 1..];
+    rest.is_empty() || rest.eq_ignore_ascii_case("mdbrowser")
+}
+
 /// Validation order: empty → scheme → absolute → extension. Nothing touches the disk.
 pub fn parse_address(input: &str, home: &Path) -> Result<Target, ErrorCode> {
     let input = input.trim();
@@ -124,6 +130,7 @@ pub fn parse_address(input: &str, home: &Path) -> Result<Target, ErrorCode> {
     }
     let (path, fragment) = match scheme_of(input).as_deref() {
         Some(scheme) if WEB_SCHEMES.contains(&scheme) => return parse_web_url(input),
+        Some(ABOUT_SCHEME) if is_about(input) => return Ok(Target { location: Location::About, fragment: None }),
         Some(FILE_SCHEME) => parse_file_url(input).ok_or(ErrorCode::NotAbsolute)?,
         Some(_) => return Err(ErrorCode::UnsupportedScheme),
         None => {
@@ -169,6 +176,21 @@ mod tests {
 
     fn ok(path: &str, fragment: Option<&str>) -> Result<(String, Option<String>), ErrorCode> {
         Ok((native(path), fragment.map(str::to_string)))
+    }
+
+    #[test]
+    fn the_about_address_is_accepted_in_any_case_and_bare_about_is_an_alias() {
+        for input in ["about:mdbrowser", "ABOUT:MDBROWSER", "  About:mdBrowser ", "about:"] {
+            let target = parse_address(input, Path::new(&native(HOME))).expect(input);
+            assert_eq!((target.location, target.fragment), (Location::About, None), "{input}");
+        }
+    }
+
+    #[test]
+    fn any_other_about_address_is_an_unsupported_scheme() {
+        for input in ["about:blank", "about:mdbrowser/x", "about:mdbrowser#faq"] {
+            assert_eq!(parse(input), Err(ErrorCode::UnsupportedScheme), "{input}");
+        }
     }
 
     #[test]

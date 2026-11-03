@@ -286,7 +286,7 @@ impl State {
         }
         match self.current_location()? {
             Location::Web(url) => url.join(web::LLMS_TXT).ok().map(String::from),
-            Location::File(_) | Location::Welcome => None,
+            Location::File(_) | Location::Welcome | Location::About => None,
         }
     }
 }

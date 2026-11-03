@@ -39,6 +39,7 @@ fn in_background(
 
 /// The built-in page, bundled in the binary.
 const WELCOME_PAGE: &str = include_str!("../../assets/welcome.md");
+const ABOUT_PAGE: &str = include_str!("../../assets/about.md");
 
 /// Reads a file or fetches a page. Matched exhaustively, so a web location can never reach `files`.
 pub fn load(location: Location, limits: &web::Limits, origin: Origin) -> Result<Loaded, ErrorCode> {
@@ -50,6 +51,9 @@ pub fn load(location: Location, limits: &web::Limits, origin: Origin) -> Result<
         }),
         Location::Welcome => {
             Ok(Loaded { source: WELCOME_PAGE.to_string(), location: Location::Welcome, fallback_from: None })
+        }
+        Location::About => {
+            Ok(Loaded { source: ABOUT_PAGE.to_string(), location: Location::About, fallback_from: None })
         }
         Location::Web(url) => web::fetch(&url, limits, origin).map(|fetched| Loaded {
             source: fetched.source,
