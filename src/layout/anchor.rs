@@ -50,6 +50,17 @@ mod tests {
     }
 
     #[test]
+    fn a_tall_image_arriving_above_the_view_moves_the_view_by_its_scaled_height() {
+        let before = page(POST, &no_images);
+        let after = page(POST, &|_| ImageView::Shown { width: 200, height: 3000 });
+        let scroll = y_of(&before, "Second after") - 10.0;
+        let kept = keep(&before, &after, scroll);
+        assert_eq!(y_of(&after, "Second after") - kept, 10.0, "the text stays put");
+        assert!(after.height < before.height + 3000.0, "the page grew by the capped box, not the natural one");
+        assert!(after.height > before.height + 500.0);
+    }
+
+    #[test]
     fn an_image_arriving_below_the_view_changes_nothing() {
         let before = page(POST, &no_images);
         let after = page(POST, &|_| ImageView::Shown { width: 100, height: 300 });

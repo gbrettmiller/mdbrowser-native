@@ -38,6 +38,14 @@ pub fn no_images(_: &str) -> ImageView {
     ImageView::Placeholder { note: None }
 }
 
+/// An image of `own` pixels laid out to fit within `max_width` (whole pixels) and `max_height`:
+/// one scale factor, the smaller of the two, never above 1; each side rounded, at least 1.
+pub(super) fn fit((own_width, own_height): (u32, u32), max_width: f32, max_height: f32) -> (f32, f32) {
+    let (own_width, own_height) = (own_width as f32, own_height as f32);
+    let scale = (max_width.floor() / own_width).min(max_height / own_height).min(1.0);
+    ((own_width * scale).round().max(1.0), (own_height * scale).round().max(1.0))
+}
+
 impl Flow<'_> {
     pub(super) fn image(&mut self, source: Source, column: Column, ink: Ink) {
         match (self.images)(source.src) {
@@ -53,11 +61,9 @@ impl Flow<'_> {
         }
     }
 
-    /// Never scaled up; scaled down to the column, aspect kept, in whole pixels.
-    fn picture(&mut self, source: Source, column: Column, (own_width, own_height): (u32, u32), ink: Ink) {
-        let (own_width, own_height) = (own_width as f32, own_height as f32);
-        let width = own_width.min(column.width.floor());
-        let height = (own_height * width / own_width).round().max(1.0);
+    /// Never scaled up; scaled down to the column and to the maximum image height, aspect kept.
+    fn picture(&mut self, source: Source, column: Column, own: (u32, u32), ink: Ink) {
+        let (width, height) = fit(own, column.width, self.theme.image_max_height());
         let bounds = Rectangle { x: column.x, y: self.y, width, height };
         let link = source.link;
         self.page.images.push(LaidImage { src: source.src.to_string(), bounds, link: link.clone() });
@@ -136,7 +142,94 @@ mod tests {
     fn a_shown_image_keeps_its_size_when_it_fits() {
         assert_eq!(size(&page_with("![a](a.png)", shown(100, 50))), (100.0, 50.0));
         assert_eq!(size(&page_with("![a](a.png)", shown(1, 1))), (1.0, 1.0));
-        assert_eq!(size(&page_with("![a](a.png)", shown(1, 10_000))), (1.0, 10_000.0));
+        assert_eq!(size(&page_with("![a](a.png)", shown(300, 400))), (300.0, 400.0));
+    }
+
+    fn max_height() -> f32 {
+        reading(Look::default()).image_max_height()
+    }
+
+    #[test]
+    fn fit_scales_by_the_smaller_factor_in_whole_pixels_and_never_up() {
+        let table = [
+            // own size, column, maximum height, expected
+            ((200, 3000), 500.0, 540.0, (36.0, 540.0)),
+            ((100, 540), 500.0, 540.0, (100.0, 540.0)),
+            ((100, 541), 500.0, 540.0, (100.0, 540.0)),
+            ((100, 10_000), 500.0, 540.0, (5.0, 540.0)),
+            ((1, 10_000), 500.0, 540.0, (1.0, 540.0)),
+            ((640, 480), 720.0, 540.0, (640.0, 480.0)),
+            ((4000, 100), 500.0, 540.0, (500.0, 13.0)),
+            ((4000, 6000), 500.0, 540.0, (360.0, 540.0)),
+            ((6000, 4000), 500.0, 540.0, (500.0, 333.0)),
+            ((10, 10), 500.0, 540.0, (10.0, 10.0)),
+            ((100, 100), 500.5, 540.0, (100.0, 100.0)),
+            ((1000, 1000), 500.5, 540.0, (500.0, 500.0)),
+        ];
+        for (own, column, max, expected) in table {
+            assert_eq!(fit(own, column, max), expected, "{own:?} in {column} wide, {max} tall");
+        }
+    }
+
+    #[test]
+    fn a_tall_image_is_scaled_to_the_maximum_height_with_the_text_right_below_it() {
+        let p = page_with("![t](t.png)\n\nThe first line.", shown(200, 3000));
+        assert_eq!(size(&p), (36.0, max_height()));
+        let image = p.images[0].bounds;
+        let text = p.fragments.iter().find(|f| f.text == "The first line.").expect("the paragraph");
+        let theme = reading(Look::default());
+        assert_eq!(text.bounds.y, image.y + image.height + theme.block_gap, "a block gap below the scaled box");
+        assert!(text.bounds.y <= image.y + theme.image_max_height() + theme.block_gap);
+    }
+
+    #[test]
+    fn a_larger_text_size_allows_a_taller_image() {
+        let at = |px: u64| {
+            let look = Look { size: crate::theme::TextSize::from_px(px).unwrap(), ..Look::default() };
+            fonts::install();
+            let p = layout(&parse("![t](t.png)").blocks, &reading(look), WIDTH, &shown(200, 3000));
+            p.images[0].bounds.height
+        };
+        assert_eq!((at(12), at(18), at(24), at(32)), (360.0, 540.0, 720.0, 960.0));
+    }
+
+    #[test]
+    fn a_capped_image_is_clickable_only_inside_its_scaled_box() {
+        let p = page_with("[![t](t.png)](https://x.org/)", shown(200, 3000));
+        let b = p.images[0].bounds;
+        assert_eq!(b.height, max_height());
+        let at = |x: f32, y: f32| p.link_at(Point::new(x, y));
+        assert_eq!(at(b.x + b.width / 2.0, b.y + b.height - 1.0), Some("https://x.org/"));
+        assert_eq!(at(b.x + b.width + 5.0, b.y + 10.0), None, "right of the scaled box");
+        assert_eq!(at(b.x + b.width / 2.0, b.y + b.height + 1.0), None, "below it, where the natural size would reach");
+    }
+
+    #[test]
+    fn a_capped_linked_image_is_one_stop_with_the_scaled_ring() {
+        let p = page_with("[![t](t.png)](https://x.org/)", shown(200, 3000));
+        let stops = p.stops();
+        assert_eq!(stops.len(), 1);
+        assert_eq!(stops[0].rects, [p.images[0].bounds]);
+    }
+
+    #[test]
+    fn a_capped_image_copies_as_its_description_once() {
+        let p = page_with("Before\n\n![a tall one](t.png)\n\nafter", shown(200, 3000));
+        let last = p.fragments.len() - 1;
+        let all = p.selected_text(
+            Caret { fragment: 0, byte: 0 },
+            Caret { fragment: last, byte: p.fragments[last].text.len() },
+        );
+        assert_eq!(all, "Before\n[image: a tall one]\nafter");
+    }
+
+    #[test]
+    fn a_very_thin_linked_image_still_has_a_box_a_stop_and_a_link() {
+        let p = page_with("[![t](t.png)](https://x.org/)", shown(1, 10_000));
+        assert_eq!(size(&p), (1.0, max_height()));
+        assert_eq!(p.stops().len(), 1);
+        let b = p.images[0].bounds;
+        assert_eq!(p.link_at(Point::new(b.x + 0.5, b.y + 100.0)), Some("https://x.org/"));
     }
 
     #[test]
