@@ -122,3 +122,5 @@ Each of these can be added later without redesigning anything. The README and VE
 - **Unsigned warnings will still lose some users.** The README steps reduce that but don't remove it.
 - **glibc floor:** building on Ubuntu 22.04 sets the minimum at glibc 2.35. Older distributions can't run the AppImage.
 - **Size growth:** the binary has grown since the 30 MB measurement; check it against the AppImage and installer sizes before the RC.
+- **Release gate (ADR-013):** no build is distributed before `THIRD-PARTY-NOTICES.html` ships in each bundle: the OFL fonts require their notice to accompany the binary, and the About page says it does.
+- **Release checklist (ADR-013):** read `assets/about.md` (privacy, FAQ, shortcuts) against the code before tagging; the tests check only the version, licence, fonts, shortcuts and `ureq` use.
