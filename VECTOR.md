@@ -47,7 +47,7 @@ Each phase has its own plan. This is the order, not a commitment to dates.
 8. **About page** (built): a built-in page, `about:mdbrowser`, with the version and build, the licence and font credits, what the app sends and stores, the keyboard shortcuts and a short FAQ. It is a page like any other (the reader's look, Back, Source), reached from the top of Settings, F1, Ctrl/Cmd+? and a link on the welcome page, and it is not a History entry. No native menu: ADR-013. No build is distributed before the licence notices ship with it.
 9. **Discovery**: `llms.txt` as a site index (beyond the 2d fallback), RSS 2.0 feeds and OPML.
 
-Downloadable apps for Linux, Windows and macOS, so non-technical readers can install without building from source, come after phase 5 (decided 2026-10-29). The plan is in `vector/plans/release-distribution.md`.
+Downloadable apps for Linux, Windows and macOS, so non-technical readers can install without building from source, come after phase 5 (decided 2026-10-29). The plan is in `vector/plans/release-distribution.md`, and the approach is ADR-009 (cargo-packager, unsigned, GitHub Releases). Packaging and the release workflow are built; the first release candidate is not yet tagged.
 
 ## What This Is Not
 - Not an HTML browser. Nothing is ever converted to HTML, and HTML files are not rendered. Every web link is tried in the app, which looks for its Markdown (ADR-005); a page with none gets an error and an offer of the system browser. Only mail leaves the app, after the reader agrees.

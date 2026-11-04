@@ -6,10 +6,24 @@ rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 description = "A browser for the web of Markdown — no HTML, no DOM, no webview"
 
-# How the app presents itself once packaged (the packaging config itself comes with the release workflow).
+# How the app is packaged (ADR-009). The release workflow builds with `cargo build --release` and
+# `scripts/notices.sh` first, then runs `cargo packager --release` with the formats for its platform.
+# The packager's own file associations are deliberately unused: it claims the default Markdown app on Windows and adds
+# document types on macOS. "Open with" comes from the two templates below instead.
 [package.metadata.packager]
 product-name = "mdBrowser"
 identifier = "com.gbrettmiller.mdbrowser"
+description = "A browser for the web of Markdown"
+long-description = "mdBrowser reads Markdown on the web and on disk with its own layout engine: no HTML, no DOM, no webview."
+homepage = "https://github.com/gbrettmiller/mdbrowser-native"
+authors = ["gBRETT miller"]
+category = "Utility"
+license-file = "LICENSE"
+out-dir = "target/packager"
+binaries-dir = "target/release"
+binaries = [{ path = "mdbrowser", main = true }]
+# Every bundle ships the licence notices (ADR-013's release gate).
+resources = ["THIRD-PARTY-NOTICES.html", "LICENSE", "LICENSE-APACHE", "LICENSE-MIT"]
 icons = [
   "assets/icon/icon-32.png",
   "assets/icon/icon-128.png",
@@ -18,6 +32,13 @@ icons = [
   "assets/icon/icon.ico",
   "assets/icon/icon.icns",
 ]
+
+[package.metadata.packager.deb]
+desktop-template = "packaging/linux/mdbrowser.desktop"
+
+[package.metadata.packager.nsis]
+installer-mode = "currentUser"
+template = "packaging/windows/installer.nsi"
 
 [dependencies]
 dirs = "7.0.0"
