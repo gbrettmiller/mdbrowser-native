@@ -43,3 +43,13 @@ fn the_windows_installer_registers_open_with_without_the_default() {
         assert!(line.contains("OpenWithProgids"), "touches the extension itself: {line}");
     }
 }
+
+#[test]
+fn a_tag_makes_a_draft_release_that_a_person_publishes() {
+    let workflow = read(".github/workflows/release.yml");
+    assert!(workflow.contains("- 'v*'"), "releases are triggered by v* tags");
+    assert!(workflow.contains("--draft"), "a person reviews and publishes (ADR-009)");
+    assert!(workflow.contains("--prerelease"), "-rc tags are pre-releases");
+    assert!(workflow.contains("SHA256SUMS"));
+    assert!(workflow.contains("scripts/notices.sh"), "no bundle without the notices (ADR-013)");
+}

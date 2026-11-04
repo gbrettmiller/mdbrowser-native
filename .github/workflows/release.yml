@@ -1,0 +1,188 @@
+name: Release
+
+# A v* tag builds every package and opens a DRAFT GitHub Release (ADR-009). A person reviews the
+# draft and publishes it. Tags containing -rc become pre-releases. Builds are unsigned.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  PACKAGER_VERSION: 0.11.8
+
+jobs:
+  # The tag must name the version in Cargo.toml, or the packages would carry the wrong number.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          test "${GITHUB_REF_NAME}" = "v${version}" || {
+            echo "tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}" >&2
+            exit 1
+          }
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  # Same gates as ci.yml (keep them in sync), then package and smoke-test each platform's bundles.
+  package:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ubuntu-22.04 keeps the glibc floor at 2.35.
+          - os: ubuntu-22.04
+            kind: linux
+            formats: deb,appimage
+          - os: ubuntu-24.04-arm
+            kind: linux
+            formats: deb,appimage
+          - os: macos-latest
+            kind: macos
+            formats: dmg
+          - os: windows-latest
+            kind: windows
+            formats: nsis
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      # Lets an AppImage run without FUSE on the runner.
+      APPIMAGE_EXTRACT_AND_RUN: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: ${{ matrix.kind == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --no-fail-fast
+
+      # ADR-013's release gate: this fails if a dependency's licence is off the allow-list, and the
+      # file it writes is bundled by the packager.
+      - name: Licence notices
+        run: scripts/notices.sh
+
+      - name: Build
+        if: matrix.kind != 'macos'
+        run: cargo build --release
+      # One universal app for Apple Silicon and Intel: build both, join them with lipo.
+      - name: Build (universal)
+        if: matrix.kind == 'macos'
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          mkdir -p target/release
+          lipo -create -output target/release/mdbrowser \
+            target/aarch64-apple-darwin/release/mdbrowser \
+            target/x86_64-apple-darwin/release/mdbrowser
+          lipo -info target/release/mdbrowser
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-packager*
+          key: cargo-packager-${{ env.PACKAGER_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Install cargo-packager
+        run: command -v cargo-packager || cargo install --locked cargo-packager --version "${PACKAGER_VERSION}"
+      - name: Package
+        run: cargo packager --release --formats "${{ matrix.formats }}"
+
+      # Each package must install or unpack and run. On Windows the app is a GUI-subsystem program
+      # with no console, so only the exit code is checked there (ADR-009).
+      - name: Smoke test (Linux)
+        if: matrix.kind == 'linux'
+        run: |
+          cd target/packager
+          for appimage in *.AppImage; do
+            chmod +x "$appimage"
+            "./$appimage" --version | grep -x "mdbrowser ${VERSION}"
+          done
+          for deb in *.deb; do
+            rm -rf unpacked && mkdir unpacked
+            dpkg-deb -x "$deb" unpacked
+            unpacked/usr/bin/mdbrowser --version | grep -x "mdbrowser ${VERSION}"
+            test -f unpacked/usr/lib/mdbrowser/THIRD-PARTY-NOTICES.html
+            grep -x 'MimeType=text/markdown;' unpacked/usr/share/applications/mdbrowser.desktop
+          done
+          rm -rf unpacked
+      - name: Smoke test (macOS)
+        if: matrix.kind == 'macos'
+        run: |
+          cd target/packager
+          mount="$(mktemp -d)"
+          hdiutil attach *.dmg -mountpoint "$mount" -nobrowse -quiet
+          app="$(ls -d "$mount"/*.app)"
+          "$app/Contents/MacOS/mdbrowser" --version | grep -x "mdbrowser ${VERSION}"
+          test -f "$app/Contents/Resources/THIRD-PARTY-NOTICES.html"
+          hdiutil detach "$mount" -quiet
+      - name: Smoke test (Windows)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem target/packager/*-setup.exe).FullName
+          $dir = Join-Path $env:RUNNER_TEMP 'mdbrowser-smoke'
+          # NSIS wants /D last and unquoted.
+          Start-Process -Wait -FilePath $installer -ArgumentList '/S', "/D=$dir"
+          if (-not (Test-Path "$dir\THIRD-PARTY-NOTICES.html")) { throw 'notices missing from the install' }
+          $run = Start-Process -Wait -PassThru -FilePath "$dir\mdbrowser.exe" -ArgumentList '--version'
+          if ($run.ExitCode -ne 0) { throw "mdbrowser --version exited $($run.ExitCode)" }
+
+      - name: Name the packages
+        run: |
+          cd target/packager
+          # The packager names the dmg after the build host; this one holds both architectures.
+          if [ "${{ matrix.kind }}" = macos ]; then
+            for dmg in *.dmg; do mv "$dmg" "mdbrowser_${VERSION}_universal.dmg"; done
+          fi
+          ls -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os }}
+          path: |
+            target/packager/*.deb
+            target/packager/*.AppImage
+            target/packager/*.dmg
+            target/packager/*-setup.exe
+          if-no-files-found: error
+
+  # Collects every package, writes the checksums and opens the draft. Nothing is published here.
+  draft:
+    needs: [version, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "${GITHUB_REF_NAME}" in *-rc*) prerelease="--prerelease" ;; esac
+          gh release create "${GITHUB_REF_NAME}" release/* \
+            --repo "${GITHUB_REPOSITORY}" --draft ${prerelease} \
+            --title "mdBrowser ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
