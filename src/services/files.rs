@@ -68,12 +68,17 @@ fn open_without_blocking(path: &Path) -> std::io::Result<std::fs::File> {
     std::fs::File::open(path)
 }
 
-/// An address given on the command line: a URL as is, a path made absolute against the working directory.
+/// An address given on the command line: a URL as is; a path made absolute against the working
+/// directory and written as a `file://` URL, so characters an address would read specially
+/// (`#`, `%`) stay part of the name. "Open with" hands over a path, never an address.
 pub fn from_command_line(argument: &str) -> String {
     if has_scheme(argument) {
         return argument.to_string(); // a URL, not a path
     }
-    std::path::absolute(argument).map_or_else(|_| argument.to_string(), |path| path.display().to_string())
+    std::path::absolute(argument).map_or_else(
+        |_| argument.to_string(),
+        |path| url::Url::from_file_path(&path).map_or_else(|()| path.display().to_string(), String::from),
+    )
 }
 
 /// The address to open at launch: the first argument after the program's name, if any.
@@ -103,28 +108,20 @@ mod tests {
             launch_address(args(&["mdbrowser", "https://a.co/x.md", "ignored"])),
             Some("https://a.co/x.md".into())
         );
-        let path = launch_address(args(&["mdbrowser", "notes/a.md"])).unwrap();
-        assert!(std::path::Path::new(&path).is_absolute(), "{path}");
+        let address = launch_address(args(&["mdbrowser", "notes/a.md"])).unwrap();
+        assert!(address.starts_with("file://") && address.ends_with("/notes/a.md"), "{address}");
     }
 
     #[test]
-    fn a_path_from_open_with_reaches_the_app_whole() {
+    fn a_path_from_open_with_is_a_path_whatever_characters_its_name_has() {
         let dir = tempfile::tempdir().unwrap();
-        for name in ["my notes.md", "café ☕ 日本語.md", "-dash.md"] {
+        for name in ["my notes.md", "café ☕ 日本語.md", "-dash.md", "a#b.md", "100%.md", "a%20b.md", "q?x.md"] {
             let path = dir.path().join(name);
-            let argument = path.display().to_string();
-            assert_eq!(from_command_line(&argument), argument, "{name}");
-            let launched = launch_address(["mdbrowser".to_string(), argument.clone()]);
-            assert_eq!(launched, Some(argument.clone()), "{name}");
-            let target = crate::session::address::parse_address(&argument, dir.path()).unwrap();
+            let address = launch_address(["mdbrowser".to_string(), path.display().to_string()]).unwrap();
+            let target = crate::session::address::parse_address(&address, dir.path()).unwrap();
             assert_eq!(target.location, crate::session::location::Location::file(path), "{name}");
+            assert_eq!(target.fragment, None, "{name}");
         }
-        let relative = from_command_line("my notes/café.md");
-        assert!(
-            std::path::Path::new(&relative).is_absolute()
-                && relative.ends_with("my notes/café.md".replace('/', std::path::MAIN_SEPARATOR_STR).as_str()),
-            "{relative}"
-        );
     }
 
     #[test]
@@ -176,7 +173,9 @@ mod tests {
 
     #[test]
     fn paths_on_the_command_line_become_absolute() {
-        assert!(std::path::Path::new(&from_command_line("notes/a.md")).is_absolute());
+        let address = from_command_line("notes/a.md");
+        let path = url::Url::parse(&address).unwrap().to_file_path().unwrap();
+        assert!(path.is_absolute() && path.ends_with("notes/a.md"), "{address}");
     }
 
     #[test]
