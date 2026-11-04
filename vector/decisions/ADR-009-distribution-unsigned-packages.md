@@ -113,3 +113,11 @@ This is the only option that fits one maintainer and one config file, and it ser
 - ADR-001: the bundled fonts, whose OFL licences must ship with the binary.
 - ADR-003: the HTTP client. The RC checks which TLS root store `ureq` uses on the packaged builds.
 - ADR-010: web links open in the app. This is the reason the welcome page leads with live sites in the remote check.
+
+## Amendment (2026-11-04): "Open with" comes from our templates, not the packager's file associations
+
+Reading cargo-packager 0.11.8 before writing the config showed that its `file-associations` setting does the wrong thing for us. On Windows its NSIS macro writes the extension's default class (`HKCU\Software\Classes\.md`), which claims the default app. On macOS it adds `CFBundleDocumentTypes`, which would list the app in "Open with" but open it without the file (the Apple Event gap). On Linux it sets `Exec=… %F`. The setting is global, not per format.
+
+We therefore do not use `file-associations`. The Windows installer uses a copy of the packager's NSIS template (`packaging/windows/installer.nsi`) that registers the app under `Applications\mdbrowser.exe` and lists it in `.md\OpenWithProgids` and `.markdown\OpenWithProgids`, and never writes an extension's default. The `.deb` uses its own desktop template (`packaging/linux/mdbrowser.desktop`) with `MimeType=text/markdown;` and `Exec=mdbrowser %f`. macOS gets no document types. `tests/packaging.rs` guards all of this.
+
+This is the "NSIS script sets the default app" fallback trigger, handled by customising templates rather than switching tools. The cost is that we own a copy of the NSIS template and must re-diff it against upstream when cargo-packager is upgraded.
