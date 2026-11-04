@@ -145,8 +145,17 @@ jobs:
           mount="$(mktemp -d)"
           hdiutil attach *.dmg -mountpoint "$mount" -nobrowse -quiet
           app="$(ls -d "$mount"/*.app)"
-          "$app/Contents/MacOS/mdbrowser" --version | grep -x "mdbrowser ${VERSION}"
-          test -f "$app/Contents/Resources/THIRD-PARTY-NOTICES.html"
+          echo "== bundle"
+          find "$app" -maxdepth 3 | sort
+          archs="$(lipo -archs "$app/Contents/MacOS/mdbrowser")"
+          echo "architectures: $archs"
+          for arch in x86_64 arm64; do
+            case " $archs " in *" $arch "*) ;; *) echo "missing $arch: the app is not universal" >&2; exit 1 ;; esac
+          done
+          version="$("$app/Contents/MacOS/mdbrowser" --version)"
+          echo "version output: $version"
+          test "$version" = "mdbrowser ${VERSION}"
+          test -f "$app/Contents/Resources/THIRD-PARTY-NOTICES.html" || { echo "notices missing from the bundle" >&2; exit 1; }
           hdiutil detach "$mount" -quiet
       - name: Smoke test (Windows)
         if: matrix.kind == 'windows'

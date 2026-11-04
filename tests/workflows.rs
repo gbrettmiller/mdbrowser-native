@@ -54,3 +54,15 @@ fn the_release_installs_cargo_about_with_its_cli_on_macos() {
     let text = workflow("release.yml");
     assert!(text.contains("cargo install --locked cargo-about --features cli"));
 }
+
+#[test]
+fn the_macos_smoke_test_says_what_it_found_and_checks_both_architectures() {
+    // A silent `grep -x` once failed this step with nothing in the log to say why.
+    let text = workflow("release.yml");
+    let step = text.split("Smoke test (macOS)").nth(1).expect("a macOS smoke test");
+    let step = step.split("Smoke test (Windows)").next().expect("it comes before Windows");
+    assert!(step.contains("find \"$app\""), "list what is in the bundle");
+    assert!(step.contains("echo \"version output:"), "show what --version printed");
+    assert!(step.contains("lipo -archs"), "the app must hold both architectures");
+    assert!(step.contains("x86_64") && step.contains("arm64"));
+}
