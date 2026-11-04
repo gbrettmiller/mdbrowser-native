@@ -81,6 +81,11 @@ pub fn launch_address(args: impl IntoIterator<Item = String>) -> Option<String> 
     args.into_iter().nth(1).map(|argument| from_command_line(&argument))
 }
 
+/// Whether the program was asked to print its version and exit: `--version` or `-V` as the first argument.
+pub fn asks_for_version(args: impl IntoIterator<Item = String>) -> bool {
+    args.into_iter().nth(1).is_some_and(|argument| argument == "--version" || argument == "-V")
+}
+
 /// The address the program was started with.
 pub fn launch_address_from_environment() -> Option<String> {
     launch_address(std::env::args())
@@ -100,6 +105,22 @@ mod tests {
         );
         let path = launch_address(args(&["mdbrowser", "notes/a.md"])).unwrap();
         assert!(std::path::Path::new(&path).is_absolute(), "{path}");
+    }
+
+    #[test]
+    fn only_a_first_argument_of_version_or_v_asks_for_the_version() {
+        let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert!(asks_for_version(args(&["mdbrowser", "--version"])));
+        assert!(asks_for_version(args(&["mdbrowser", "-V"])));
+        for other in [
+            &["mdbrowser"][..],
+            &["mdbrowser", "notes.md"],
+            &["mdbrowser", "https://a.co/--version"],
+            &["mdbrowser", "-v"],
+            &["mdbrowser", "a.md", "--version"],
+        ] {
+            assert!(!asks_for_version(args(other)), "{other:?}");
+        }
     }
 
     #[test]
