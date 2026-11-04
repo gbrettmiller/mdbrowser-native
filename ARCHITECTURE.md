@@ -91,6 +91,7 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `src/` — the crate, one directory per layer; `lib.rs` exposes the layers, `main.rs` only starts `ui::app`
 - `assets/fonts/` — bundled typefaces and their licences
 - `assets/welcome.md` — the built-in welcome page, a document served by `services::runner`
+- `packaging/` — the Windows NSIS template and the Linux desktop template that register "Open with" for Markdown without taking the default (ADR-009; `tests/packaging.rs` guards them). The packager config is in `Cargo.toml` `[package.metadata.packager]`
 - `assets/icon/` — the app icon: `icon.svg` and the simplified `icon-small.svg`, with PNGs, `icon.ico` and `icon.icns` made by `scripts/icons.sh` and committed. `about.toml`, `about.hbs` and `scripts/notices.sh` make `THIRD-PARTY-NOTICES.html` (git-ignored; each release ships it), and CI fails on a dependency licence off the allow-list
 - `assets/about.md` — the About page template (ADR-013): `{version}`, `{build}` and `{licence}` are filled by `session::about`. Its prose (what the app sends and stores, the FAQ) is checked by hand at each release
 - `features/` — Gherkin acceptance scenarios
@@ -99,4 +100,4 @@ Every module belongs to exactly one layer. If you're unsure where something goes
 - `corpus/` — sample Markdown documents for golden tests and manual checks
 - `scripts/shoot.sh` — screenshots documents in each font and appearance, and at chosen text sizes (`-s`), spacings (`-p`) and custom colours (`-c page,text,link`) (Hyprland + grim); with no document it shoots the welcome page. It uses a scratch store via `MDBROWSER_DATA_DIR`, which redirects History and settings away from the real data directory.
 - `vector/` — Investiture doctrine tree: `decisions/`, `plans/`, `research/`, `schemas/`, `audits/` (the latest `invest-doctrine` and `invest-architecture` reports)
-- `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check
+- `.github/workflows/` — CI: fmt once, then clippy → test → release build on Linux x64, Linux ARM64, macOS and Windows; a final `ci` job is the single required check. `release.yml` runs on a `v*` tag, packages with cargo-packager, smoke-tests each package and opens a draft GitHub Release (ADR-009)
