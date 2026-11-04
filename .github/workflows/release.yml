@@ -72,8 +72,19 @@ jobs:
           targets: ${{ matrix.kind == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
+        if: matrix.kind != 'macos'
         with:
           tool: cargo-about
+      # No prebuilt cargo-about exists for Intel macOS, and install-action's cargo-binstall fallback
+      # builds it without the `cli` feature and reports success with no binary. Build it ourselves.
+      - uses: actions/cache@v4
+        if: matrix.kind == 'macos'
+        with:
+          path: ~/.cargo/bin/cargo-about
+          key: cargo-about-cli-${{ runner.os }}-${{ runner.arch }}
+      - name: Install cargo-about (macOS)
+        if: matrix.kind == 'macos'
+        run: command -v cargo-about || cargo install --locked cargo-about --features cli
 
       - name: Lint
         run: cargo clippy --all-targets -- -D warnings
