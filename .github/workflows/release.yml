@@ -1,11 +1,15 @@
 name: Release
 
-# A v* tag builds every package and opens a DRAFT GitHub Release (ADR-009). A person reviews the
+# A v* tag builds every package and opens a DRAFT GitHub Release (ADR-009); a manual run is a
+# dry run that stops after the packages. A person reviews the
 # draft and publishes it. Tags containing -rc become pre-releases. Builds are unsigned.
 on:
   push:
     tags:
       - 'v*'
+  # A dry run: builds, packages and smoke-tests everything on the chosen branch, and drafts nothing.
+  # The packages are kept as workflow artifacts.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,7 +18,8 @@ env:
   PACKAGER_VERSION: 0.11.8
 
 jobs:
-  # The tag must name the version in Cargo.toml, or the packages would carry the wrong number.
+  # The tag must name the version in Cargo.toml (or be a -rc.N of it), or the packages would carry
+  # the wrong number. A dry run has no tag to check.
   version:
     runs-on: ubuntu-latest
     outputs:
@@ -24,10 +29,9 @@ jobs:
       - id: check
         run: |
           version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
-          test "${GITHUB_REF_NAME}" = "v${version}" || {
-            echo "tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}" >&2
-            exit 1
-          }
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            scripts/check-tag.sh "${GITHUB_REF_NAME}" "${version}"
+          fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
   # Same gates as ci.yml (keep them in sync), then package and smoke-test each platform's bundles.
@@ -163,6 +167,7 @@ jobs:
 
   # Collects every package, writes the checksums and opens the draft. Nothing is published here.
   draft:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [version, package]
     runs-on: ubuntu-latest
     permissions:
