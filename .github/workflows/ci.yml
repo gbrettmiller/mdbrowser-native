@@ -7,8 +7,14 @@ on:
 
 # Gates run fastest to slowest (Minimum CD reference architecture): format once,
 # then lint, tests and a release build on every supported platform.
+# A new push to a pull request cancels its older run; main's runs always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   format:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +27,7 @@ jobs:
   # Every dependency must offer a licence on about.toml's allow-list, and the notices
   # every release must ship (ADR-013's release gate) must generate.
   licences:
+    timeout-minutes: 15
     needs: format
     runs-on: ubuntu-latest
     steps:
@@ -33,6 +40,7 @@ jobs:
         run: scripts/notices.sh
 
   platform:
+    timeout-minutes: 30
     needs: format
     strategy:
       fail-fast: false
@@ -56,6 +64,7 @@ jobs:
 
   # The single check branch protection requires; it passes only if every job above did.
   ci:
+    timeout-minutes: 5
     if: always()
     needs: [format, licences, platform]
     runs-on: ubuntu-latest

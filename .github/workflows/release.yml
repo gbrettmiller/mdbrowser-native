@@ -21,6 +21,7 @@ jobs:
   # The tag must name the version in Cargo.toml (or be a -rc.N of it), or the packages would carry
   # the wrong number. A dry run has no tag to check.
   version:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
@@ -36,6 +37,7 @@ jobs:
 
   # Same gates as ci.yml (keep them in sync), then package and smoke-test each platform's bundles.
   package:
+    timeout-minutes: 45
     needs: version
     strategy:
       fail-fast: false
@@ -167,6 +169,7 @@ jobs:
 
   # Collects every package, writes the checksums and opens the draft. Nothing is published here.
   draft:
+    timeout-minutes: 10
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [version, package]
     runs-on: ubuntu-latest
