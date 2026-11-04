@@ -108,6 +108,26 @@ mod tests {
     }
 
     #[test]
+    fn a_path_from_open_with_reaches_the_app_whole() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["my notes.md", "café ☕ 日本語.md", "-dash.md"] {
+            let path = dir.path().join(name);
+            let argument = path.display().to_string();
+            assert_eq!(from_command_line(&argument), argument, "{name}");
+            let launched = launch_address(["mdbrowser".to_string(), argument.clone()]);
+            assert_eq!(launched, Some(argument.clone()), "{name}");
+            let target = crate::session::address::parse_address(&argument, dir.path()).unwrap();
+            assert_eq!(target.location, crate::session::location::Location::file(path), "{name}");
+        }
+        let relative = from_command_line("my notes/café.md");
+        assert!(
+            std::path::Path::new(&relative).is_absolute()
+                && relative.ends_with("my notes/café.md".replace('/', std::path::MAIN_SEPARATOR_STR).as_str()),
+            "{relative}"
+        );
+    }
+
+    #[test]
     fn only_a_first_argument_of_version_or_v_asks_for_the_version() {
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
         assert!(asks_for_version(args(&["mdbrowser", "--version"])));
