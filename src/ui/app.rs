@@ -352,6 +352,7 @@ pub fn run() -> iced::Result {
         .window(window::Settings {
             size: Size::new(WINDOW_SIZE.0, WINDOW_SIZE.1),
             min_size: Some(Size::new(MIN_WINDOW.0, MIN_WINDOW.1)),
+            icon: crate::services::icon::window_icon(),
             ..window::Settings::default()
         })
         .run()

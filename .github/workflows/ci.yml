@@ -18,6 +18,20 @@ jobs:
       - name: Format
         run: cargo fmt --check
 
+  # Every dependency must offer a licence on about.toml's allow-list, and the notices
+  # every release must ship (ADR-013's release gate) must generate.
+  licences:
+    needs: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - name: Licences
+        run: scripts/notices.sh
+
   platform:
     needs: format
     strategy:
@@ -43,8 +57,8 @@ jobs:
   # The single check branch protection requires; it passes only if every job above did.
   ci:
     if: always()
-    needs: [format, platform]
+    needs: [format, licences, platform]
     runs-on: ubuntu-latest
     steps:
       - name: All gates passed
-        run: test "${{ needs.format.result }}" = success && test "${{ needs.platform.result }}" = success
+        run: test "${{ needs.format.result }}" = success && test "${{ needs.licences.result }}" = success && test "${{ needs.platform.result }}" = success

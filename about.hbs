@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>mdBrowser: third-party notices</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; color: #222; background: #fbfaf7; }
+  h1, h2 { line-height: 1.2; }
+  pre { white-space: pre-wrap; background: #efede8; padding: 1rem; border-radius: 4px; font-size: 13px; }
+  .used-by { color: #6b6b6b; font-size: 14px; }
+  @media (prefers-color-scheme: dark) { body { color: #e4e2dc; background: #1b1b1a; } pre { background: #262624; } .used-by { color: #a19f98; } }
+</style>
+</head>
+<body>
+<h1>mdBrowser: third-party notices</h1>
+<p>mdBrowser is licensed under MIT OR Apache-2.0 (see <code>LICENSE-MIT</code> and <code>LICENSE-APACHE</code>). It includes the fonts and libraries below, each under its own licence.</p>
+
+<h2>Fonts</h2>
+<!--fonts-->
+
+<h2>Libraries</h2>
+<ul>
+{{#each overview}}
+  <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
+{{/each}}
+</ul>
+
+{{#each licenses}}
+<h3 id="{{id}}">{{name}}</h3>
+<p class="used-by">Used by:
+{{#each used_by}}
+  {{crate.name}} {{crate.version}}{{#unless @last}},{{/unless}}
+{{/each}}
+</p>
+<pre>{{text}}</pre>
+{{/each}}
+</body>
+</html>

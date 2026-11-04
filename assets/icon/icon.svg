@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>mdBrowser</title>
+  <!-- A page as the app draws it: a heading, lines of text, and one link. Colours are the light reader palette (DESIGN.md): link #1f5fbf, page #fbfaf7, ink #222, muted #6b6b6b. No text, so no font is needed. Used for 64 px and up; icon-small.svg is the simplified form below that. -->
+  <rect x="96" y="96" width="832" height="832" rx="186" fill="#1f5fbf"/>
+  <rect x="288" y="184" width="448" height="656" rx="40" fill="#fbfaf7"/>
+  <g stroke-linecap="round">
+    <path d="M360 296H560" stroke="#222" stroke-width="52" fill="none"/>
+    <path d="M360 412H664M360 484H610" stroke="#6b6b6b" stroke-width="30" fill="none"/>
+    <path d="M360 580H588" stroke="#1f5fbf" stroke-width="34" fill="none"/>
+    <path d="M360 632H588" stroke="#1f5fbf" stroke-width="12" fill="none"/>
+    <path d="M360 724H664M360 796H520" stroke="#6b6b6b" stroke-width="30" fill="none"/>
+  </g>
+</svg>

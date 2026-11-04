@@ -244,6 +244,17 @@ mod tests {
     }
 
     #[test]
+    fn the_packaged_identity_matches_the_apps_name_and_icons() {
+        let cargo = include_str!("../Cargo.toml");
+        assert!(cargo.contains(&format!("product-name = \"{APP_NAME}\"")), "Cargo.toml's product-name");
+        assert!(cargo.contains("identifier = \"com.gbrettmiller.mdbrowser\""));
+        for icon in ["icon.ico", "icon.icns", "icon-512.png", "icon-256.png", "icon-128.png", "icon-32.png"] {
+            assert!(cargo.contains(&format!("assets/icon/{icon}")), "{icon}");
+            assert!(std::path::Path::new("assets/icon").join(icon).is_file(), "{icon} exists");
+        }
+    }
+
+    #[test]
     fn the_welcome_page_is_titled_and_names_the_controls_it_describes() {
         let source = include_str!("../assets/welcome.md");
         assert_eq!(crate::model::parse(source).title(""), "Welcome");
@@ -251,6 +262,19 @@ mod tests {
             assert!(source.contains(label), "the welcome page should mention {label}");
         }
         assert!(source.contains("[About mdBrowser](about:mdbrowser)"), "the welcome page links to About");
+    }
+
+    #[test]
+    fn the_welcome_page_leads_with_the_web_of_markdown_and_gives_local_files_one_line() {
+        let source = include_str!("../assets/welcome.md");
+        let intro = source.split("\n## ").next().unwrap();
+        assert!(intro.contains("web of Markdown"), "the first thing it says is what this is");
+        assert!(intro.contains("web address"));
+        assert!(!intro.contains("command line"), "local files are not the lead");
+        let starts = source.find("## Somewhere to start").expect("a starting section");
+        let local = source.find("path").expect("a line for local files");
+        assert!(local > starts, "local files come after the live sites");
+        assert_eq!(source.matches("path").count(), 1, "one short line, not a section");
     }
 
     #[test]

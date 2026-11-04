@@ -2,6 +2,7 @@
 
 pub mod background;
 pub mod files;
+pub mod icon;
 pub mod images;
 pub mod opener;
 pub mod runner;

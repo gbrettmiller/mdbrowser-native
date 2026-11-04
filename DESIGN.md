@@ -39,6 +39,12 @@ Task-list checkboxes are drawn as shapes rather than typed glyphs, because none 
 | Chrome text | `NOTE` 13, `LABEL` 14, `BODY` 16, `HEADING` 18, `HEADLINE` 20 px (`theme::chrome_text`) | Fixed: it does not follow the reader's text size, which is for the document. A 300 px panel and a one-line toolbar would break at 32 px. A reader who needs larger chrome has the OS scale. The floor is 13 px; a test fails if the UI sets a literal size |
 | Panels | 300 px each; the page column is at least 320 px; window at least 620 by 360 | Opening a second panel closes the older one when the page would be narrower. A resize never closes a panel |
 
+## App icon
+
+A page as the app draws it, on a rounded blue tile. The tile is the light palette's link colour (`#1f5fbf`); the page is the page colour (`#fbfaf7`) holding a heading bar (ink `#222`), lines of text (muted `#6b6b6b`) and one underlined line in the link blue. It borrows no Markdown logo: what marks it as this app is that it shows a page the way mdBrowser does, with a link in it. The tile is 832 of 1024 px, as the macOS icon grid expects. Everything is drawn as shapes, with no text, so no font is needed.
+
+There are two drawings. `assets/icon/icon.svg` is the full one, used from 64 px up. `icon-small.svg` has a bigger tile and page and fewer, heavier lines, and is used for 48 px and under, where the full one turns to noise. `scripts/icons.sh` makes the PNGs, `icon.ico` and `icon.icns` next to them, and the outputs are committed. The window uses the 256 px PNG (`services::icon`); Wayland ignores window icons, so there the launcher's `.desktop` file supplies it. The product name is mdBrowser and the identifier is `com.gbrettmiller.mdbrowser`, both in `Cargo.toml` under `[package.metadata.packager]`.
+
 Decision and reasons: ADR-008.
 
 The bundled fonts add about 5.3 MB to the binary (`du -sh assets/fonts`, 2026-10-28).

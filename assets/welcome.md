@@ -1,11 +1,13 @@
 # Welcome
 
-mdBrowser reads Markdown. Type the path or web address of a Markdown file in the address bar above, or pass one on the command line.
+mdBrowser is a browser for the web of Markdown: pages written in plain Markdown, linked like any website, and drawn the way you choose. Type a web address in the bar above, or start with the links below.
 
 ## Somewhere to start
 
 - [The Web of Markdown proposal](https://raw.githubusercontent.com/scripting/markdownWeb/main/readme.md) explains the idea and links to examples.
 - [Dave Winer's scripting.com archive](https://raw.githubusercontent.com/scripting/markdownWeb/main/examples/readme.md) is a long run of posts in Markdown.
+
+A Markdown file on this computer opens too: type or paste its path in the address bar.
 
 ## Make a page your home
 
