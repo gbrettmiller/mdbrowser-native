@@ -34,3 +34,14 @@ fn a_new_push_cancels_the_pull_requests_older_ci_run_but_never_main() {
     assert!(text.contains("group: ci-${{ github.ref }}"));
     assert!(text.contains("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
 }
+
+#[test]
+fn macos_jobs_use_the_intel_runner_while_apple_silicon_runners_are_short() {
+    // macos-latest is Apple Silicon, where jobs waited 15 minutes for a runner and were cancelled
+    // (three times on 2026-11-04). The Intel runner builds the universal app just as well.
+    for name in ["ci.yml", "release.yml"] {
+        let text = workflow(name);
+        assert!(!text.contains("macos-latest"), "{name} still uses macos-latest");
+        assert!(text.contains("macos-15-intel"), "{name} has no macOS job");
+    }
+}
