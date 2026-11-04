@@ -45,3 +45,12 @@ fn macos_jobs_use_the_intel_runner_while_apple_silicon_runners_are_short() {
         assert!(text.contains("macos-15-intel"), "{name} has no macOS job");
     }
 }
+
+#[test]
+fn the_release_installs_cargo_about_with_its_cli_on_macos() {
+    // taiki-e/install-action has no prebuilt cargo-about for Intel macOS. Its cargo-binstall
+    // fallback then builds the crate without the `cli` feature and reports success with no binary,
+    // so scripts/notices.sh fails with "no such command: about".
+    let text = workflow("release.yml");
+    assert!(text.contains("cargo install --locked cargo-about --features cli"));
+}
