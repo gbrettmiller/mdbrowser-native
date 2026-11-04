@@ -265,6 +265,19 @@ mod tests {
     }
 
     #[test]
+    fn the_welcome_page_leads_with_the_web_of_markdown_and_gives_local_files_one_line() {
+        let source = include_str!("../assets/welcome.md");
+        let intro = source.split("\n## ").next().unwrap();
+        assert!(intro.contains("web of Markdown"), "the first thing it says is what this is");
+        assert!(intro.contains("web address"));
+        assert!(!intro.contains("command line"), "local files are not the lead");
+        let starts = source.find("## Somewhere to start").expect("a starting section");
+        let local = source.find("path").expect("a line for local files");
+        assert!(local > starts, "local files come after the live sites");
+        assert_eq!(source.matches("path").count(), 1, "one short line, not a section");
+    }
+
+    #[test]
     fn every_error_and_notice_has_its_own_string() {
         distinct_and_non_empty(&ErrorCode::ALL.map(error));
         distinct_and_non_empty(&ErrorCode::ALL.map(ErrorCode::key));
