@@ -46,7 +46,7 @@ jobs:
       fail-fast: false
       matrix:
         # ubuntu-22.04 keeps the glibc floor low (2.35) for future Linux binaries.
-        os: [ubuntu-22.04, ubuntu-24.04-arm, macos-latest, windows-latest]
+        os: [ubuntu-22.04, ubuntu-24.04-arm, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
