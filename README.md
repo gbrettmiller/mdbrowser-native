@@ -45,7 +45,7 @@ cd mdbrowser-native
 cargo run --release -- corpus/index.md
 ```
 
-The first build takes a few minutes. The app ends up at `target/release/mdbrowser` (`mdbrowser.exe` on Windows). Pass it a path to a `.md` file or a web address (`target/release/mdbrowser https://andrewshell.org/`), or start it with none to open your home page (the built-in welcome page until you set one) and type an address in the address bar.
+The first build takes a few minutes. The app ends up at `target/release/mdbrowser` (`mdbrowser.exe` on Windows). Pass it a path to a `.md` file or a web address (`target/release/mdbrowser https://andrewshell.org/`), or start it with none to open your home page (the built-in welcome page until you set one) and type an address in the address bar. `target/release/mdbrowser --version` prints the version and exits.
 
 ### Keyboard
 

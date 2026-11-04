@@ -20,7 +20,7 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same gates, with the build in release mode. Keep the two in sync.
+CI (`.github/workflows/ci.yml`) runs the same gates, with the build in release mode, plus a licence gate: `scripts/notices.sh` (needs `cargo install --locked cargo-about --features cli`) fails if a dependency has no licence on `about.toml`'s allow-list, and writes `THIRD-PARTY-NOTICES.html`, which every release bundle must ship (ADR-013). Run it when you add a dependency. Keep the two in sync.
 
 `cargo run --release -- <path.md>` runs the app. `scripts/shoot.sh -f "literata inter" corpus/index.md` screenshots documents in each font, using a scratch store. Read the screenshots to check rendering.
 
