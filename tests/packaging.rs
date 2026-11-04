@@ -53,3 +53,32 @@ fn a_tag_makes_a_draft_release_that_a_person_publishes() {
     assert!(workflow.contains("SHA256SUMS"));
     assert!(workflow.contains("scripts/notices.sh"), "no bundle without the notices (ADR-013)");
 }
+
+#[cfg(unix)]
+fn tag_matches(tag: &str, version: &str) -> bool {
+    std::process::Command::new("bash")
+        .args(["scripts/check-tag.sh", tag, version])
+        .status()
+        .expect("bash runs")
+        .success()
+}
+
+#[cfg(unix)]
+#[test]
+fn a_release_tag_names_the_cargo_version_with_an_optional_rc_suffix() {
+    assert!(tag_matches("v0.1.0", "0.1.0"));
+    assert!(tag_matches("v0.1.0-rc.1", "0.1.0"));
+    assert!(tag_matches("v0.1.0-rc.12", "0.1.0"));
+    for wrong in ["v0.1.1", "0.1.0", "v0.1.0-rc", "v0.1.0-rc.x", "v0.1.0-beta.1", "v0.1.0-rc.1-x", "v0.1.0.1", ""] {
+        assert!(!tag_matches(wrong, "0.1.0"), "{wrong:?} must not match");
+    }
+}
+
+#[test]
+fn a_manual_dry_run_packages_everything_but_never_drafts_a_release() {
+    let workflow = read(".github/workflows/release.yml");
+    assert!(workflow.contains("workflow_dispatch:"));
+    let draft = workflow.split("\n  draft:").nth(1).expect("a draft job");
+    assert!(draft.contains("startsWith(github.ref, 'refs/tags/v')"), "only a tag drafts a release");
+    assert!(workflow.contains("scripts/check-tag.sh"));
+}
