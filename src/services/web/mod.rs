@@ -514,7 +514,10 @@ mod tests {
         let strays: Vec<_> = rust_files(&src)
             .into_iter()
             .filter(|path| !path.starts_with(&web))
-            .filter(|path| std::fs::read_to_string(path).unwrap().contains("ureq"))
+            .filter(|path| {
+                let text = std::fs::read_to_string(path).unwrap();
+                ["ureq::", "use ureq", "TcpStream"].iter().any(|used| text.contains(used))
+            })
             .collect();
         assert!(strays.is_empty(), "the HTTP client is used outside services/web: {strays:?}");
     }

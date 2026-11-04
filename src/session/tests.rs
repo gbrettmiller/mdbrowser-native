@@ -544,6 +544,17 @@ fn the_about_event_leaves_the_source_view_and_a_failed_page() {
     assert_eq!((state.address().as_str(), effects.len()), ("about:mdbrowser", 1));
 }
 
+#[test]
+fn the_about_event_on_the_about_source_view_returns_to_the_page_without_a_new_entry() {
+    let (state, _) = step(viewing_a_page(), Event::About);
+    let (state, _) = step(state, loaded_at(2, Location::About, "# About mdBrowser"));
+    let (state, _) = step(state, Event::ToggleSource);
+    assert!(matches!(state.view, PageView::Source(_)));
+    let (after, effects) = step(state.clone(), Event::About);
+    assert!(matches!(after.view, PageView::Page), "the reader asked for About, which is the page");
+    assert_eq!((after.nav, effects), (state.nav, vec![]), "no second entry, no reload");
+}
+
 fn load_origins(effects: &[Effect]) -> Vec<Origin> {
     effects
         .iter()

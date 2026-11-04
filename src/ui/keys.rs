@@ -76,8 +76,8 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         // About and help. F1 needs Fn on many Mac keyboards, so Cmd+? (Ctrl+? elsewhere) is the second route;
         // `?` is Shift+/, which some layouts report as `/`. Not bare keys: those type into the address bar.
         Key::Named(Named::F1) if !primary && !alt => Command::Session(Event::About),
-        Key::Character("?") if primary => Command::Session(Event::About),
-        Key::Character("/") if primary && shift => Command::Session(Event::About),
+        Key::Character("?") if primary && !alt => Command::Session(Event::About),
+        Key::Character("/") if primary && shift && !alt => Command::Session(Event::About),
         Key::Character("r") if primary => Command::Session(Event::Reload),
         Key::Character("l") if primary => Command::FocusAddress,
         Key::Character("h") if primary => Command::ToggleHistory,
@@ -130,6 +130,9 @@ mod tests {
         assert_eq!(command(Key::Character("?"), Modifiers::empty()), None, "a bare ? types into a field");
         assert_eq!(command(Key::Character("/"), primary()), None);
         assert_eq!(command(Key::Named(Named::F1), Modifiers::ALT), None);
+        let with_alt = primary().union(Modifiers::ALT);
+        assert_eq!(command(Key::Character("?"), with_alt), None, "Ctrl+Alt is how AltGr types characters");
+        assert_eq!(command(Key::Character("/"), with_alt.union(Modifiers::SHIFT)), None);
     }
 
     /// Each shortcut the About page lists is in the page's text and does what the page says.

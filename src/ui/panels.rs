@@ -45,11 +45,6 @@ impl Open {
     }
 }
 
-/// About is a page: opening it closes both panels, since two overlays compete with it in a small window.
-pub const fn after_about(_open: Open) -> Open {
-    Open { history: false, settings: false }
-}
-
 /// What Esc does: the panels afterwards, and whether the source view is left.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Escaped {
@@ -88,13 +83,6 @@ mod tests {
 
     const ROOMY: f32 = 1000.0;
     const NARROW: f32 = 700.0;
-
-    #[test]
-    fn opening_about_closes_both_panels() {
-        for open in [Open::default(), Open { history: true, settings: false }, Open { history: true, settings: true }] {
-            assert_eq!(after_about(open), Open::default(), "{open:?}");
-        }
-    }
 
     #[test]
     fn a_panel_opens_and_closes() {

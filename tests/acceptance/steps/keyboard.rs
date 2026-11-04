@@ -146,7 +146,7 @@ fn press(w: &mut Browser, chord: String) {
 /// panels and puts the keyboard on the page.
 pub(super) fn send_command(w: &mut Browser, event: Event) {
     if matches!(event, Event::About) {
-        w.keys.panels = panels::after_about(w.keys.panels);
+        w.keys.panels = panels::Open::default();
         w.keys.page_focused = true;
     }
     w.send(event);

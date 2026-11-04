@@ -83,6 +83,8 @@ Bundled `assets/about.md`, filled with the build's version, and opened like any 
 - No in-app licence viewer: a reader offline sees the licence names, and the texts are in the installed notices file and the repository.
 
 **Neutral:**
+- `about:mdbrowser#faq` works as a link and as a typed address, so another built-in page can point at a section.
+- `Location::About`'s label (the title of last resort) is a string in `session`, like the file and host labels; the page's own heading is the title in practice.
 - The address `about:mdbrowser` is the first reserved internal address. If a second built-in page is added, `Location` is the place to generalise.
 - The source view of About shows the filled page text, front matter and placeholders resolved.
 

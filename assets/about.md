@@ -26,7 +26,7 @@ The reading fonts are bundled in the app. Each is licensed under the SIL Open Fo
 
 ## What it sends and stores
 
-- **On the web:** it fetches only addresses you open or follow, and web images when the Images setting allows. Each request carries a type preference (`Accept`) and a `User-Agent` that names the app and its version. It sends no cookies, no referrer and no account. If your system sets a proxy, the app uses it.
+- **On the web:** it fetches only addresses you open or follow, and web images when the Images setting allows. Each request carries the usual headers for fetching a page: a type preference (`Accept`), the compression it understands, and a `User-Agent` that names the app and its version. It sends no cookies, no referrer and no account. If your system sets a proxy, the app uses it for requests to the public web.
 - **Mail links:** `mailto:` links open your mail program, and only after you agree.
 - **Nothing else:** there is no analytics and no update check. It makes no request you did not cause.
 - **On this computer:** your History and settings are saved in an `mdbrowser` folder in your user data directory. The README says where that is on each system. Clear History in the History panel.

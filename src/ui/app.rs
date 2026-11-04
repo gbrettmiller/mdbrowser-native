@@ -190,7 +190,8 @@ impl App {
         let images = self.schedule_images();
         let kept = self.keep_place(look_before, page_before);
         let focus = if about {
-            self.panels = panels::after_about(self.panels);
+            // About is a page: two overlays would compete with it in a small window.
+            self.panels = panels::Open::default();
             operation::focus(PAGE_ID)
         } else {
             Task::none()

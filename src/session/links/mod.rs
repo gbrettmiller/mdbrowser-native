@@ -8,7 +8,7 @@ use url::Url;
 
 mod page;
 
-use super::address::{decode, is_about, normalise, scheme_of, web_target};
+use super::address::{about_target, decode, normalise, scheme_of, web_target};
 use super::href::{as_browsers_read, local_target};
 use super::location::{ABOUT_SCHEME, Location, Target, WEB_SCHEMES, is_markdown};
 
@@ -48,9 +48,7 @@ pub fn classify(href: &str, current: &Location) -> Link {
 /// and nowhere else. (None links to the welcome page: its address is blank.)
 fn from_builtin(reference: &str) -> Link {
     match scheme_of(reference).as_deref() {
-        Some(ABOUT_SCHEME) if is_about(reference) => {
-            Link::Navigate(Target { location: Location::About, fragment: None })
-        }
+        Some(ABOUT_SCHEME) => about_target(reference).map_or(Link::Unsupported, Link::Navigate),
         Some(MAIL_SCHEME) => Link::External(reference.to_string()),
         Some(scheme) if WEB_SCHEMES.contains(&scheme) => match Url::parse(reference) {
             Ok(url) => Link::Navigate(web_target(url)),
@@ -101,6 +99,12 @@ mod tests {
                 assert_eq!(classify(other, &page), Link::Unsupported, "{page:?} {other}");
             }
         }
+    }
+
+    #[test]
+    fn a_built_in_page_can_link_to_a_section_of_the_about_page() {
+        let target = Target { location: Location::About, fragment: Some("faq".into()) };
+        assert_eq!(classify("about:mdbrowser#faq", &Location::Welcome), Link::Navigate(target));
     }
 
     #[test]

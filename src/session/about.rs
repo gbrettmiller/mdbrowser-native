@@ -1,11 +1,11 @@
 //! The About page (ADR-013): a bundled Markdown template with this build's facts filled in.
 //! The facts are compile-time constants, so this stays pure.
 
-use super::State;
 use super::location::{Location, Target};
 use super::navigation::Entry;
 use super::reducer::{Step, navigate_to, none};
 use super::web::Origin;
+use super::{State, Status, View};
 
 /// What the page says about this build.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +51,12 @@ pub fn fill(template: &str, facts: &Facts) -> String {
 pub(super) fn open(state: State) -> Step {
     let here = state.nav.current().and_then(|entry| entry.target.as_ref()).map(|target| &target.location);
     if here == Some(&Location::About) {
-        return none(state);
+        // Already here: nothing to load, but the reader asked for the page, not its source.
+        let view = match &state.status {
+            Status::Ready(_) => View::Page,
+            _ => state.view.clone(),
+        };
+        return none(State { view, ..state });
     }
     let target = Target { location: Location::About, fragment: None };
     navigate_to(state, Entry { input: Location::About.address(), target: Some(target), origin: Origin::Trusted })
