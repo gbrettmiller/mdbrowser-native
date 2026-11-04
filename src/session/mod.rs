@@ -1,6 +1,7 @@
 //! The browsing session as a pure reducer: `step(state, event) → (state, effects)`.
 //! Effects are data; `services::runner` executes them and feeds results back as events.
 
+pub mod about;
 pub mod address;
 pub mod error;
 mod href;
@@ -170,6 +171,8 @@ pub enum Event {
     ChooseHome(String),
     /// Open the home page, or the welcome page when none is set.
     Home,
+    /// Open the About page (ADR-013). Nothing more when it is already the current page.
+    About,
     /// The app started, with the address given on the command line if any. That
     /// address wins; otherwise the home page opens.
     Launch(Option<String>),
@@ -286,7 +289,7 @@ impl State {
         }
         match self.current_location()? {
             Location::Web(url) => url.join(web::LLMS_TXT).ok().map(String::from),
-            Location::File(_) | Location::Welcome => None,
+            Location::File(_) | Location::Welcome | Location::About => None,
         }
     }
 }

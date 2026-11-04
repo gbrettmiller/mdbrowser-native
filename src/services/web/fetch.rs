@@ -17,7 +17,7 @@ use crate::session::web::{self, FetchError, MAX_REDIRECTS, Origin, StatusClass, 
 
 const USER_AGENT: &str = concat!("mdbrowser/", env!("CARGO_PKG_VERSION"));
 
-/// One GET per hop, each a fresh request carrying only `Accept`: no cookies, and
+/// One GET per hop, each a fresh request carrying `Accept` and a fixed `User-Agent` (no `Referer`): no cookies, and
 /// no credentials beyond those typed for the first host (`next_hop` strips them).
 /// Returns the final URL and the body, checked against `want`'s types.
 pub fn fetch_bytes(url: &Url, want: Want, limits: &Limits, origin: Origin) -> Result<(Url, Vec<u8>), FetchError> {

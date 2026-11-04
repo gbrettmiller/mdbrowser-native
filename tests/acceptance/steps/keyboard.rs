@@ -114,7 +114,13 @@ fn press(w: &mut Browser, chord: String) {
     if let Some(letter) = chord.strip_prefix("Ctrl+") {
         let command = keys::command(Key::Character(&letter.to_lowercase()), Modifiers::COMMAND);
         if let Some(keys::Command::Session(event)) = command {
-            w.send(event);
+            send_command(w, event);
+        }
+        return;
+    }
+    if chord == "F1" {
+        if let Some(keys::Command::Session(event)) = keys::command(Key::Named(Named::F1), Modifiers::empty()) {
+            send_command(w, event);
         }
         return;
     }
@@ -134,6 +140,16 @@ fn press(w: &mut Browser, chord: String) {
             }
         }
     }
+}
+
+/// A session event from a shortcut, with what the app's UI does around it: About closes the
+/// panels and puts the keyboard on the page.
+pub(super) fn send_command(w: &mut Browser, event: Event) {
+    if matches!(event, Event::About) {
+        w.keys.panels = panels::Open::default();
+        w.keys.page_focused = true;
+    }
+    w.send(event);
 }
 
 /// Esc as the app handles it: a panel closes first, then the source view is left.

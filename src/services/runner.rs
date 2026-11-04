@@ -8,6 +8,7 @@ use iced::Task;
 
 use super::store::{Store, Ticket};
 use super::{background, files, images, opener, web};
+use crate::session::about;
 use crate::session::error::ErrorCode;
 use crate::session::location::Location;
 use crate::session::web::Origin;
@@ -39,6 +40,7 @@ fn in_background(
 
 /// The built-in page, bundled in the binary.
 const WELCOME_PAGE: &str = include_str!("../../assets/welcome.md");
+const ABOUT_PAGE: &str = include_str!("../../assets/about.md");
 
 /// Reads a file or fetches a page. Matched exhaustively, so a web location can never reach `files`.
 pub fn load(location: Location, limits: &web::Limits, origin: Origin) -> Result<Loaded, ErrorCode> {
@@ -50,6 +52,9 @@ pub fn load(location: Location, limits: &web::Limits, origin: Origin) -> Result<
         }),
         Location::Welcome => {
             Ok(Loaded { source: WELCOME_PAGE.to_string(), location: Location::Welcome, fallback_from: None })
+        }
+        Location::About => {
+            Ok(Loaded { source: about::page(ABOUT_PAGE), location: Location::About, fallback_from: None })
         }
         Location::Web(url) => web::fetch(&url, limits, origin).map(|fetched| Loaded {
             source: fetched.source,
@@ -81,5 +86,18 @@ pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
         Effect::PersistSettings(settings) => {
             in_background(store, move |store, ticket| store.save_settings(ticket, settings))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_about_page_is_served_filled_in_without_the_network() {
+        let loaded = load(Location::About, &web::Limits::default(), Origin::Trusted).expect("about loads");
+        assert_eq!((loaded.location, loaded.fallback_from), (Location::About, None));
+        assert!(loaded.source.starts_with("# About mdBrowser"));
+        assert!(loaded.source.contains(about::version()) && !loaded.source.contains('{'));
     }
 }

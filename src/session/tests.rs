@@ -489,6 +489,72 @@ fn welcome_page_links_go_to_the_web_and_anchors_scroll() {
     assert_eq!((state.notices.len(), effects), (1, vec![]));
 }
 
+#[test]
+fn the_about_page_is_a_page_with_a_title_and_an_address_but_no_history_entry() {
+    let about = Event::Enter("about:mdbrowser".into());
+    let (state, effects) = run([about.clone()]);
+    assert_eq!(effects, vec![Effect::Load { request_id: 1, location: Location::About, origin: Origin::Trusted }]);
+    let (state, effects) = step(state, loaded_at(1, Location::About, "# About mdBrowser\n\nHello"));
+    let Status::Ready(shown) = &state.status else { panic!("{:?}", state.status) };
+    assert_eq!((shown.title.as_str(), state.address().as_str()), ("About mdBrowser", "about:mdbrowser"));
+    assert!(state.visits.is_empty(), "the about page is not a place to revisit");
+    assert!(effects.iter().all(|e| !matches!(e, Effect::LoadImage { .. })), "{effects:?}");
+}
+
+fn viewing_a_page() -> State {
+    run([Event::Enter(native("/d/post.md")), loaded_at(1, Location::file(native("/d/post.md")), "# Post")]).0
+}
+
+#[test]
+fn the_about_event_loads_the_about_page_like_a_typed_address() {
+    let (state, effects) = step(viewing_a_page(), Event::About);
+    assert_eq!(effects, vec![Effect::Load { request_id: 2, location: Location::About, origin: Origin::Trusted }]);
+    assert_eq!(state.address(), "about:mdbrowser");
+    assert!(effects.iter().all(|e| !matches!(e, Effect::LoadImage { .. })), "no image load");
+}
+
+#[test]
+fn about_is_a_place_to_go_back_from_and_forward_to() {
+    let (state, _) = step(viewing_a_page(), Event::About);
+    let (state, _) = step(state, loaded_at(2, Location::About, "# About mdBrowser"));
+    let (state, effects) = step(state, Event::Back);
+    assert_eq!(state.address(), native("/d/post.md"));
+    assert_eq!(effects.len(), 1, "back reloads the page it returns to");
+    let (state, _) = step(state, loaded_at(3, Location::file(native("/d/post.md")), "# Post"));
+    let (state, _) = step(state, Event::Forward);
+    assert_eq!(state.address(), "about:mdbrowser");
+}
+
+#[test]
+fn the_about_event_on_the_about_page_does_nothing_more() {
+    let (state, _) = step(viewing_a_page(), Event::About);
+    let (state, _) = step(state, loaded_at(2, Location::About, "# About mdBrowser"));
+    let (again, effects) = step(state.clone(), Event::About);
+    assert_eq!((again, effects), (state, vec![]), "no second entry to go back through");
+}
+
+#[test]
+fn the_about_event_leaves_the_source_view_and_a_failed_page() {
+    let (state, _) = step(viewing_a_page(), Event::ToggleSource);
+    assert!(matches!(state.view, PageView::Source(_)));
+    let (state, _) = step(state, Event::About);
+    assert!(matches!(state.view, PageView::Page));
+    let (failed, _) = run([Event::Enter("nonsense".into())]);
+    let (state, effects) = step(failed, Event::About);
+    assert_eq!((state.address().as_str(), effects.len()), ("about:mdbrowser", 1));
+}
+
+#[test]
+fn the_about_event_on_the_about_source_view_returns_to_the_page_without_a_new_entry() {
+    let (state, _) = step(viewing_a_page(), Event::About);
+    let (state, _) = step(state, loaded_at(2, Location::About, "# About mdBrowser"));
+    let (state, _) = step(state, Event::ToggleSource);
+    assert!(matches!(state.view, PageView::Source(_)));
+    let (after, effects) = step(state.clone(), Event::About);
+    assert!(matches!(after.view, PageView::Page), "the reader asked for About, which is the page");
+    assert_eq!((after.nav, effects), (state.nav, vec![]), "no second entry, no reload");
+}
+
 fn load_origins(effects: &[Effect]) -> Vec<Origin> {
     effects
         .iter()

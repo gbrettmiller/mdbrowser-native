@@ -8,9 +8,9 @@ use url::Url;
 
 mod page;
 
-use super::address::{decode, normalise, scheme_of, web_target};
+use super::address::{about_target, decode, normalise, scheme_of, web_target};
 use super::href::{as_browsers_read, local_target};
-use super::location::{Location, Target, WEB_SCHEMES, is_markdown};
+use super::location::{ABOUT_SCHEME, Location, Target, WEB_SCHEMES, is_markdown};
 
 const MAIL_SCHEME: &str = "mailto";
 
@@ -40,13 +40,15 @@ pub fn classify(href: &str, current: &Location) -> Link {
     match current {
         Location::File(_) => from_file(reference, current),
         Location::Web(page) => page::classify(reference, page),
-        Location::Welcome => from_welcome(reference),
+        Location::Welcome | Location::About => from_builtin(reference),
     }
 }
 
-/// The built-in page links to the web and mail by absolute address, and nowhere else.
-fn from_welcome(reference: &str) -> Link {
+/// A built-in page links to the web and mail by absolute address, and to the About page,
+/// and nowhere else. (None links to the welcome page: its address is blank.)
+fn from_builtin(reference: &str) -> Link {
     match scheme_of(reference).as_deref() {
+        Some(ABOUT_SCHEME) => about_target(reference).map_or(Link::Unsupported, Link::Navigate),
         Some(MAIL_SCHEME) => Link::External(reference.to_string()),
         Some(scheme) if WEB_SCHEMES.contains(&scheme) => match Url::parse(reference) {
             Ok(url) => Link::Navigate(web_target(url)),
@@ -83,6 +85,31 @@ mod tests {
 
     fn navigate(path: &str, fragment: Option<&str>) -> Link {
         Link::Navigate(Target { location: Location::file(native(path)), fragment: fragment.map(str::to_string) })
+    }
+
+    #[test]
+    fn built_in_pages_link_to_the_web_mail_and_the_about_page_only() {
+        let about = Link::Navigate(Target { location: Location::About, fragment: None });
+        for page in [Location::Welcome, Location::About] {
+            assert_eq!(classify("about:mdbrowser", &page), about, "{page:?}");
+            assert_eq!(classify("ABOUT:MDBROWSER", &page), about, "{page:?}");
+            assert_eq!(classify("mailto:a@b.example", &page), Link::External("mailto:a@b.example".into()));
+            assert!(matches!(classify("https://example.com/a.md", &page), Link::Navigate(_)));
+            for other in ["about:other", "about:blank", "notes.md", "/etc/x.md", "file:///x.md", "welcome"] {
+                assert_eq!(classify(other, &page), Link::Unsupported, "{page:?} {other}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_built_in_page_can_link_to_a_section_of_the_about_page() {
+        let target = Target { location: Location::About, fragment: Some("faq".into()) };
+        assert_eq!(classify("about:mdbrowser#faq", &Location::Welcome), Link::Navigate(target));
+    }
+
+    #[test]
+    fn anchors_scroll_on_the_about_page() {
+        assert_eq!(classify("#faq", &Location::About), Link::Scroll("faq".into()));
     }
 
     #[test]

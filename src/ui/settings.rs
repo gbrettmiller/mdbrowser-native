@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use iced::widget::{column, container, pick_list, row, scrollable, text, text_input};
+use iced::widget::{column, container, pick_list, row, scrollable, text, text_input, tooltip};
 use iced::{Element, Length};
 
 use super::app::Message;
@@ -124,6 +124,13 @@ fn colour_fields<'a>(drafts: &'a ColourDrafts) -> Element<'a, Message> {
         .into()
 }
 
+/// Opens the About page. At the top, so it needs no scrolling in a small window.
+fn about_button<'a>() -> Element<'a, Message> {
+    let open = button(text(content::ABOUT).size(chrome_text::LABEL), Some(Message::Session(Event::About)));
+    let tip = text(content::about_tooltip(cfg!(target_os = "macos")));
+    tooltip(open, tip, tooltip::Position::Bottom).into()
+}
+
 pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDrafts) -> Element<'a, Message> {
     let settings = &state.settings;
     let home = column![
@@ -135,6 +142,7 @@ pub fn panel<'a>(state: &'a State, home_draft: &'a str, colours: &'a ColourDraft
     .spacing(4);
     let fields = column![
         text(content::SETTINGS).size(chrome_text::HEADING),
+        about_button(),
         choice(content::FONT_LABEL, &ReadingFont::ALL, settings.font, content::font_name, Event::ChooseFont),
         choice(
             content::IMAGES_LABEL,

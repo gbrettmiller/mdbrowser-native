@@ -170,6 +170,7 @@ impl App {
         } else {
             None
         };
+        let about = matches!(event, Event::About);
         let (state, effects) = session::step(self.session.take().expect("session"), event);
         self.session = Some(state);
         if self.session().address() != previous_address {
@@ -188,7 +189,14 @@ impl App {
             self.scroll_after(before, fragment_before, source_before != matches!(self.session().view, View::Source(_)));
         let images = self.schedule_images();
         let kept = self.keep_place(look_before, page_before);
-        Task::batch(effects.into_iter().chain([scroll, images, kept]))
+        let focus = if about {
+            // About is a page: two overlays would compete with it in a small window.
+            self.panels = panels::Open::default();
+            operation::focus(PAGE_ID)
+        } else {
+            Task::none()
+        };
+        Task::batch(effects.into_iter().chain([scroll, images, kept, focus]))
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {

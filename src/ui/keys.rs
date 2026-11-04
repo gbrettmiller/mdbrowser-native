@@ -73,6 +73,11 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         }
         Key::Named(Named::Escape) if !primary && !alt && !shift => Command::ClosePanel,
         Key::Named(Named::F5) => Command::Session(Event::Reload),
+        // About and help. F1 needs Fn on many Mac keyboards, so Cmd+? (Ctrl+? elsewhere) is the second route;
+        // `?` is Shift+/, which some layouts report as `/`. Not bare keys: those type into the address bar.
+        Key::Named(Named::F1) if !primary && !alt => Command::Session(Event::About),
+        Key::Character("?") if primary && !alt => Command::Session(Event::About),
+        Key::Character("/") if primary && shift && !alt => Command::Session(Event::About),
         Key::Character("r") if primary => Command::Session(Event::Reload),
         Key::Character("l") if primary => Command::FocusAddress,
         Key::Character("h") if primary => Command::ToggleHistory,
@@ -113,6 +118,51 @@ mod tests {
         assert_eq!(command(Key::Character("U"), primary()), toggle, "Caps Lock");
         assert_eq!(command(Key::Character("u"), Modifiers::ALT), None);
         assert_eq!(command(Key::Character("U"), primary().union(Modifiers::SHIFT)), None);
+    }
+
+    #[test]
+    fn f1_and_ctrl_or_cmd_question_mark_open_about_and_nothing_else_does() {
+        let about = Some(Command::Session(Event::About));
+        assert_eq!(command(Key::Named(Named::F1), Modifiers::empty()), about);
+        assert_eq!(command(Key::Character("?"), primary()), about);
+        assert_eq!(command(Key::Character("?"), primary().union(Modifiers::SHIFT)), about);
+        assert_eq!(command(Key::Character("/"), primary().union(Modifiers::SHIFT)), about, "Shift+/ on a US layout");
+        assert_eq!(command(Key::Character("?"), Modifiers::empty()), None, "a bare ? types into a field");
+        assert_eq!(command(Key::Character("/"), primary()), None);
+        assert_eq!(command(Key::Named(Named::F1), Modifiers::ALT), None);
+        let with_alt = primary().union(Modifiers::ALT);
+        assert_eq!(command(Key::Character("?"), with_alt), None, "Ctrl+Alt is how AltGr types characters");
+        assert_eq!(command(Key::Character("/"), with_alt.union(Modifiers::SHIFT)), None);
+    }
+
+    /// Each shortcut the About page lists is in the page's text and does what the page says.
+    #[test]
+    fn every_shortcut_the_about_page_lists_works() {
+        let page = include_str!("../../assets/about.md");
+        let session = |event| Some(Command::Session(event));
+        let table = [
+            ("F1 or Ctrl+?", command(Key::Named(Named::F1), Modifiers::empty()), session(Event::About)),
+            ("Ctrl+,", command(Key::Character(","), primary()), Some(Command::ToggleSettings)),
+            ("Ctrl+H", command(Key::Character("h"), primary()), Some(Command::ToggleHistory)),
+            ("Ctrl+L", command(Key::Character("l"), primary()), Some(Command::FocusAddress)),
+            ("Ctrl+U", command(Key::Character("u"), primary()), session(Event::ToggleSource)),
+            ("Alt+Home", command(Key::Named(Named::Home), Modifiers::ALT), session(Event::Home)),
+            (
+                "Ctrl+=, Ctrl+-, Ctrl+0",
+                command(Key::Character("="), primary()),
+                session(Event::StepTextSize(TextStep::Larger)),
+            ),
+            ("Tab or Shift+Tab", command(Key::Named(Named::Tab), Modifiers::empty()), Some(Command::FocusNext)),
+            (
+                "| Close a panel | Esc |",
+                command(Key::Named(Named::Escape), Modifiers::empty()),
+                Some(Command::ClosePanel),
+            ),
+        ];
+        for (listed, actual, expected) in table {
+            assert!(page.contains(listed), "the About page no longer lists {listed}");
+            assert_eq!(actual, expected, "{listed}");
+        }
     }
 
     #[test]

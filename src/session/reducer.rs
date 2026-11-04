@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use super::about;
 use super::address::parse_address;
 use super::error::ErrorCode;
 use super::images::{ImageLoading, Images};
@@ -15,9 +16,9 @@ use crate::model;
 use crate::theme::colours::{self, Unreadable};
 use crate::theme::{Appearance, Colours, Spacing, TextSize, Which};
 
-type Step = (State, Vec<Effect>);
+pub(super) type Step = (State, Vec<Effect>);
 
-fn none(state: State) -> Step {
+pub(super) fn none(state: State) -> Step {
     (state, Vec::new())
 }
 
@@ -32,6 +33,7 @@ pub fn step(state: State, event: Event) -> Step {
             Some(href) => follow(state, &href),
             None => none(state),
         },
+        Event::About => about::open(state),
         Event::Back => move_by(state, Navigation::back),
         Event::Forward => move_by(state, Navigation::forward),
         Event::Reload => match state.nav.current().cloned() {
@@ -106,7 +108,7 @@ fn open_offer(state: State, url: &str) -> Step {
     navigate_to(state, entry)
 }
 
-fn navigate_to(state: State, entry: Entry) -> Step {
+pub(super) fn navigate_to(state: State, entry: Entry) -> Step {
     let nav = state.nav.clone().push(entry.clone());
     enter(State { nav, view: View::Page, ..state }, entry)
 }
@@ -150,10 +152,10 @@ fn loaded(state: State, request_id: u64, result: Result<Loaded, ErrorCode>, now:
             let source: Arc<str> = source.into();
             let document = model::parse(&source);
             let title = document.title(&location.label());
-            let visits = if location.is_welcome() {
-                state.visits
-            } else {
+            let visits = if location.records_history() {
                 visits::record(&state.visits, &location.address(), &title, now)
+            } else {
+                state.visits
             };
             let shown = Arc::new(Shown { document: Arc::new(document), source, title, fallback_from });
             let sources = shown.document.image_sources();

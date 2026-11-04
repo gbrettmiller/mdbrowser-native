@@ -11,6 +11,10 @@ const MARKDOWN_EXTENSIONS: [&str; 2] = ["md", "markdown"];
 /// The only schemes fetched or shown in the app.
 pub const WEB_SCHEMES: [&str; 2] = ["http", "https"];
 pub const FILE_SCHEME: &str = "file";
+/// The built-in About page: its address, the scheme of that address, and its title of last resort.
+pub const ABOUT_ADDRESS: &str = "about:mdbrowser";
+pub const ABOUT_SCHEME: &str = "about";
+const ABOUT_LABEL: &str = "About mdBrowser";
 
 /// The URL without a user name or password, which are never sent anywhere.
 pub fn without_credentials(mut url: Url) -> Url {
@@ -28,6 +32,8 @@ pub enum Location {
     Web(Url),
     /// The built-in welcome page. It has a blank address and isn't a file or a URL.
     Welcome,
+    /// The built-in About page (ADR-013), at `about:mdbrowser`. Not a file or a URL either.
+    About,
 }
 
 /// A location plus the in-page anchor to scroll to, if any.
@@ -50,12 +56,18 @@ impl Location {
     pub fn as_file(&self) -> Option<&Path> {
         match self {
             Location::File(path) => Some(path),
-            Location::Web(_) | Location::Welcome => None,
+            Location::Web(_) | Location::Welcome | Location::About => None,
         }
     }
 
-    pub fn is_welcome(&self) -> bool {
-        matches!(self, Location::Welcome)
+    /// A page bundled in the app: no file, no URL, and no network.
+    pub fn is_builtin(&self) -> bool {
+        matches!(self, Location::Welcome | Location::About)
+    }
+
+    /// Whether visiting it adds a History entry: a built-in page is not a place to revisit.
+    pub fn records_history(&self) -> bool {
+        !self.is_builtin()
     }
 
     pub fn is_web(&self) -> bool {
@@ -65,7 +77,7 @@ impl Location {
     /// A web page's host name; files have none.
     pub fn host(&self) -> Option<&str> {
         match self {
-            Location::File(_) | Location::Welcome => None,
+            Location::File(_) | Location::Welcome | Location::About => None,
             Location::Web(url) => url.host_str(),
         }
     }
@@ -76,6 +88,7 @@ impl Location {
             Location::File(path) => path.display().to_string(),
             Location::Web(url) => url.to_string(),
             Location::Welcome => String::new(),
+            Location::About => ABOUT_ADDRESS.to_string(),
         }
     }
 
@@ -83,6 +96,7 @@ impl Location {
     pub fn label(&self) -> String {
         let name = match self {
             Location::Welcome => None,
+            Location::About => Some(ABOUT_LABEL.to_string()),
             Location::File(path) => path.file_name().map(|name| name.to_string_lossy().into_owned()),
             Location::Web(url) => url
                 .path_segments()
@@ -123,6 +137,22 @@ mod tests {
     #[test]
     fn the_welcome_page_has_no_label_of_its_own() {
         assert_eq!(Location::Welcome.label(), "");
+    }
+
+    #[test]
+    fn the_about_page_has_its_own_address_and_label_and_is_neither_file_nor_web() {
+        assert_eq!(Location::About.address(), "about:mdbrowser");
+        assert_eq!(Location::About.label(), "About mdBrowser");
+        assert_eq!((Location::About.host(), Location::About.as_file(), Location::About.is_web()), (None, None, false));
+    }
+
+    #[test]
+    fn built_in_pages_make_no_history_entry_and_show_no_local_images() {
+        for page in [Location::Welcome, Location::About] {
+            assert!(page.is_builtin() && !page.records_history(), "{page:?}");
+        }
+        assert!(Location::file("/x/a.md").records_history() && !Location::file("/x/a.md").is_builtin());
+        assert!(web("https://example.com/a.md").records_history());
     }
 
     #[test]
