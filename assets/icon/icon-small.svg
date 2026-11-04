@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>mdBrowser (small sizes)</title>
+  <!-- The same icon simplified for 48 px and under: a bigger tile and page, fewer and heavier lines, so they stay apart when rasterised. -->
+  <rect x="48" y="48" width="928" height="928" rx="200" fill="#1f5fbf"/>
+  <rect x="236" y="148" width="552" height="728" rx="48" fill="#fbfaf7"/>
+  <g stroke-linecap="round" fill="none">
+    <path d="M324 292H560" stroke="#222" stroke-width="88"/>
+    <path d="M324 472H700" stroke="#6b6b6b" stroke-width="64"/>
+    <path d="M324 640H600" stroke="#1f5fbf" stroke-width="72"/>
+    <path d="M324 788H680" stroke="#6b6b6b" stroke-width="64"/>
+  </g>
+</svg>

@@ -6,6 +6,19 @@ rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 description = "A browser for the web of Markdown — no HTML, no DOM, no webview"
 
+# How the app presents itself once packaged (the packaging config itself comes with the release workflow).
+[package.metadata.packager]
+product-name = "mdBrowser"
+identifier = "com.gbrettmiller.mdbrowser"
+icons = [
+  "assets/icon/icon-32.png",
+  "assets/icon/icon-128.png",
+  "assets/icon/icon-256.png",
+  "assets/icon/icon-512.png",
+  "assets/icon/icon.ico",
+  "assets/icon/icon.icns",
+]
+
 [dependencies]
 dirs = "7.0.0"
 # Only the codecs ADR-004 allows: no AVIF, TIFF, EXR or the rest.

@@ -244,6 +244,17 @@ mod tests {
     }
 
     #[test]
+    fn the_packaged_identity_matches_the_apps_name_and_icons() {
+        let cargo = include_str!("../Cargo.toml");
+        assert!(cargo.contains(&format!("product-name = \"{APP_NAME}\"")), "Cargo.toml's product-name");
+        assert!(cargo.contains("identifier = \"com.gbrettmiller.mdbrowser\""));
+        for icon in ["icon.ico", "icon.icns", "icon-512.png", "icon-256.png", "icon-128.png", "icon-32.png"] {
+            assert!(cargo.contains(&format!("assets/icon/{icon}")), "{icon}");
+            assert!(std::path::Path::new("assets/icon").join(icon).is_file(), "{icon} exists");
+        }
+    }
+
+    #[test]
     fn the_welcome_page_is_titled_and_names_the_controls_it_describes() {
         let source = include_str!("../assets/welcome.md");
         assert_eq!(crate::model::parse(source).title(""), "Welcome");
