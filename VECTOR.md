@@ -85,7 +85,7 @@ First public release:
 - [ ] The reader can set typeface, text size, spacing and a light or dark palette, and the choices persist.
 - [ ] Opening a typical post takes under 250 ms on a local file. Scrolling and resizing don't stutter.
 - [ ] Builds and passes CI on Linux. macOS and Windows build in CI.
-- [ ] Downloadable installers: unsigned packages for Linux (x64 and ARM64, `.deb` and AppImage), Windows x64 and macOS (universal) come from a GitHub Release. On each system, following the README's steps installs the app, and the welcome page's link to a live Markdown site loads over `https` and renders with images (ADR-009).
+- [x] Downloadable installers (v0.1.0): unsigned packages for Linux (x64 and ARM64, `.deb` and AppImage), Windows x64 and macOS (universal) come from a GitHub Release. On each system, following the README's steps installs the app, and the welcome page's link to a live Markdown site loads over `https` and renders with images (ADR-009).
 - [ ] Later, not required for v0.1: code-signed and notarised installers, so the OS warnings go away.
 
 # Knowledge Map
@@ -112,7 +112,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 - **Opening files without typing a path.** Drag-and-drop onto the window is small (iced reports `FileDropped`). A file dialog needs a new dependency and an ADR. Mac readers have neither until one of them exists.
 - **Code signing and notarisation.** When, and with which certificates? Unsigned installers lose some readers at the OS warning.
 - **Other Linux packages.** An AUR package (`mdbrowser-bin`), Flatpak or RPM, if readers ask.
-- **AppImage and `libfuse2`.** Ubuntu 22.04 and later don't ship it. Does the AppImage need it? The release candidate settles this, and the README should then say so.
+- **AppImage and `libfuse2`.** The v0.1.0-rc.1 AppImage ran on an Arch system with only `libfuse3`, so the README has no `libfuse2` note. It has not been tried on a clean Ubuntu; add a note if a reader reports it failing to start.
 - **Which discovery convention comes first?** `llms.txt`, a post's `source` feed, or OPML?
 - **Interop with other Markdown-web browsers.** Should we share a test corpus, for example with Andrew Shell's browser?
 - Live updates over WebSockets: noted in INT-001 and not yet in scope.
