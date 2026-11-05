@@ -37,7 +37,9 @@ jobs:
 
   # Same gates as ci.yml (keep them in sync), then package and smoke-test each platform's bundles.
   package:
-    timeout-minutes: 45
+    # A cold Intel macOS run takes about 50 minutes: two release builds, the tests, and cargo-about and
+    # cargo-packager built from source.
+    timeout-minutes: 90
     needs: version
     strategy:
       fail-fast: false
@@ -71,6 +73,9 @@ jobs:
           components: clippy
           targets: ${{ matrix.kind == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Save the build cache even if a later step fails or the job is cancelled, so a retry is warm.
+          cache-on-failure: true
       - uses: taiki-e/install-action@v2
         if: matrix.kind != 'macos'
         with:
