@@ -89,3 +89,13 @@ fn the_macos_smoke_test_cannot_fail_without_a_message() {
     assert!(step.contains("hdiutil imageinfo"), "say what the image is before mounting it");
     assert!(step.contains("-readonly") && step.contains("-noverify"));
 }
+
+#[test]
+fn the_macos_smoke_test_accepts_the_dmg_licence_prompt() {
+    // The packager embeds LICENSE in the dmg; `hdiutil attach` prints "attach canceled"
+    // unless something answers its agreement prompt on stdin.
+    let text = workflow("release.yml");
+    let step = text.split("Smoke test (macOS)").nth(1).expect("a macOS smoke test");
+    let step = step.split("Smoke test (Windows)").next().expect("it comes before Windows");
+    assert!(step.contains("echo Y | hdiutil attach"), "answer the licence prompt");
+}
