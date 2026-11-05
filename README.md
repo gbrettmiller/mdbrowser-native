@@ -4,7 +4,30 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 5 (keyboard access), local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page and About page (F1), a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), an offer of the site's `llms.txt`, and a source view of any page (Ctrl+U). Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 5 (keyboard access), downloadable installers for Linux, Windows and macOS on the way (see [Download](#download)), local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page and About page (F1), a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), an offer of the site's `llms.txt`, and a source view of any page (Ctrl+U). Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
+
+## Download
+
+Get the latest build from the [Releases page](https://github.com/gbrettmiller/mdbrowser-native/releases/latest). The builds are not code-signed yet, so your system will warn you the first time. The steps below say what to click.
+
+> **Not published yet.** The first release (v0.1.0) is still being prepared, so that page may be empty. Until then, [build from source](#build-from-source).
+
+| Your system | Download | Install |
+|---|---|---|
+| **macOS** (Apple Silicon or Intel) | the `_universal.dmg` | Open it and drag mdBrowser to Applications. Open the app, and when macOS says it can't verify it, go to System Settings → Privacy & Security and choose **Open Anyway**. You only do this once. |
+| **Windows** (64-bit) | the `_x64-setup.exe` | Run it. When Windows SmartScreen says it protected your PC, click **More info**, then **Run anyway**. It installs for your user only, so it doesn't ask for administrator rights. |
+| **Ubuntu, Debian, Mint, Pop!_OS** | the `.deb` for your processor (`amd64` or `arm64`) | Open it with your software installer, or run `sudo apt install ./mdbrowser_*.deb`. |
+| **Arch, Fedora and everything else** | the `.AppImage` for your processor (`x86_64` or `aarch64`) | Make it executable (`chmod +x mdbrowser_*.AppImage`) and run it. |
+
+Each release also has a `SHA256SUMS` file, so you can check a download with `sha256sum -c`.
+
+### Reading Markdown
+
+mdBrowser opens web addresses: type or paste one into the address bar, or follow a link on the welcome page. Local files open by typing or pasting a path, from the command line (`mdbrowser notes.md`), or with "Open with":
+
+- **Windows:** right-click a `.md` file → Open with → mdBrowser. mdBrowser is listed there, but it doesn't become your default Markdown app.
+- **Linux:** the same, when you installed the `.deb`. An AppImage doesn't register itself, so "Open with" works only if you add it to your menus with a tool such as AppImageLauncher. Otherwise paste the path.
+- **macOS:** not yet. Paste the path into the address bar (in Finder, Option+Cmd+C copies a file's path).
 
 ## What it does today
 

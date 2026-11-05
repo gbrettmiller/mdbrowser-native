@@ -85,6 +85,8 @@ First public release:
 - [ ] The reader can set typeface, text size, spacing and a light or dark palette, and the choices persist.
 - [ ] Opening a typical post takes under 250 ms on a local file. Scrolling and resizing don't stutter.
 - [ ] Builds and passes CI on Linux. macOS and Windows build in CI.
+- [ ] Downloadable installers: unsigned packages for Linux (x64 and ARM64, `.deb` and AppImage), Windows x64 and macOS (universal) come from a GitHub Release. On each system, following the README's steps installs the app, and the welcome page's link to a live Markdown site loads over `https` and renders with images (ADR-009).
+- [ ] Later, not required for v0.1: code-signed and notarised installers, so the OS warnings go away.
 
 # Knowledge Map
 
@@ -106,6 +108,11 @@ Detail and test methods are in `vector/research/assumptions/`.
 - **Certificate failures.** A bad certificate shows as `unreachable`, the same as a site that is down. Should it get its own error, so an intercepted connection is visible?
 - ~~Enclosures: link out or play?~~ Resolved by ADR-006 (2026-10-30): a link line, not a player. Playing in the browser would need its own ADR.
 - ~~Fallbacks from non-Markdown pages (phase 2d).~~ Resolved by ADR-005 (2026-10-29): `Link` alternate, then the `.md` sibling; the address bar and History hold the shown URL; `llms.txt` is only offered. Still open: scanning `<link rel="alternate">` in HTML (needs its own ADR). Example to test against: `every.to/context-window/…` and the same URL with `.md`.
+- **macOS "Open with".** winit 0.30.x never passes on the file a Mac user opened (it arrives as an Apple Event), so a `.md` association would open the app without the file. Fixing it needs a small Objective-C hook (`unsafe`, so an ADR) or a newer winit. Check the winit version iced resolves first.
+- **Opening files without typing a path.** Drag-and-drop onto the window is small (iced reports `FileDropped`). A file dialog needs a new dependency and an ADR. Mac readers have neither until one of them exists.
+- **Code signing and notarisation.** When, and with which certificates? Unsigned installers lose some readers at the OS warning.
+- **Other Linux packages.** An AUR package (`mdbrowser-bin`), Flatpak or RPM, if readers ask.
+- **AppImage and `libfuse2`.** Ubuntu 22.04 and later don't ship it. Does the AppImage need it? The release candidate settles this, and the README should then say so.
 - **Which discovery convention comes first?** `llms.txt`, a post's `source` feed, or OPML?
 - **Interop with other Markdown-web browsers.** Should we share a test corpus, for example with Andrew Shell's browser?
 - Live updates over WebSockets: noted in INT-001 and not yet in scope.
