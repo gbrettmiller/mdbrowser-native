@@ -4,13 +4,11 @@ A browser for the [Web of Markdown](https://github.com/scripting/markdownWeb). I
 
 Writers own the words. Readers own the presentation. The document chooses nothing about how it looks; the reader picks the typeface, and raw HTML in a document is never interpreted.
 
-> **Status:** phase 5 (keyboard access), downloadable installers for Linux, Windows and macOS on the way (see [Download](#download)), local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page and About page (F1), a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), an offer of the site's `llms.txt`, and a source view of any page (Ctrl+U). Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
+> **Status:** phase 5 (keyboard access), downloadable installers for Linux, Windows and macOS (see [Download](#download)), local files and remote Markdown over `http(s)`, with images, a Settings panel (font, text size, spacing, Web images, light, dark, system or custom colours, home page), a built-in welcome page and About page (F1), a Markdown fallback when a page is HTML (its `Link` alternate, then the `.md` sibling), an offer of the site's `llms.txt`, and a source view of any page (Ctrl+U). Shared front matter (byline, previous and next, description, enclosure) is read. Discovery (`llms.txt` as a site index, feeds) is next. See [VECTOR.md](VECTOR.md) § Direction.
 
 ## Download
 
 Get the latest build from the [Releases page](https://github.com/gbrettmiller/mdbrowser-native/releases/latest). The builds are not code-signed yet, so your system will warn you the first time. The steps below say what to click.
-
-> **Not published yet.** The first release (v0.1.0) is still being prepared, so that page may be empty. Until then, [build from source](#build-from-source).
 
 | Your system | Download | Install |
 |---|---|---|
