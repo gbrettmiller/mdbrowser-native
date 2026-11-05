@@ -54,6 +54,16 @@ fn a_tag_makes_a_draft_release_that_a_person_publishes() {
     assert!(workflow.contains("scripts/notices.sh"), "no bundle without the notices (ADR-013)");
 }
 
+#[test]
+fn the_release_notes_name_the_previous_tag() {
+    // GitHub's notes endpoint returned HTTP 500 for v0.1.0 when it had to pick the previous tag itself.
+    let workflow = read(".github/workflows/release.yml");
+    let draft = workflow.split("\n  draft:").nth(1).expect("a draft job");
+    assert!(draft.contains("fetch-depth: 0"), "the draft job needs the tags to find the previous one");
+    assert!(draft.contains("git describe --tags --abbrev=0"), "find the previous tag");
+    assert!(draft.contains("--notes-start-tag"), "pass it to gh release create");
+}
+
 #[cfg(unix)]
 fn tag_matches(tag: &str, version: &str) -> bool {
     std::process::Command::new("bash")
