@@ -66,3 +66,14 @@ fn the_macos_smoke_test_says_what_it_found_and_checks_both_architectures() {
     assert!(step.contains("lipo -archs"), "the app must hold both architectures");
     assert!(step.contains("x86_64") && step.contains("arm64"));
 }
+
+#[test]
+fn a_cold_release_build_on_macos_has_time_and_a_failed_run_still_saves_its_cache() {
+    // A cold Intel macOS package job took over 45 minutes and was cancelled, and since caches are
+    // saved only after success, the next run was just as cold.
+    let text = workflow("release.yml");
+    let package = text.split("\n  package:").nth(1).expect("a package job");
+    let package = package.split("\n  draft:").next().expect("it comes before draft");
+    assert!(package.contains("    timeout-minutes: 90\n"));
+    assert!(package.contains("cache-on-failure: true"));
+}
