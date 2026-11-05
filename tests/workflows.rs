@@ -77,3 +77,15 @@ fn a_cold_release_build_on_macos_has_time_and_a_failed_run_still_saves_its_cache
     assert!(package.contains("    timeout-minutes: 90\n"));
     assert!(package.contains("cache-on-failure: true"));
 }
+
+#[test]
+fn the_macos_smoke_test_cannot_fail_without_a_message() {
+    // `hdiutil attach -quiet` failed once with no output at all, before the first echo.
+    let text = workflow("release.yml");
+    let step = text.split("Smoke test (macOS)").nth(1).expect("a macOS smoke test");
+    let step = step.split("Smoke test (Windows)").next().expect("it comes before Windows");
+    assert!(!step.contains("-quiet"), "-quiet hides why a mount failed");
+    assert!(step.contains("set -x"), "echo every command");
+    assert!(step.contains("hdiutil imageinfo"), "say what the image is before mounting it");
+    assert!(step.contains("-readonly") && step.contains("-noverify"));
+}

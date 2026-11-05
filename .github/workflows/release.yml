@@ -146,9 +146,15 @@ jobs:
       - name: Smoke test (macOS)
         if: matrix.kind == 'macos'
         run: |
+          # Echo every command, and never hide hdiutil's errors: a silent failure here once left
+          # nothing in the log.
+          set -x
           cd target/packager
+          ls -l
+          dmg="$(ls *.dmg)"
+          hdiutil imageinfo "$dmg"
           mount="$(mktemp -d)"
-          hdiutil attach *.dmg -mountpoint "$mount" -nobrowse -quiet
+          hdiutil attach "$dmg" -mountpoint "$mount" -nobrowse -readonly -noverify
           app="$(ls -d "$mount"/*.app)"
           echo "== bundle"
           find "$app" -maxdepth 3 | sort
@@ -161,7 +167,7 @@ jobs:
           echo "version output: $version"
           test "$version" = "mdbrowser ${VERSION}"
           test -f "$app/Contents/Resources/THIRD-PARTY-NOTICES.html" || { echo "notices missing from the bundle" >&2; exit 1; }
-          hdiutil detach "$mount" -quiet
+          hdiutil detach "$mount"
       - name: Smoke test (Windows)
         if: matrix.kind == 'windows'
         shell: pwsh
