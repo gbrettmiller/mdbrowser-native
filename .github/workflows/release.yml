@@ -154,7 +154,7 @@ jobs:
           dmg="$(ls *.dmg)"
           hdiutil imageinfo "$dmg"
           mount="$(mktemp -d)"
-          hdiutil attach "$dmg" -mountpoint "$mount" -nobrowse -readonly -noverify
+          echo Y | hdiutil attach "$dmg" -mountpoint "$mount" -nobrowse -readonly -noverify
           app="$(ls -d "$mount"/*.app)"
           echo "== bundle"
           find "$app" -maxdepth 3 | sort
