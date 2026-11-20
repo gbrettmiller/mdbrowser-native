@@ -84,3 +84,27 @@ It follows the community vocabulary as-is (Principle 4), keeps metadata in the r
 - ADR-002: Strip raw HTML. Same stance of ignoring what we don't understand.
 - ADR-004: Images. Front matter image fields were left to phase 3 there, and are settled here as parse-only.
 - ADR-005: Markdown fallbacks. Fetch and address handling are unchanged by this decision.
+
+## Amendment (2026-11-19): the image fields are now understood
+
+markdownWeb issue #5 ("image, inlineImage and metaImage", written by Dave Winer, with a BonBon screenshot) documents the three fields. It supersedes the references above to the meaning being unconfirmed and to "markdownWeb issue #1".
+
+**What the fields mean:**
+
+- `image`: a picture that goes with a paragraph. On scripting.com it floats in the right margin with text flowing around it. In the Markdown it is at the head of its paragraph.
+- `inlineImage`: a picture that stands alone at the full width of the text, with the headline text as its caption. In the Markdown it is a paragraph holding only the picture, with the caption as its alt text.
+- `metaImage`: the picture that stands for the post in a shared link (`og:image`). It appears only in front matter, never in the body.
+- When `image` or `inlineImage` is on the post's own headline, the same URL is repeated in front matter to say which kind it is. The body already holds it as a Markdown image.
+
+**Consequences for this decision:**
+
+- The decision stands. Parsing the fields and drawing nothing from them is correct: a browser that draws the body has drawn `image` and `inlineImage`, and `metaImage` is not part of the page.
+- The duplication seen in the corpus (`2022/05/21/a020940`) is by design, not an inconsistency.
+- The Cons entry "posts whose image fields are meant to be shown lack that image" does not apply: every picture is already in the body.
+- Dave's guidance is that a page with no pictures should have nothing made up for it. We follow it.
+
+**Deferred, each needing its own ADR if taken up:**
+
+- Drawing the alt text of a standalone-image paragraph as a caption (BonBon shows `inlineImage` this way). This is body rendering, not front matter.
+- Floating an `image` picture in the margin with text flowing around it. It needs layout engine work, and nothing requires it.
+- Using `metaImage` as a thumbnail where a list of posts is shown. We have no such list today.
