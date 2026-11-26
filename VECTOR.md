@@ -114,6 +114,7 @@ Detail and test methods are in `vector/research/assumptions/`.
 - **Other Linux packages.** An AUR package (`mdbrowser-bin`), Flatpak or RPM, if readers ask.
 - **AppImage and `libfuse2`.** The v0.1.0-rc.1 AppImage ran on an Arch system with only `libfuse3`, so the README has no `libfuse2` note. It has not been tried on a clean Ubuntu; add a note if a reader reports it failing to start.
 - **Which discovery convention comes first?** `llms.txt`, a post's `source` feed, or OPML?
+- **Accept `text/x-opml` once OPML is read.** bonBon sends `Accept: text/markdown, text/x-opml`. We leave OPML out of our `Accept` until we can read it, so a server offering both formats doesn't send us something we refuse. Add it in the change that reads OPML (see `/.well-known/toc.opml`, phase 9).
 - **Interop with other Markdown-web browsers.** Should we share a test corpus, for example with Andrew Shell's browser?
 - Live updates over WebSockets: noted in INT-001 and not yet in scope.
 - ~~How should in-page anchors map to headings (slug rules)?~~ Resolved in phase 1: GitHub-style slugs (`model::slug`), so anchors written for GitHub work unchanged.
