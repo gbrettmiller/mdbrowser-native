@@ -12,6 +12,7 @@ pub fn error(code: ErrorCode) -> &'static str {
         ErrorCode::UnsupportedScheme => "Only files and http or https addresses can be opened.",
         ErrorCode::NotMarkdown => "That isn't a Markdown file.",
         ErrorCode::NotMarkdownWithLlms => "That isn't a Markdown file, but its site has an llms.txt.",
+        ErrorCode::IsFile => "That's a file to download, not a page.",
         ErrorCode::NotFound => "There's no file at this address.",
         ErrorCode::Unreadable => "This file couldn't be read as text.",
         ErrorCode::ServerError => "The site had a problem sending this page.",
@@ -31,6 +32,7 @@ pub fn web_error(code: ErrorCode) -> Option<(&'static str, &'static str)> {
             "This page isn't Markdown, but the site has an llms.txt.",
             "You can read that, or open this page in your web browser.",
         )),
+        ErrorCode::IsFile => Some(("This is a file, not a page.", "You can download it with your web browser.")),
         ErrorCode::NotFound => Some(("There's no page at this address.", "Check it for typos.")),
         ErrorCode::Unreadable => Some(("This page couldn't be read as text.", "It may be too large or not in UTF-8.")),
         ErrorCode::ServerError => Some((error(code), "Try again later.")),
@@ -211,9 +213,10 @@ mod tests {
     use super::*;
 
     /// Every error a fetch can end in; the rest are about the typed address.
-    const WEB_ERRORS: [ErrorCode; 8] = [
+    const WEB_ERRORS: [ErrorCode; 9] = [
         ErrorCode::NotMarkdown,
         ErrorCode::NotMarkdownWithLlms,
+        ErrorCode::IsFile,
         ErrorCode::NotFound,
         ErrorCode::Unreadable,
         ErrorCode::ServerError,

@@ -9,6 +9,8 @@ pub enum ErrorCode {
     NotMarkdown,
     /// Not Markdown, and the site has an `llms.txt` to offer instead.
     NotMarkdownWithLlms,
+    /// A file, not a page: audio, video, an archive, a PDF and the like.
+    IsFile,
     NotFound,
     Unreadable,
     ServerError,
@@ -19,12 +21,13 @@ pub enum ErrorCode {
 
 impl ErrorCode {
     /// Every code, for exhaustive content tests; `key` fails to compile until a new code is handled.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Empty,
         Self::NotAbsolute,
         Self::UnsupportedScheme,
         Self::NotMarkdown,
         Self::NotMarkdownWithLlms,
+        Self::IsFile,
         Self::NotFound,
         Self::Unreadable,
         Self::ServerError,
@@ -33,9 +36,10 @@ impl ErrorCode {
         Self::LocalAddress,
     ];
 
-    /// Whether the page was fetched and wasn't Markdown, with or without an `llms.txt` to offer.
+    /// Whether the address was fetched and wasn't Markdown: a page, with or without an
+    /// `llms.txt` to offer, or a file.
     pub const fn is_not_markdown(self) -> bool {
-        matches!(self, Self::NotMarkdown | Self::NotMarkdownWithLlms)
+        matches!(self, Self::NotMarkdown | Self::NotMarkdownWithLlms | Self::IsFile)
     }
 
     pub const fn key(self) -> &'static str {
@@ -45,6 +49,7 @@ impl ErrorCode {
             Self::UnsupportedScheme => "unsupportedScheme",
             Self::NotMarkdown => "notMarkdown",
             Self::NotMarkdownWithLlms => "notMarkdownWithLlms",
+            Self::IsFile => "isFile",
             Self::NotFound => "notFound",
             Self::Unreadable => "unreadable",
             Self::ServerError => "serverError",

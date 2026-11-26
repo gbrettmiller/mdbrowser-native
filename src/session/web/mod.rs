@@ -92,6 +92,8 @@ pub enum FetchError {
     TooLarge,
     /// A type this fetch doesn't take.
     WrongType,
+    /// A page fetch answered with a file (not text, HTML or XML).
+    File,
     /// Cut off, badly compressed, or not readable as what was wanted.
     Undecodable,
     /// A public name that resolved into the reader's own machine or network.
@@ -108,6 +110,7 @@ impl FetchError {
             Self::BadRedirect => ErrorCode::BadRedirect,
             Self::TooLarge | Self::Undecodable => ErrorCode::Unreadable,
             Self::WrongType => ErrorCode::NotMarkdown,
+            Self::File => ErrorCode::IsFile,
             Self::LocalAddress => ErrorCode::LocalAddress,
         }
     }

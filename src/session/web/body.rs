@@ -10,6 +10,9 @@ const MARKDOWN_TYPES: [&str; 2] = ["text/markdown", "text/x-markdown"];
 pub const LLMS_TXT: &str = "/llms.txt";
 /// No type (`""`) or plain text: they say nothing about the format, so the path decides.
 const PLAIN_TYPES: [&str; 2] = ["", "text/plain"];
+/// A server's default for an extension it doesn't know (S3, nginx's `default_type`):
+/// Markdown only at a Markdown path, never at `llms.txt`.
+const GENERIC_BINARY: &str = "application/octet-stream";
 /// Charsets that decode as UTF-8 (`utf8` is a common misspelling).
 const READABLE_CHARSETS: [&str; 3] = ["utf-8", "utf8", "us-ascii"];
 
@@ -24,9 +27,10 @@ pub fn body_policy(content_type: Option<&str>, final_url: &Url) -> Result<(), Fe
     let mut parts = content_type.unwrap_or_default().split(';');
     let media = parts.next().unwrap_or_default().trim().to_ascii_lowercase();
     let markdown = MARKDOWN_TYPES.contains(&media.as_str())
-        || (PLAIN_TYPES.contains(&media.as_str()) && (is_markdown_name(final_url.path()) || is_llms_txt(final_url)));
+        || (PLAIN_TYPES.contains(&media.as_str()) && (is_markdown_name(final_url.path()) || is_llms_txt(final_url)))
+        || (media == GENERIC_BINARY && is_markdown_name(final_url.path()));
     if !markdown {
-        return Err(FetchError::WrongType);
+        return Err(if is_document_type(&media) { FetchError::WrongType } else { FetchError::File });
     }
     // Every charset parameter must be readable, so a decoy can't vouch for the real one.
     let readable = parts
@@ -34,6 +38,12 @@ pub fn body_policy(content_type: Option<&str>, final_url: &Url) -> Result<(), Fe
         .filter(|(name, _)| name.trim().eq_ignore_ascii_case("charset"))
         .all(|(_, value)| READABLE_CHARSETS.contains(&value.trim().trim_matches('"').to_ascii_lowercase().as_str()));
     if readable { Ok(()) } else { Err(FetchError::Undecodable) }
+}
+
+/// Whether a type that isn't Markdown is still a document of some kind (text, HTML,
+/// XML or JSON, or no type at all) rather than a file to download.
+fn is_document_type(media: &str) -> bool {
+    media.is_empty() || media.starts_with("text/") || media.ends_with("xml") || media.ends_with("json")
 }
 
 /// Whether a successful response may be an image: any `image/*` type, a generic
@@ -107,8 +117,45 @@ mod tests {
     }
 
     #[test]
+    fn generic_binary_type_is_markdown_only_at_markdown_paths() {
+        let binary = Some("application/octet-stream");
+        assert_eq!(body(binary, "https://example.com/a.md"), Ok(()));
+        assert_eq!(body(Some("Application/Octet-Stream; charset=utf-8"), "https://example.com/notes.markdown"), Ok(()));
+        for at in [PAGE, "https://example.com/a.txt", "https://example.com/llms.txt", "https://example.com/a.bin"] {
+            assert_eq!(body(binary, at), Err(FetchError::File), "{at}");
+        }
+    }
+
+    #[test]
+    fn types_that_are_not_text_are_files() {
+        for content_type in ["application/pdf", "application/zip", "audio/mpeg", "video/mp4", "image/png", "font/woff2"]
+        {
+            assert_eq!(body(Some(content_type), "https://example.com/a.md"), Err(FetchError::File), "{content_type}");
+        }
+        for at in [PAGE, "https://example.com/a.bin", "https://example.com/llms.txt"] {
+            assert_eq!(body(Some("application/octet-stream"), at), Err(FetchError::File), "{at}");
+        }
+    }
+
+    #[test]
+    fn text_html_and_xml_are_pages_that_are_not_markdown() {
+        for content_type in [
+            "text/html; charset=utf-8",
+            "text/csv",
+            "application/xhtml+xml",
+            "application/xml",
+            "application/rss+xml",
+            "image/svg+xml",
+            "application/json",
+            "application/ld+json",
+        ] {
+            assert_eq!(body(Some(content_type), PAGE), Err(FetchError::WrongType), "{content_type}");
+        }
+    }
+
+    #[test]
     fn other_types_are_not_markdown_even_at_markdown_paths() {
-        for content_type in ["text/html", "application/json", "application/octet-stream", "text/markdownish"] {
+        for content_type in ["text/html", "application/json", "text/markdownish"] {
             assert_eq!(
                 body(Some(content_type), "https://example.com/a.md"),
                 Err(FetchError::WrongType),

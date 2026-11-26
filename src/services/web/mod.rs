@@ -65,7 +65,7 @@ fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Error
         Ok(found) => return Ok(found),
         Err(refused) => refused,
     };
-    if refused.error != web::FetchError::WrongType {
+    if !matches!(refused.error, web::FetchError::WrongType | web::FetchError::File) {
         return Err(refused.error.for_page());
     }
     let asked = refused.url.as_ref().unwrap_or(url);
@@ -74,7 +74,9 @@ fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Error
         .find_map(|candidate| page(candidate, &remaining(), web::candidate_origin(origin, asked, candidate)).ok())
         .map(|found| Fetched { fallback_from: Some(url.clone()), ..found })
         .ok_or_else(|| {
-            if has_llms_txt(url, &remaining(), origin) {
+            if refused.error == web::FetchError::File {
+                ErrorCode::IsFile
+            } else if has_llms_txt(url, &remaining(), origin) {
                 ErrorCode::NotMarkdownWithLlms
             } else {
                 ErrorCode::NotMarkdown
@@ -326,6 +328,21 @@ mod tests {
         let server = Server::start(|request| if request.path == "/post" { html() } else { Reply::new(404) });
         let result = fallback(&Url::parse(&server.url("/post")).unwrap(), &limits(), Origin::Trusted);
         assert_eq!(result, Err(ErrorCode::NotMarkdown));
+    }
+
+    #[test]
+    fn a_file_says_so_still_tries_fallbacks_and_offers_no_llms_txt() {
+        let server = Server::start(|request| match request.path.as_str() {
+            "/archive" => Reply::new(200).header("Content-Type", "application/zip").body("PK"),
+            "/download" => Reply::new(200).header("Content-Type", "application/zip").body("PK"),
+            "/download.md" => Reply::markdown("# Download notes"),
+            "/llms.txt" => Reply::markdown("# Site"),
+            _ => Reply::new(404),
+        });
+        let result = fallback(&Url::parse(&server.url("/archive")).unwrap(), &limits(), Origin::Trusted);
+        assert_eq!(result, Err(ErrorCode::IsFile));
+        let found = fallback(&Url::parse(&server.url("/download")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        assert_eq!(found.source, "# Download notes");
     }
 
     fn with_llms(llms: Reply) -> Server {

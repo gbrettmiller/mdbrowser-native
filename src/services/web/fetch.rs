@@ -87,7 +87,7 @@ fn fetch_response(
                 want.check_type(content_type, &url).map_err(|error| Refused {
                     error,
                     url: Some(url.clone()),
-                    link: (error == FetchError::WrongType)
+                    link: matches!(error, FetchError::WrongType | FetchError::File)
                         .then(|| header(&response, "link").map(String::from))
                         .flatten(),
                 })?;

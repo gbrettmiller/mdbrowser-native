@@ -77,7 +77,7 @@ impl Problem {
             }
             FetchError::BadRedirect | FetchError::LocalAddress => Self::Refused,
             FetchError::TooLarge => Self::TooLarge,
-            FetchError::WrongType => Self::Unsupported,
+            FetchError::WrongType | FetchError::File => Self::Unsupported,
         }
     }
 
