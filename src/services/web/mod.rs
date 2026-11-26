@@ -166,7 +166,7 @@ mod tests {
         let quick = Limits { overall: Duration::from_millis(400), ..limits() };
         let started = Instant::now();
         let result = fetch(&Url::parse(&server.url("/a.md")).unwrap(), &quick, Origin::Trusted).map(|f| f.source);
-        assert_eq!(result, Err(ErrorCode::Unreachable));
+        assert_eq!(result, Err(ErrorCode::TimedOut));
         assert!(server.requests().len() < 4, "stopped by the deadline, not the hop limit");
         assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
     }
@@ -180,7 +180,14 @@ mod tests {
 
     #[test]
     fn failing_statuses() {
-        for (status, code) in [(404, ErrorCode::NotFound), (410, ErrorCode::NotFound), (500, ErrorCode::ServerError)] {
+        for (status, code) in [
+            (404, ErrorCode::NotFound),
+            (410, ErrorCode::NotFound),
+            (403, ErrorCode::NeedsSignIn(403)),
+            (400, ErrorCode::Refused(400)),
+            (429, ErrorCode::Busy(429)),
+            (500, ErrorCode::ServerError(500)),
+        ] {
             assert_eq!(source(&serve(Reply::new(status)).url("/a.md")), Err(code), "{status}");
         }
     }
@@ -432,7 +439,7 @@ mod tests {
                 "/post.md" => Reply::markdown("# Found"),
                 _ => Reply::new(status),
             });
-            let expected = if status == 404 { ErrorCode::NotFound } else { ErrorCode::ServerError };
+            let expected = if status == 404 { ErrorCode::NotFound } else { ErrorCode::ServerError(500) };
             assert_eq!(fall(&server, "/post"), Err(expected), "{status}");
             assert_eq!(paths(&server), ["/post"], "{status}");
         }
@@ -448,23 +455,23 @@ mod tests {
     }
 
     #[test]
-    fn a_silent_server_times_out_as_unreachable() {
+    fn a_silent_server_times_out() {
         let silent = TcpListener::bind("127.0.0.1:0").unwrap(); // connects, never answers
         let url = Url::parse(&format!("http://{}/a.md", silent.local_addr().unwrap())).unwrap();
         let quick = Limits { overall: Duration::from_millis(300), ..limits() };
         let started = Instant::now();
-        assert_eq!(fetch(&url, &quick, Origin::Trusted).map(|f| f.source), Err(ErrorCode::Unreachable));
+        assert_eq!(fetch(&url, &quick, Origin::Trusted).map(|f| f.source), Err(ErrorCode::TimedOut));
         let waited = started.elapsed();
         assert!(waited >= Duration::from_millis(250) && waited < Duration::from_secs(3), "{waited:?}");
     }
 
     #[test]
-    fn a_body_that_stalls_past_the_deadline_is_unreachable() {
+    fn a_body_that_stalls_past_the_deadline_times_out() {
         let stalled = serve(Reply::markdown("# Hi").cut_short(100, Duration::from_secs(5)));
         let quick = Limits { overall: Duration::from_millis(300), ..limits() };
         let started = Instant::now();
         let result = fetch(&Url::parse(&stalled.url("/a.md")).unwrap(), &quick, Origin::Trusted).map(|f| f.source);
-        assert_eq!(result, Err(ErrorCode::Unreachable));
+        assert_eq!(result, Err(ErrorCode::TimedOut));
         assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
     }
 

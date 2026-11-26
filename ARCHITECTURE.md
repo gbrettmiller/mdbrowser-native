@@ -16,7 +16,7 @@ Rust (edition 2024). Rationale: ADR-001; HTTP and URLs: ADR-003; images: ADR-004
 | Frontmatter | yaml-rust2 |
 | History and settings files | serde, serde_json |
 | Per-user data directory | dirs |
-| HTTP(S) fetching | ureq 3, with rustls and webpki roots; no cookies, redirects off |
+| HTTP(S) fetching | ureq 3, with rustls and webpki roots; no cookies, redirects off. rustls is also a direct dependency (no features of its own), only to recognise a certificate failure inside ureq's errors |
 | URLs and relative-reference resolution | url |
 | Handing links to the system | open, behind `services::opener` |
 | Non-blocking file opens (unix only) | libc, in `services::files` |

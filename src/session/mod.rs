@@ -271,14 +271,14 @@ impl State {
     }
 
     /// The address the system browser may open instead: a web page that turned
-    /// out not to be Markdown, or the original address of one whose Markdown
-    /// version is shown. Local files are never handed over.
+    /// out not to be Markdown or needs a sign-in, or the original address of one
+    /// whose Markdown version is shown. Local files are never handed over.
     pub fn browser_offer(&self) -> Option<String> {
         if let Status::Ready(shown) = &self.status {
             return shown.fallback_from.clone();
         }
-        let not_markdown = matches!(self.status, Status::Failed(code) if code.is_not_markdown());
-        self.current_location().filter(|location| not_markdown && location.is_web()).map(Location::address)
+        let offered = matches!(self.status, Status::Failed(code) if code.offers_browser());
+        self.current_location().filter(|location| offered && location.is_web()).map(Location::address)
     }
 
     /// The site's `llms.txt`, offered (never substituted) when a web page has no

@@ -158,6 +158,16 @@ pub(super) fn see_error(w: &mut Browser, code: String) {
     }
 }
 
+#[then(expr = "the error says the site answered {string}")]
+fn error_status(w: &mut Browser, status: String) {
+    match &w.state().status {
+        Status::Failed(code) => {
+            assert_eq!(content::status_line(*code), Some(format!("The site answered {status}.")))
+        }
+        other => panic!("expected an error, got {other:?}"),
+    }
+}
+
 #[then(expr = "the error shows the address {string}")]
 fn error_address(w: &mut Browser, input: String) {
     assert_eq!(w.state().address(), input);

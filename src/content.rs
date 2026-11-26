@@ -15,8 +15,14 @@ pub fn error(code: ErrorCode) -> &'static str {
         ErrorCode::IsFile => "That's a file to download, not a page.",
         ErrorCode::NotFound => "There's no file at this address.",
         ErrorCode::Unreadable => "This file couldn't be read as text.",
-        ErrorCode::ServerError => "The site had a problem sending this page.",
+        ErrorCode::NeedsSignIn(_) => "This page is private or needs you to sign in.",
+        ErrorCode::Refused(_) => "The site wouldn't send this page.",
+        ErrorCode::Busy(_) => "The site is too busy to send this page.",
+        ErrorCode::ServerError(_) => "The site had a problem sending this page.",
         ErrorCode::Unreachable => "Couldn't reach this site.",
+        ErrorCode::TimedOut => "The site took too long to answer.",
+        ErrorCode::NoSuchSite => "There's no site by that name.",
+        ErrorCode::Certificate => "This site's security certificate isn't valid.",
         ErrorCode::BadRedirect => "This site redirected somewhere that can't be followed safely.",
         ErrorCode::LocalAddress => "This address leads into your local network.",
     }
@@ -35,13 +41,68 @@ pub fn web_error(code: ErrorCode) -> Option<(&'static str, &'static str)> {
         ErrorCode::IsFile => Some(("This is a file, not a page.", "You can download it with your web browser.")),
         ErrorCode::NotFound => Some(("There's no page at this address.", "Check it for typos.")),
         ErrorCode::Unreadable => Some(("This page couldn't be read as text.", "It may be too large or not in UTF-8.")),
-        ErrorCode::ServerError => Some((error(code), "Try again later.")),
+        ErrorCode::NeedsSignIn(_) => {
+            Some((error(code), "mdBrowser doesn't sign in to sites. You can open it in your web browser."))
+        }
+        ErrorCode::Refused(_) => Some((error(code), "Check the address for typos.")),
+        ErrorCode::Busy(_) => Some((error(code), "Try again in a while.")),
+        ErrorCode::ServerError(_) => Some((error(code), "Try again later.")),
         ErrorCode::Unreachable => Some((error(code), "Check your connection, then reload.")),
+        ErrorCode::TimedOut => Some((error(code), "Check your connection, or reload to try again.")),
+        ErrorCode::NoSuchSite => Some((error(code), "Check the address for typos.")),
+        ErrorCode::Certificate => Some((error(code), "The connection may not be private, so the page wasn't loaded.")),
         ErrorCode::BadRedirect => Some((error(code), "Try opening the address in your web browser.")),
         ErrorCode::LocalAddress => {
             Some((error(code), "Links from web pages can't open it. Type the address yourself if you trust it."))
         }
     }
+}
+
+/// "The site answered 403 Forbidden.", for a failure that came with an HTTP status.
+/// A status without a common name is given as a number.
+pub fn status_line(code: ErrorCode) -> Option<String> {
+    let status = code.status()?;
+    Some(match reason(status) {
+        Some(reason) => format!("The site answered {status} {reason}."),
+        None => format!("The site answered {status}."),
+    })
+}
+
+/// The standard name of a status the reader may meet (RFC 9110 and RFC 6585).
+/// HTTP/2 sends no reason phrase, so these are ours, not the server's.
+const fn reason(status: u16) -> Option<&'static str> {
+    Some(match status {
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        402 => "Payment Required",
+        403 => "Forbidden",
+        405 => "Method Not Allowed",
+        406 => "Not Acceptable",
+        407 => "Proxy Authentication Required",
+        408 => "Request Timeout",
+        409 => "Conflict",
+        411 => "Length Required",
+        412 => "Precondition Failed",
+        413 => "Content Too Large",
+        414 => "URI Too Long",
+        415 => "Unsupported Media Type",
+        416 => "Range Not Satisfiable",
+        421 => "Misdirected Request",
+        422 => "Unprocessable Content",
+        425 => "Too Early",
+        426 => "Upgrade Required",
+        428 => "Precondition Required",
+        429 => "Too Many Requests",
+        431 => "Request Header Fields Too Large",
+        451 => "Unavailable For Legal Reasons",
+        500 => "Internal Server Error",
+        501 => "Not Implemented",
+        502 => "Bad Gateway",
+        503 => "Service Unavailable",
+        504 => "Gateway Timeout",
+        505 => "HTTP Version Not Supported",
+        _ => return None,
+    })
 }
 
 /// What went wrong, plus what to try next for a page on the web.
@@ -213,14 +274,20 @@ mod tests {
     use super::*;
 
     /// Every error a fetch can end in; the rest are about the typed address.
-    const WEB_ERRORS: [ErrorCode; 9] = [
+    const WEB_ERRORS: [ErrorCode; 15] = [
         ErrorCode::NotMarkdown,
         ErrorCode::NotMarkdownWithLlms,
         ErrorCode::IsFile,
         ErrorCode::NotFound,
         ErrorCode::Unreadable,
-        ErrorCode::ServerError,
+        ErrorCode::NeedsSignIn(403),
+        ErrorCode::Refused(400),
+        ErrorCode::Busy(503),
+        ErrorCode::ServerError(500),
         ErrorCode::Unreachable,
+        ErrorCode::TimedOut,
+        ErrorCode::NoSuchSite,
+        ErrorCode::Certificate,
         ErrorCode::BadRedirect,
         ErrorCode::LocalAddress,
     ];
@@ -315,6 +382,22 @@ mod tests {
             format!("Couldn't load this image. Click or press {modifier}+Shift+I to try again.")
         );
         assert_eq!(image_note(Note::Off), format!("Web images are off. Press {modifier}+Shift+I to load this page's."));
+    }
+
+    #[test]
+    fn an_http_error_names_its_status() {
+        assert_eq!(status_line(ErrorCode::NeedsSignIn(403)).as_deref(), Some("The site answered 403 Forbidden."));
+        assert_eq!(status_line(ErrorCode::NeedsSignIn(401)).as_deref(), Some("The site answered 401 Unauthorized."));
+        assert_eq!(status_line(ErrorCode::Busy(429)).as_deref(), Some("The site answered 429 Too Many Requests."));
+        assert_eq!(status_line(ErrorCode::Busy(503)).as_deref(), Some("The site answered 503 Service Unavailable."));
+        assert_eq!(
+            status_line(ErrorCode::ServerError(500)).as_deref(),
+            Some("The site answered 500 Internal Server Error.")
+        );
+        assert_eq!(status_line(ErrorCode::Refused(418)).as_deref(), Some("The site answered 418."));
+        for code in [ErrorCode::NotFound, ErrorCode::Unreachable, ErrorCode::Certificate, ErrorCode::NotMarkdown] {
+            assert_eq!(status_line(code), None, "{code:?}");
+        }
     }
 
     #[test]

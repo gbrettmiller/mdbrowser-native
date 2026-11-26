@@ -18,6 +18,7 @@ Feature: Browse remote Markdown
   #   /moved.md      301 → /index.md                        /loop.md      302 → /loop.md
   #   /to-file.md    302 → file:///etc/hosts                /no-location.md 302, no Location
   #   /missing.md    404   /gone.md 410   /broken.md 500
+  #   /private.md    403   /teapot.md 418   /busy.md 503
   #   /latin1.md     text/markdown; charset=iso-8859-1      /bad-utf8.md  text/markdown, invalid bytes
   #   /huge.md       body over the world's size limit (the limit is lowered for the test)
   #   /slow.md       "# Slow"; held by the world until released
@@ -104,9 +105,27 @@ Feature: Browse remote Markdown
       | /missing.md  | notFound    |
       | /gone.md     | notFound    |
       | /broken.md   | serverError |
+      | /private.md  | needsSignIn |
+      | /teapot.md   | refused     |
+      | /busy.md     | busy        |
       | /latin1.md   | unreadable  |
       | /bad-utf8.md | unreadable  |
       | /huge.md     | unreadable  |
+
+  Scenario Outline: An HTTP error names the site's status
+    When I enter the URL of "<path>"
+    Then the error says the site answered "<status>"
+    Examples:
+      | path        | status                    |
+      | /broken.md  | 500 Internal Server Error |
+      | /private.md | 403 Forbidden             |
+      | /teapot.md  | 418                       |
+      | /busy.md    | 503 Service Unavailable   |
+
+  Scenario: A page that needs a sign-in can go to the system browser
+    When I enter the URL of "/private.md"
+    And I choose to open it in the browser
+    Then the system opened the URL of "/private.md"
 
   Scenario: A site that refuses the connection
     When I enter a URL whose connection is refused

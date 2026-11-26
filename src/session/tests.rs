@@ -172,6 +172,12 @@ fn a_page_that_is_not_markdown_can_go_to_the_system_browser() {
 }
 
 #[test]
+fn a_page_that_needs_a_sign_in_can_go_to_the_system_browser() {
+    let (state, _) = run([Event::Enter("https://x.org/private".into()), failed_with(ErrorCode::NeedsSignIn(403))]);
+    assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/private"));
+}
+
+#[test]
 fn a_file_can_go_to_the_system_browser() {
     let (state, _) = run([Event::Enter("https://x.org/a.zip".into()), failed_with(ErrorCode::IsFile)]);
     assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/a.zip"));
@@ -183,6 +189,9 @@ fn the_system_browser_is_offered_for_nothing_else() {
     let cases = [
         vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::NotFound)],
         vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::IsFile)],
+        vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::Refused(400))],
+        vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::Certificate)],
+        vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::Busy(503))],
         vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdown)],
         vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdownWithLlms)],
         vec![Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")],

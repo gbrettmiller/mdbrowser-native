@@ -72,9 +72,13 @@ pub enum Problem {
 impl Problem {
     pub const fn from_fetch(error: FetchError) -> Self {
         match error {
-            FetchError::NotFound | FetchError::Server | FetchError::Unreachable | FetchError::Undecodable => {
-                Self::Unavailable
-            }
+            FetchError::NotFound
+            | FetchError::Status(_)
+            | FetchError::Unreachable
+            | FetchError::TimedOut
+            | FetchError::NoSuchSite
+            | FetchError::Certificate
+            | FetchError::Undecodable => Self::Unavailable,
             FetchError::BadRedirect | FetchError::LocalAddress => Self::Refused,
             FetchError::TooLarge => Self::TooLarge,
             FetchError::WrongType | FetchError::File => Self::Unsupported,
@@ -122,8 +126,11 @@ mod tests {
     fn fetch_failures_become_image_problems() {
         for (error, problem) in [
             (FetchError::NotFound, Problem::Unavailable),
-            (FetchError::Server, Problem::Unavailable),
+            (FetchError::Status(500), Problem::Unavailable),
             (FetchError::Unreachable, Problem::Unavailable),
+            (FetchError::TimedOut, Problem::Unavailable),
+            (FetchError::NoSuchSite, Problem::Unavailable),
+            (FetchError::Certificate, Problem::Unavailable),
             (FetchError::BadRedirect, Problem::Refused),
             (FetchError::LocalAddress, Problem::Refused),
             (FetchError::TooLarge, Problem::TooLarge),

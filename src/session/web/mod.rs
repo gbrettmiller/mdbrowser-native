@@ -85,8 +85,14 @@ pub fn checks_resolved_address(origin: Origin, hop: u32, url: &Url, asked: &Url)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FetchError {
     NotFound,
-    Server,
+    /// Any other status that isn't a body or a redirect.
+    Status(u16),
     Unreachable,
+    TimedOut,
+    /// The name didn't resolve.
+    NoSuchSite,
+    /// The TLS certificate wasn't valid for the site.
+    Certificate,
     BadRedirect,
     /// Over the size cap, counted after decompression.
     TooLarge,
@@ -101,12 +107,18 @@ pub enum FetchError {
 }
 
 impl FetchError {
-    /// What a page shows; the same codes as before images (phase 2a).
+    /// What a page shows.
     pub const fn for_page(self) -> ErrorCode {
         match self {
             Self::NotFound => ErrorCode::NotFound,
-            Self::Server => ErrorCode::ServerError,
+            Self::Status(status @ (401 | 403)) => ErrorCode::NeedsSignIn(status),
+            Self::Status(status @ (429 | 503)) => ErrorCode::Busy(status),
+            Self::Status(status @ 400..=499) => ErrorCode::Refused(status),
+            Self::Status(status) => ErrorCode::ServerError(status),
             Self::Unreachable => ErrorCode::Unreachable,
+            Self::TimedOut => ErrorCode::TimedOut,
+            Self::NoSuchSite => ErrorCode::NoSuchSite,
+            Self::Certificate => ErrorCode::Certificate,
             Self::BadRedirect => ErrorCode::BadRedirect,
             Self::TooLarge | Self::Undecodable => ErrorCode::Unreadable,
             Self::WrongType => ErrorCode::NotMarkdown,
@@ -134,7 +146,7 @@ pub fn classify_status(status: u16) -> Result<StatusClass, FetchError> {
         200..=299 => Ok(StatusClass::Body),
         _ if REDIRECT_STATUSES.contains(&status) => Ok(StatusClass::Redirect),
         _ if NOT_FOUND_STATUSES.contains(&status) => Err(FetchError::NotFound),
-        _ => Err(FetchError::Server),
+        _ => Err(FetchError::Status(status)),
     }
 }
 
@@ -209,12 +221,31 @@ mod tests {
     }
 
     #[test]
-    fn missing_pages_are_not_found_and_other_statuses_are_server_errors() {
+    fn missing_pages_are_not_found_and_other_statuses_keep_their_number() {
         for code in [404, 410] {
             assert_eq!(classify_status(code), Err(FetchError::NotFound), "{code}");
         }
         for code in [100, 199, 300, 304, 400, 401, 403, 418, 429, 500, 503] {
-            assert_eq!(classify_status(code), Err(FetchError::Server), "{code}");
+            assert_eq!(classify_status(code), Err(FetchError::Status(code)), "{code}");
+        }
+    }
+
+    #[test]
+    fn statuses_say_who_refused_and_whether_to_wait() {
+        for (status, code) in [
+            (401, ErrorCode::NeedsSignIn(401)),
+            (403, ErrorCode::NeedsSignIn(403)),
+            (400, ErrorCode::Refused(400)),
+            (405, ErrorCode::Refused(405)),
+            (451, ErrorCode::Refused(451)),
+            (429, ErrorCode::Busy(429)),
+            (503, ErrorCode::Busy(503)),
+            (500, ErrorCode::ServerError(500)),
+            (502, ErrorCode::ServerError(502)),
+            (304, ErrorCode::ServerError(304)),
+            (100, ErrorCode::ServerError(100)),
+        ] {
+            assert_eq!(FetchError::Status(status).for_page(), code, "{status}");
         }
     }
 
@@ -292,8 +323,10 @@ mod tests {
     fn page_failures_keep_their_2a_codes() {
         for (error, code) in [
             (FetchError::NotFound, ErrorCode::NotFound),
-            (FetchError::Server, ErrorCode::ServerError),
             (FetchError::Unreachable, ErrorCode::Unreachable),
+            (FetchError::TimedOut, ErrorCode::TimedOut),
+            (FetchError::NoSuchSite, ErrorCode::NoSuchSite),
+            (FetchError::Certificate, ErrorCode::Certificate),
             (FetchError::BadRedirect, ErrorCode::BadRedirect),
             (FetchError::TooLarge, ErrorCode::Unreadable),
             (FetchError::WrongType, ErrorCode::NotMarkdown),
