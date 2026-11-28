@@ -3,6 +3,7 @@
 use crate::session::NoticeKind;
 use crate::session::error::ErrorCode;
 use crate::session::images::{ImageLoading, Note};
+use crate::theme::icons::Icon;
 use crate::theme::{Appearance, ReadingFont, Spacing, TextSize, Which};
 
 pub fn error(code: ErrorCode) -> &'static str {
@@ -208,39 +209,42 @@ pub fn font_name(font: ReadingFont) -> &'static str {
 }
 
 pub const APP_NAME: &str = "mdBrowser";
-pub const BACK: &str = "←";
-pub const FORWARD: &str = "→";
-pub const RELOAD: &str = "Reload";
 pub const HISTORY: &str = "History";
 pub const CLEAR_HISTORY: &str = "Clear History";
 pub const HISTORY_EMPTY: &str = "Nothing here yet. Documents you open are listed here.";
 pub const BOOKMARKS: &str = "Bookmarks";
-pub const BOOKMARKS_EMPTY: &str = "No bookmarks yet. Press ☆ or Ctrl+D on a page to keep it here.";
-/// The toolbar's bookmark toggle: an empty star to add the page, a filled one when it is kept.
-pub const BOOKMARK: &str = "☆";
-pub const BOOKMARKED: &str = "★";
-pub fn bookmark_tooltip(bookmarked: bool, mac: bool) -> String {
-    let what = if bookmarked { "Remove this bookmark" } else { "Bookmark this page" };
-    format!("{what} ({}+D)", if mac { "Cmd" } else { "Ctrl" })
+pub const BOOKMARKS_EMPTY: &str = "No bookmarks yet. The star in the toolbar keeps the page you're reading.";
+
+/// An icon button's name, with its shortcut if it has one: its tooltip, and what the status
+/// line shows while it has the keyboard (ADR-016).
+pub fn icon_name(icon: Icon, mac: bool) -> String {
+    let (primary, alt) = if mac { ("Cmd", "Option") } else { ("Ctrl", "Alt") };
+    match icon {
+        Icon::Back => format!("Back ({alt}+←)"),
+        Icon::Forward => format!("Forward ({alt}+→)"),
+        Icon::Reload => format!("Reload ({primary}+R)"),
+        Icon::Source => source_tooltip(false, mac),
+        Icon::Page => source_tooltip(true, mac),
+        Icon::Home => format!("Home page ({alt}+Home)"),
+        Icon::Bookmark => format!("Bookmark this page ({primary}+D)"),
+        Icon::Bookmarked => format!("Remove this bookmark ({primary}+D)"),
+        Icon::Bookmarks => format!("Bookmarks ({primary}+B)"),
+        // Cmd+H hides the app on macOS, so there History has no shortcut.
+        Icon::History if mac => "History".into(),
+        Icon::History => format!("History ({primary}+H)"),
+        Icon::Settings => format!("Settings ({primary}+,)"),
+        Icon::MoveUp => "Move up".into(),
+        Icon::MoveDown => "Move down".into(),
+        Icon::Remove => "Remove bookmark".into(),
+    }
 }
-/// Each bookmark's own buttons, and what a screen reader or tooltip calls them.
-pub const MOVE_UP: &str = "↑";
-pub const MOVE_DOWN: &str = "↓";
-pub const REMOVE_BOOKMARK: &str = "×";
-pub const MOVE_UP_TIP: &str = "Move up";
-pub const MOVE_DOWN_TIP: &str = "Move down";
-pub const REMOVE_BOOKMARK_TIP: &str = "Remove bookmark";
 pub const DISMISS: &str = "Dismiss";
 pub const OPEN_IN_BROWSER: &str = "Open in browser";
 pub const ADDRESS_PLACEHOLDER: &str = "Path or web address of a Markdown file, e.g. ~/notes/index.md";
-pub const HOME: &str = "Home";
-/// The toolbar button that shows the Markdown source, and the one that returns to the page.
-pub const SOURCE: &str = "Source";
-pub const PAGE: &str = "Page";
-
-/// The source button's tooltip, which names the chord.
-pub fn source_tooltip(mac: bool) -> String {
-    format!("View Markdown source ({}+U)", if mac { "Cmd" } else { "Ctrl" })
+/// The source button's tooltip: what pressing it shows, and the chord.
+pub fn source_tooltip(in_source: bool, mac: bool) -> String {
+    let what = if in_source { "View page" } else { "View Markdown source" };
+    format!("{what} ({}+U)", if mac { "Cmd" } else { "Ctrl" })
 }
 
 /// The Settings panel's button that opens the About page, and its tooltip, which names both chords.
@@ -314,13 +318,31 @@ mod tests {
     }
 
     #[test]
+    fn every_icon_is_named_with_its_shortcut_on_each_platform() {
+        for mac in [false, true] {
+            let names = Icon::ALL.map(|icon| icon_name(icon, mac));
+            distinct_and_non_empty(&names.each_ref().map(String::as_str));
+            let (wrong_primary, wrong_alt) = if mac { ("Ctrl", "Alt") } else { ("Cmd", "Option") };
+            assert!(names.iter().all(|name| !name.contains(wrong_primary) && !name.contains(wrong_alt)), "{names:?}");
+        }
+        assert_eq!(icon_name(Icon::Back, false), "Back (Alt+←)");
+        assert_eq!(icon_name(Icon::Back, true), "Back (Option+←)");
+        assert_eq!(icon_name(Icon::Bookmark, true), "Bookmark this page (Cmd+D)");
+        assert_eq!(icon_name(Icon::History, false), "History (Ctrl+H)");
+        assert_eq!(icon_name(Icon::History, true), "History", "Cmd+H hides the app on macOS");
+        assert_eq!(icon_name(Icon::Source, false), source_tooltip(false, false));
+        assert_eq!(icon_name(Icon::Page, true), source_tooltip(true, true));
+    }
+
+    #[test]
     fn the_reader_controls_are_labelled() {
         distinct_and_non_empty(&Spacing::ALL.map(spacing));
         distinct_and_non_empty(&Which::ALL.map(colour_name));
         assert!(COLOURS_HINT.contains("Enter") && COLOURS_HINT.contains("Tab"));
-        assert_eq!((SOURCE, PAGE), ("Source", "Page"));
-        assert_eq!(source_tooltip(false), "View Markdown source (Ctrl+U)");
-        assert_eq!(source_tooltip(true), "View Markdown source (Cmd+U)");
+        assert_eq!(source_tooltip(false, false), "View Markdown source (Ctrl+U)");
+        assert_eq!(source_tooltip(false, true), "View Markdown source (Cmd+U)");
+        assert_eq!(source_tooltip(true, false), "View page (Ctrl+U)", "in the source view it goes back");
+        assert_eq!(source_tooltip(true, true), "View page (Cmd+U)");
         assert_eq!(ABOUT, "About mdBrowser");
         assert_eq!(about_tooltip(false), "Version, licence and help (F1 or Ctrl+?)");
         assert_eq!(about_tooltip(true), "Version, licence and help (F1 or Cmd+?)");
@@ -344,7 +366,7 @@ mod tests {
     fn the_welcome_page_is_titled_and_names_the_controls_it_describes() {
         let source = include_str!("../assets/welcome.md");
         assert_eq!(crate::model::parse(source).title(""), "Welcome");
-        for label in [SETTINGS, HOME_PAGE_LABEL, HOME] {
+        for label in [SETTINGS, HOME_PAGE_LABEL, "the gear", "the house"] {
             assert!(source.contains(label), "the welcome page should mention {label}");
         }
         assert!(source.contains("[About mdBrowser](about:mdbrowser)"), "the welcome page links to About");

@@ -1,11 +1,13 @@
 //! Bundled typefaces. Host font metadata is unreliable (spike finding 1), so the
-//! reading faces ship inside the binary and win over any host copy.
+//! reading faces and the chrome's icon font (ADR-016) ship inside the binary and win over
+//! any host copy.
 
 use std::sync::{Arc, Once};
 
 use iced::advanced::graphics::text::cosmic_text::fontdb::{FaceInfo, Source, Style, Weight};
 use iced::advanced::graphics::text::font_system;
 
+use super::icons::ICON_FAMILY;
 use super::{MONO_FAMILY, ReadingFont};
 
 /// A bundled file and the variant it is *meant* to be. Some upstream files
@@ -23,7 +25,7 @@ macro_rules! bundled {
     };
 }
 
-const FILES: [Bundled; 20] = bundled![
+const FILES: [Bundled; 22] = bundled![
     "literata/Literata-Regular.ttf" => NORMAL Normal,
     "literata/Literata-Bold.ttf" => BOLD Normal,
     "literata/Literata-Italic.ttf" => NORMAL Italic,
@@ -44,10 +46,12 @@ const FILES: [Bundled; 20] = bundled![
     "jetbrains-mono/JetBrainsMono-Bold.ttf" => BOLD Normal,
     "jetbrains-mono/JetBrainsMono-Italic.ttf" => NORMAL Italic,
     "jetbrains-mono/JetBrainsMono-BoldItalic.ttf" => BOLD Italic,
+    "font-awesome/FontAwesome7Free-Solid-900.otf" => BLACK Normal,
+    "font-awesome/FontAwesome7Free-Regular-400.otf" => NORMAL Normal,
 ];
 
 fn is_bundled_family(name: &str) -> bool {
-    name == MONO_FAMILY || ReadingFont::ALL.iter().any(|font| font.family() == name)
+    name == MONO_FAMILY || name == ICON_FAMILY || ReadingFont::ALL.iter().any(|font| font.family() == name)
 }
 
 /// Loads the bundled faces into iced's shared font system, first evicting any

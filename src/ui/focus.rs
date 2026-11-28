@@ -30,13 +30,31 @@ pub fn button<'a, Message: Clone + 'a>(
     pressable(widgets::button(content).on_press_maybe(on_press.clone()), on_press)
 }
 
-/// A `button` that `operation::focus(id)` can reach, and whose Enter or Space sends `on_key`
-/// rather than the click's message.
+/// A `button` whose content doesn't name it, such as an icon: `name` is what `focused_name`
+/// reports while it has the keyboard, since a tooltip shows only under the mouse (ADR-016).
+pub fn named_button<'a, Message: Clone + 'a>(
+    content: impl Into<Element<'a, Message>>,
+    on_press: Option<Message>,
+    name: String,
+) -> Element<'a, Message> {
+    let reachable = on_press.is_some();
+    Element::new(FocusStop {
+        content: widgets::button(content).on_press_maybe(on_press.clone()).into(),
+        keys: Keys { press: on_press, previous: None, next: None },
+        reachable,
+        id: None,
+        name: Some(name),
+    })
+}
+
+/// A `named_button` that `operation::focus(id)` can reach, and whose Enter or Space sends
+/// `on_key` rather than the click's message.
 pub fn button_with_id<'a, Message: Clone + 'a>(
     content: impl Into<Element<'a, Message>>,
     on_press: Option<Message>,
     on_key: Option<Message>,
     id: Id,
+    name: String,
 ) -> Element<'a, Message> {
     let reachable = on_key.is_some();
     Element::new(FocusStop {
@@ -44,6 +62,7 @@ pub fn button_with_id<'a, Message: Clone + 'a>(
         keys: Keys { press: on_key, previous: None, next: None },
         reachable,
         id: Some(id),
+        name: Some(name),
     })
 }
 
@@ -58,6 +77,7 @@ pub fn pressable<'a, Message: Clone + 'a>(
         keys: Keys { press: on_press, previous: None, next: None },
         reachable,
         id: None,
+        name: None,
     })
 }
 
@@ -73,6 +93,7 @@ pub fn choice<'a, Message: Clone + 'a>(
         keys: Keys { press: None, previous, next },
         reachable: true,
         id: None,
+        name: None,
     })
 }
 
@@ -220,6 +241,37 @@ struct FocusStop<'a, Message> {
     reachable: bool,
     /// For `operation::focus`; most stops are reached only by Tab.
     id: Option<Id>,
+    /// What `focused_name` reports while this stop has the keyboard, when its content doesn't say.
+    name: Option<String>,
+}
+
+/// A focused stop's name, handed to `FocusedName` through `Operation::custom`.
+struct Name(String);
+
+/// The name of the focused stop, if it has one: shown in the status line, because an icon's
+/// tooltip shows only under the mouse (ADR-016).
+pub fn focused_name() -> Task<Option<String>> {
+    widget::operate(FocusedName { found: None })
+}
+
+struct FocusedName {
+    found: Option<String>,
+}
+
+impl Operation<Option<String>> for FocusedName {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<Option<String>>)) {
+        operate(self);
+    }
+
+    fn custom(&mut self, _id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
+        if let Some(Name(name)) = state.downcast_ref::<Name>() {
+            self.found = Some(name.clone());
+        }
+    }
+
+    fn finish(&self) -> Outcome<Option<String>> {
+        Outcome::Some(self.found.clone())
+    }
 }
 
 #[derive(Default)]
@@ -270,6 +322,9 @@ impl<Message: Clone> Widget<Message, Theme, Renderer> for FocusStop<'_, Message>
         let state = tree.state.downcast_mut::<State>();
         if in_tab_order(self.reachable, state.focused) {
             operation.focusable(self.id.as_ref(), layout.bounds(), state);
+        }
+        if let (true, Some(name)) = (state.focused, &self.name) {
+            operation.custom(None, layout.bounds(), &mut Name(name.clone()));
         }
         self.content.as_widget_mut().operate(&mut tree.children[0], layout, renderer, operation);
     }
@@ -439,6 +494,16 @@ mod tests {
         assert!(in_tab_order(true, false));
         assert!(in_tab_order(false, true), "disabled while focused: the place is kept");
         assert!(!in_tab_order(false, false), "a disabled control is skipped");
+    }
+
+    #[test]
+    fn the_focused_name_is_what_a_named_stop_reports_and_nothing_else() {
+        let mut find = FocusedName { found: None };
+        let bounds = Rectangle::default();
+        find.custom(None, bounds, &mut 7_u32);
+        assert!(matches!(find.finish(), Outcome::Some(None)), "other custom state is ignored");
+        find.custom(None, bounds, &mut Name("Back (Alt+←)".into()));
+        assert!(matches!(find.finish(), Outcome::Some(Some(name)) if name == "Back (Alt+←)"));
     }
 
     #[test]

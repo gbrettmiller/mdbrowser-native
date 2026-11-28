@@ -2,15 +2,17 @@
 //! move up, move down and remove buttons.
 
 use iced::advanced::widget::Id;
-use iced::widget::{button, column, container, row, scrollable, text, tooltip};
+use iced::widget::{button, column, container, row, scrollable, text};
 use iced::{Element, Fill, Length};
 
 use super::app::Message;
-use super::focus::{self, RING_REACH, pressable};
+use super::focus::{RING_REACH, pressable};
+use super::icon;
 use super::panels::PANEL_WIDTH;
 use crate::content;
 use crate::session::bookmarks::{Bookmark, Move};
 use crate::session::{Event, State};
+use crate::theme::icons::Icon;
 use crate::theme::{self, chrome_text};
 
 /// The moves a bookmark at `at` in a list `len` long can make: none past either end.
@@ -47,20 +49,15 @@ pub fn focus_after_move(bookmarks: &[Bookmark], address: &str, by: Move) -> Opti
     }
 }
 
-fn small<'a>(label: &'a str, tip: &'a str, on_press: Option<Message>) -> Element<'a, Message> {
-    tooltip(focus::button(text(label).size(chrome_text::BODY), on_press), text(tip), tooltip::Position::Bottom).into()
-}
-
 /// A move button: a click moves the bookmark, and Enter or Space also keeps the keyboard on it.
 fn move_button(address: &str, by: Move, enabled: bool) -> Element<'_, Message> {
-    let (label, tip) = match by {
-        Move::Up => (content::MOVE_UP, content::MOVE_UP_TIP),
-        Move::Down => (content::MOVE_DOWN, content::MOVE_DOWN_TIP),
+    let glyph = match by {
+        Move::Up => Icon::MoveUp,
+        Move::Down => Icon::MoveDown,
     };
     let click = enabled.then(|| Message::Session(Event::MoveBookmark(address.to_string(), by)));
     let key = enabled.then(|| Message::MoveBookmarkByKey(address.to_string(), by));
-    let stop = focus::button_with_id(text(label).size(chrome_text::BODY), click, key, move_id(address, by));
-    tooltip(stop, text(tip), tooltip::Position::Bottom).into()
+    icon::button_with_id(glyph, click, key, move_id(address, by))
 }
 
 fn entry(bookmark: &Bookmark, at: usize, len: usize, muted: iced::Color) -> Element<'_, Message> {
@@ -76,11 +73,7 @@ fn entry(bookmark: &Bookmark, at: usize, len: usize, muted: iced::Color) -> Elem
         pressable(button(label).width(Fill).style(button::text).on_press_maybe(open.clone()), open),
         move_button(&bookmark.address, Move::Up, up),
         move_button(&bookmark.address, Move::Down, down),
-        small(
-            content::REMOVE_BOOKMARK,
-            content::REMOVE_BOOKMARK_TIP,
-            session(Event::RemoveBookmark(bookmark.address.clone()))
-        ),
+        icon::button(Icon::Remove, session(Event::RemoveBookmark(bookmark.address.clone()))),
     ]
     .spacing(4)
     .align_y(iced::alignment::Vertical::Center)

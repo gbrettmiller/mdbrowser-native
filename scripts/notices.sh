@@ -20,6 +20,7 @@ fonts = [
     ("iA Writer Quattro S", "ia-writer-quattro/LICENSE.md"),
     ("Inter", "inter/LICENSE.txt"),
     ("JetBrains Mono", "jetbrains-mono/OFL.txt"),
+    ("Font Awesome Free", "font-awesome/LICENSE.txt"),
 ]
 section = ""
 for name, path in fonts:

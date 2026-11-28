@@ -137,10 +137,10 @@ Feature: View the Markdown source
 
   Scenario: The button names the other view
     Given I am viewing "index.md"
-    Then the source button reads "Source"
+    Then the source button is named "View Markdown source (Ctrl+U)"
     And the source button is enabled
     When I view the source
-    Then the source button reads "Page"
+    Then the source button is named "View page (Ctrl+U)"
 
   Scenario: The button is disabled when there is no page
     Given I entered the absolute path of "missing.md" and see the error "notFound"

@@ -36,9 +36,9 @@ mdBrowser opens web addresses: type or paste one into the address bar, or follow
 - Renders CommonMark plus GitHub tables, task lists and strikethrough. In-page `#anchors` use GitHub heading slugs.
 - Takes the window title from front matter `title`, then the first heading, then the file name.
 - Back, forward, reload, and a History panel that persists across restarts.
-- Bookmarks: ☆ in the toolbar (or Ctrl+D) keeps the page you're reading, and the **Bookmarks** panel (Ctrl+B) lists them in your own order. New ones go at the end; ↑ and ↓ move one, × removes it. A built-in page or an error can't be bookmarked.
+- Bookmarks: the star in the toolbar (or Ctrl+D) keeps the page you're reading, and the **Bookmarks** panel (the bookmark icon, or Ctrl+B) lists them in your own order. New ones go at the end; the up and down arrows move one, and the cross removes it. A built-in page or an error can't be bookmarked.
 - Four bundled reading faces: Literata (default), Source Serif 4, iA Writer Quattro and Inter. Code is set in JetBrains Mono.
-- A **Settings** panel (Ctrl+, or Cmd+,) holds the reading font, text size (12 to 32 px in steps of 2), spacing (Compact, Comfortable or Spacious), Web images, Appearance (System, Light, Dark, one of seven presets, or Custom) and a Home page, with a button that puts size and spacing back. System follows the operating system. Custom takes page, text and link colours as `#rgb` or `#rrggbb` (applied on Enter or Tab), and refuses a set whose text or links fall below WCAG AA contrast (4.5:1) on the page. Home (the toolbar button or Alt+Home) opens the home page, or a built-in welcome page when none is set, and the app opens it on launch unless you give an address.
+- A **Settings** panel (Ctrl+, or Cmd+,) holds the reading font, text size (12 to 32 px in steps of 2), spacing (Compact, Comfortable or Spacious), Web images, Appearance (System, Light, Dark, one of seven presets, or Custom) and a Home page, with a button that puts size and spacing back. System follows the operating system. Custom takes page, text and link colours as `#rgb` or `#rrggbb` (applied on Enter or Tab), and refuses a set whose text or links fall below WCAG AA contrast (4.5:1) on the page. Home (the house in the toolbar, or Alt+Home) opens the home page, or a built-in welcome page when none is set, and the app opens it on launch unless you give an address.
 - Reads the shared Web of Markdown front matter: a byline under the title from `author`, `pubDate` and the `source` site name, a `description`, a **Listen** line for an `enclosure` (a link like any other: it isn't Markdown, so you are offered **Open in browser**), and **Previous** and **Next** links from `urlPrev` and `urlNext`. Other keys, and the `image`, `inlineImage` and `metaImage` fields, are ignored.
 - Select text with the mouse and copy it with Ctrl+C.
 - A `mailto` link is the one kind that leaves the app. mdBrowser says where it goes and asks first (**Open** or **Stay here**). Other schemes are blocked.
@@ -76,7 +76,7 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Back / forward | Alt+← / Alt+→ | Option+← / Option+→ |
 | Reload | Ctrl+R or F5 | Cmd+R or F5 |
 | Focus the address bar | Ctrl+L | Cmd+L |
-| Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
+| Show or hide History | Ctrl+H | The History button, a clock (Cmd+H hides the app on macOS) |
 | Show or hide Bookmarks | Ctrl+B | Cmd+B |
 | Bookmark this page, or remove it | Ctrl+D | Cmd+D |
 | Show or hide Settings | Ctrl+, | Cmd+, |

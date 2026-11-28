@@ -64,7 +64,7 @@ Each icon is a character in a bundled font, drawn as text through the existing f
 
 **We will bundle Font Awesome Free 7.3.1's Solid and Regular desktop fonts, unmodified, and draw the chrome's icons as text in them (Option B).** It matches the charter, fits the existing bundled-font path (ADR-001) without a new dependency, and its font licence is the OFL we already ship.
 
-Icons replace the words on Back (arrow-left), Forward (arrow-right), Reload (arrow-rotate-right), Home (house), the bookmark toggle (star: Regular when the page isn't kept, Solid when it is), Bookmarks (bookmark), History (clock-rotate-left) and Settings (gear), and the Bookmarks panel's move up, move down and remove (arrow-up, arrow-down, xmark). **Source / Page stays in words**: it is a mode switch, and its label names the view you'll get. Every icon button has a tooltip naming its action and shortcut, as Source already does.
+Icons replace the words on Back (arrow-left), Forward (arrow-right), Reload (arrow-rotate-right), Home (house), the bookmark toggle (star: Regular when the page isn't kept, Solid when it is), Bookmarks (bookmark), History (clock-rotate-left) and Settings (gear), and the Bookmarks panel's move up, move down and remove (arrow-up, arrow-down, xmark). The source toggle is a mode switch, so its icon names the view you'll get, as its words did: code to view the Markdown source, file-lines to go back to the page. Every icon button has a tooltip naming its action and shortcut ("View Markdown source (Ctrl+U)", "View page (Ctrl+U)").
 
 ## Consequences
 

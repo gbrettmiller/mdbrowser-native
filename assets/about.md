@@ -14,7 +14,7 @@ Licensed under {licence}, at your option. The source is at [github.com/gbrettmil
 
 ## Licence and credits
 
-The reading fonts are bundled in the app. Each is licensed under the SIL Open Font License 1.1, and the full texts, with those of the libraries the app is built from, ship with each release in THIRD-PARTY-NOTICES.html.
+The fonts are bundled in the app: the reading fonts, and Font Awesome Free for the toolbar's icons. Each is licensed under the SIL Open Font License 1.1, and the full texts, with those of the libraries the app is built from, ship with each release in THIRD-PARTY-NOTICES.html.
 
 | Font | Used for | Licence |
 |---|---|---|
@@ -23,6 +23,7 @@ The reading fonts are bundled in the app. Each is licensed under the SIL Open Fo
 | iA Writer Quattro S | Reading font | SIL Open Font License 1.1 |
 | Inter | Reading font | SIL Open Font License 1.1 |
 | JetBrains Mono | Code | SIL Open Font License 1.1 |
+| Font Awesome Free (Fonticons, Inc.) | Toolbar and panel icons | SIL Open Font License 1.1 |
 
 ## What it sends and stores
 

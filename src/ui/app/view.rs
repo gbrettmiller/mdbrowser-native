@@ -69,7 +69,7 @@ impl App {
             }))
             .push(self.panels.settings.then(|| settings::panel(state, &self.home_draft, &self.colour_drafts)));
         let content: Element<'_, Message> = panels.into();
-        let status = self.hover.clone().unwrap_or_default();
+        let status = self.hover.clone().or_else(|| self.focused_name.clone()).unwrap_or_default();
         column![toolbar::toolbar(state, &self.draft)]
             .push(
                 body::title_line(&state.status, matches!(state.view, View::Source(_)))

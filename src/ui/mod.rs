@@ -7,6 +7,7 @@ mod chrome;
 pub mod document;
 mod focus;
 mod history;
+mod icon;
 pub mod images;
 pub mod keys;
 pub mod pages;
