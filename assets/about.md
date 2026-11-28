@@ -14,7 +14,7 @@ Licensed under {licence}, at your option. The source is at [github.com/gbrettmil
 
 ## Licence and credits
 
-The reading fonts are bundled in the app. Each is licensed under the SIL Open Font License 1.1, and the full texts, with those of the libraries the app is built from, ship with each release in THIRD-PARTY-NOTICES.html.
+The fonts are bundled in the app: the reading fonts, and Font Awesome Free for the toolbar's icons. Each is licensed under the SIL Open Font License 1.1, and the full texts, with those of the libraries the app is built from, ship with each release in THIRD-PARTY-NOTICES.html.
 
 | Font | Used for | Licence |
 |---|---|---|
@@ -23,13 +23,14 @@ The reading fonts are bundled in the app. Each is licensed under the SIL Open Fo
 | iA Writer Quattro S | Reading font | SIL Open Font License 1.1 |
 | Inter | Reading font | SIL Open Font License 1.1 |
 | JetBrains Mono | Code | SIL Open Font License 1.1 |
+| Font Awesome Free (Fonticons, Inc.) | Toolbar and panel icons | SIL Open Font License 1.1 |
 
 ## What it sends and stores
 
 - **On the web:** it fetches only addresses you open or follow, and web images when the Images setting allows. Each request carries the usual headers for fetching a page: a type preference (`Accept`), the compression it understands, and a `User-Agent` that names the app and its version. It sends no cookies, no referrer and no account. If your system sets a proxy, the app uses it for requests to the public web.
 - **Mail links:** `mailto:` links open your mail program, and only after you agree.
 - **Nothing else:** there is no analytics and no update check. It makes no request you did not cause.
-- **On this computer:** your History and settings are saved in an `mdbrowser` folder in your user data directory. The README says where that is on each system. Clear History in the History panel.
+- **On this computer:** your History, Bookmarks and settings are saved in an `mdbrowser` folder in your user data directory. The README says where that is on each system. Clear History in the History panel; Bookmarks stay until you remove them.
 
 ## Keyboard shortcuts
 
@@ -40,6 +41,8 @@ Use Cmd instead of Ctrl on macOS.
 | Show this page | F1 or Ctrl+? |
 | Show or hide Settings | Ctrl+, |
 | Show or hide History | Ctrl+H |
+| Show or hide Bookmarks | Ctrl+B |
+| Bookmark this page, or remove it | Ctrl+D |
 | Focus the address bar | Ctrl+L |
 | Show a page's Markdown source, and back | Ctrl+U |
 | Open the home page | Alt+Home |
@@ -61,9 +64,9 @@ The website's styling is its own HTML and CSS. mdBrowser draws the Markdown the 
 
 An image is scaled down to fit the column and a height that follows your text size. It keeps its shape and is never cropped or enlarged.
 
-### Where are my settings and History?
+### Where are my settings, History and Bookmarks?
 
-In an `mdbrowser` folder in your user data directory (see the README). Deleting that folder resets both.
+In an `mdbrowser` folder in your user data directory (see the README). Deleting that folder resets all three.
 
 ### How do I change what the app looks like?
 

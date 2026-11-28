@@ -11,7 +11,7 @@ A Markdown file on this computer opens too: type or paste its path in the addres
 
 ## Make a page your home
 
-Open **Settings** and put the address of any Markdown page in **Home page**. It opens when the app starts, and the **Home** button (or Alt+Home) takes you back to it. Leave it empty to see this page.
+Open **Settings** (the gear at the right of the toolbar) and put the address of any Markdown page in **Home page**. It opens when the app starts, and the house in the toolbar (or Alt+Home) takes you back to it. Leave it empty to see this page.
 
 ## Use the keyboard
 

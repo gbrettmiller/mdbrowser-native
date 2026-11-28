@@ -172,9 +172,26 @@ fn a_page_that_is_not_markdown_can_go_to_the_system_browser() {
 }
 
 #[test]
+fn a_page_that_needs_a_sign_in_can_go_to_the_system_browser() {
+    let (state, _) = run([Event::Enter("https://x.org/private".into()), failed_with(ErrorCode::NeedsSignIn(403))]);
+    assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/private"));
+}
+
+#[test]
+fn a_file_can_go_to_the_system_browser() {
+    let (state, _) = run([Event::Enter("https://x.org/a.zip".into()), failed_with(ErrorCode::IsFile)]);
+    assert_eq!(state.browser_offer().as_deref(), Some("https://x.org/a.zip"));
+    assert_eq!(state.llms_offer(), None);
+}
+
+#[test]
 fn the_system_browser_is_offered_for_nothing_else() {
     let cases = [
         vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::NotFound)],
+        vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::IsFile)],
+        vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::Refused(400))],
+        vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::Certificate)],
+        vec![Event::Enter("https://x.org/a.md".into()), failed_with(ErrorCode::Busy(503))],
         vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdown)],
         vec![Event::Enter(native("/d/a.md")), failed_with(ErrorCode::NotMarkdownWithLlms)],
         vec![Event::Enter("https://x.org/a.md".into()), fetched(1, "https://x.org/a.md", "# A")],
@@ -201,7 +218,7 @@ fn choosing_a_font_persists_it_and_restore_brings_it_back() {
     let (state, effects) = run([Event::ChooseFont(ReadingFont::Inter)]);
     let settings = Settings { font: ReadingFont::Inter, ..Settings::default() };
     assert_eq!((state.settings, effects), (settings.clone(), vec![Effect::PersistSettings(settings.clone())]));
-    let (restored, _) = run([Event::Restore { visits: vec![], settings: settings.clone() }]);
+    let (restored, _) = run([Event::Restore { visits: vec![], bookmarks: vec![], settings: settings.clone() }]);
     assert_eq!(restored.settings.font, ReadingFont::Inter);
 }
 
@@ -264,7 +281,7 @@ fn restoring_saved_settings_brings_back_size_spacing_and_custom_colours() {
         custom: Some(SEPIA),
         ..Settings::default()
     };
-    let (state, effects) = run([Event::Restore { visits: Vec::new(), settings: saved.clone() }]);
+    let (state, effects) = run([Event::Restore { visits: Vec::new(), bookmarks: Vec::new(), settings: saved.clone() }]);
     assert_eq!((state.settings, effects), (saved, vec![]));
 }
 
@@ -1085,4 +1102,81 @@ fn back_with_nowhere_to_go_keeps_the_source_view() {
     let state = in_source([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A")]);
     let (state, _) = step(state, Event::Back);
     assert!(source_of(&state).is_some());
+}
+
+// ── Bookmarks ───────────────────────────────────────────────────────────────
+
+fn bookmarked(effects: &[Effect]) -> Vec<String> {
+    match effects {
+        [Effect::PersistBookmarks(bookmarks)] => bookmarks.iter().map(|b| b.address.clone()).collect(),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn bookmarking_the_shown_page_adds_it_with_its_title_and_saves() {
+    let (state, effects) = run([Event::Enter(native("/d/a.md")), loaded(1, "/d/a.md", "# A"), Event::ToggleBookmark]);
+    assert!(state.is_bookmarked());
+    assert_eq!(bookmarked(&effects), [native("/d/a.md")]);
+    assert_eq!(state.bookmarks[0].title, "A");
+    let (state, effects) = step(state, Event::ToggleBookmark);
+    assert!(!state.is_bookmarked());
+    assert_eq!(bookmarked(&effects), Vec::<String>::new());
+}
+
+#[test]
+fn only_a_shown_page_that_history_records_can_be_bookmarked() {
+    let nothing = |events: Vec<Event>| {
+        let (state, effects) = run(events.into_iter().chain([Event::ToggleBookmark]));
+        assert!(state.bookmarks.is_empty() && effects.is_empty() && !state.is_bookmarked(), "{:?}", state.status);
+    };
+    nothing(vec![]);
+    nothing(vec![Event::Enter(native("/d/a.md"))]);
+    nothing(vec![Event::Enter("notes/a.md".into())]);
+    nothing(vec![
+        Event::About,
+        Event::Loaded {
+            request_id: 1,
+            result: Ok(Loaded { source: "# About".into(), location: Location::About, fallback_from: None }),
+            now: 1,
+        },
+    ]);
+}
+
+#[test]
+fn bookmarks_move_and_are_removed_and_each_change_is_saved() {
+    let (state, _) = run([
+        Event::Enter(native("/d/a.md")),
+        loaded(1, "/d/a.md", "# A"),
+        Event::ToggleBookmark,
+        Event::Enter(native("/d/b.md")),
+        loaded(2, "/d/b.md", "# B"),
+        Event::ToggleBookmark,
+    ]);
+    let (state, effects) = step(state, Event::MoveBookmark(native("/d/b.md"), bookmarks::Move::Up));
+    assert_eq!(bookmarked(&effects), [native("/d/b.md"), native("/d/a.md")]);
+    let (state, effects) = step(state, Event::RemoveBookmark(native("/d/b.md")));
+    assert_eq!(bookmarked(&effects), [native("/d/a.md")]);
+    assert!(!state.is_bookmarked(), "b, shown, is no longer bookmarked");
+}
+
+#[test]
+fn opening_a_bookmark_navigates_like_a_typed_address() {
+    let (state, effects) = run([Event::OpenBookmark(native("/d/a.md"))]);
+    assert_eq!(state.status, Status::Loading);
+    assert_eq!(
+        effects,
+        [Effect::Load { request_id: 1, location: Location::file(native("/d/a.md")), origin: Origin::Trusted }]
+    );
+}
+
+#[test]
+fn restore_brings_bookmarks_back_in_their_order() {
+    let saved = vec![
+        bookmarks::Bookmark { address: "b".into(), title: "B".into() },
+        bookmarks::Bookmark { address: "a".into(), title: "A".into() },
+    ];
+    let (state, effects) =
+        run([Event::Restore { visits: vec![], bookmarks: saved.clone(), settings: Settings::default() }]);
+    assert_eq!((state.bookmarks, effects), (saved, vec![]));
 }

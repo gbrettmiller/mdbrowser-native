@@ -3,6 +3,7 @@
 pub mod chrome_text;
 pub mod colours;
 pub mod fonts;
+pub mod icons;
 pub mod scale;
 
 use iced::font::{Style, Weight};

@@ -90,7 +90,7 @@ fn entered_and_failed(w: &mut Browser, name: String, code: String) {
 
 #[given(expr = "I am viewing {string}")]
 #[given(expr = "I viewed {string}")]
-fn viewing(w: &mut Browser, name: String) {
+pub(super) fn viewing(w: &mut Browser, name: String) {
     enter_absolute(w, name.clone());
     still_viewing(w, name);
 }
@@ -155,6 +155,16 @@ pub(super) fn see_error(w: &mut Browser, code: String) {
     match &w.state().status {
         Status::Failed(actual) => assert_eq!(actual.key(), code),
         other => panic!("expected error {code}, got {other:?}"),
+    }
+}
+
+#[then(expr = "the error says the site answered {string}")]
+fn error_status(w: &mut Browser, status: String) {
+    match &w.state().status {
+        Status::Failed(code) => {
+            assert_eq!(content::status_line(*code), Some(format!("The site answered {status}.")))
+        }
+        other => panic!("expected an error, got {other:?}"),
     }
 }
 

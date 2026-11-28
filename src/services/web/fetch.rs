@@ -87,7 +87,7 @@ fn fetch_response(
                 want.check_type(content_type, &url).map_err(|error| Refused {
                     error,
                     url: Some(url.clone()),
-                    link: (error == FetchError::WrongType)
+                    link: matches!(error, FetchError::WrongType | FetchError::File)
                         .then(|| header(&response, "link").map(String::from))
                         .flatten(),
                 })?;
@@ -155,7 +155,7 @@ fn header<'a, B>(response: &'a Response<B>, name: &str) -> Option<&'a str> {
 fn read_capped(body: &mut Body, max_bytes: u64) -> Result<Vec<u8>, FetchError> {
     let mut bytes = Vec::new();
     body.as_reader().take(max_bytes.saturating_add(1)).read_to_end(&mut bytes).map_err(|error| {
-        if timed_out(&error) { FetchError::Unreachable } else { FetchError::Undecodable } // cut off, or bad gzip
+        if timed_out(&error) { FetchError::TimedOut } else { FetchError::Undecodable } // cut off, or bad gzip
     })?;
     if bytes.len() as u64 > max_bytes { Err(FetchError::TooLarge) } else { Ok(bytes) }
 }
@@ -171,8 +171,22 @@ fn timed_out(error: &io::Error) -> bool {
 fn request_failed(error: ureq::Error) -> FetchError {
     match error {
         ureq::Error::Other(inner) if inner.is::<LocalAddress>() => FetchError::LocalAddress,
+        ureq::Error::Timeout(_) => FetchError::TimedOut,
+        ureq::Error::HostNotFound => FetchError::NoSuchSite,
+        ureq::Error::Rustls(inner) if is_certificate(&inner) => FetchError::Certificate,
+        ureq::Error::Io(inner) if timed_out(&inner) => FetchError::TimedOut,
+        // The handshake reports rustls's error inside an `io::Error`.
+        ureq::Error::Io(inner) if inner.get_ref().and_then(|e| e.downcast_ref()).is_some_and(is_certificate) => {
+            FetchError::Certificate
+        }
         _ => FetchError::Unreachable,
     }
+}
+
+/// A certificate the site sent that doesn't hold for it: expired, self-signed,
+/// for another name, revoked and the like.
+fn is_certificate(error: &rustls::Error) -> bool {
+    matches!(error, rustls::Error::InvalidCertificate(_))
 }
 
 #[cfg(test)]
@@ -181,6 +195,27 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
+
+    #[test]
+    fn connection_failures_say_why() {
+        let certificate = rustls::Error::InvalidCertificate(rustls::CertificateError::Expired);
+        for (error, expected) in [
+            (ureq::Error::Timeout(ureq::Timeout::Global), FetchError::TimedOut),
+            (ureq::Error::Timeout(ureq::Timeout::Connect), FetchError::TimedOut),
+            (ureq::Error::HostNotFound, FetchError::NoSuchSite),
+            (ureq::Error::Io(io::Error::new(io::ErrorKind::InvalidData, certificate)), FetchError::Certificate),
+            (
+                ureq::Error::Rustls(rustls::Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer)),
+                FetchError::Certificate,
+            ),
+            (ureq::Error::Io(io::Error::new(io::ErrorKind::TimedOut, "slow")), FetchError::TimedOut),
+            (ureq::Error::Io(io::Error::from(io::ErrorKind::ConnectionRefused)), FetchError::Unreachable),
+            (ureq::Error::Rustls(rustls::Error::HandshakeNotComplete), FetchError::Unreachable),
+            (ureq::Error::ConnectionFailed, FetchError::Unreachable),
+        ] {
+            assert_eq!(request_failed(error), expected);
+        }
+    }
     use crate::services::test_server::{Reply, Server};
 
     /// Resolves every name to the test server, as rebinding DNS would.

@@ -83,6 +83,9 @@ pub fn run(effect: Effect, store: Option<Arc<Store>>) -> Task<Option<Event>> {
             })
         }),
         Effect::PersistVisits(visits) => in_background(store, move |store, ticket| store.save_visits(ticket, &visits)),
+        Effect::PersistBookmarks(bookmarks) => {
+            in_background(store, move |store, ticket| store.save_bookmarks(ticket, &bookmarks))
+        }
         Effect::PersistSettings(settings) => {
             in_background(store, move |store, ticket| store.save_settings(ticket, settings))
         }

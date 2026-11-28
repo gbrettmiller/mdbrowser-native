@@ -3,6 +3,7 @@
 use std::fs;
 
 use cucumber::{given, then, when};
+use mdbrowser::content;
 use mdbrowser::model::Block;
 use mdbrowser::session::{Event, Status, View};
 use mdbrowser::ui::toolbar::source_button;
@@ -93,9 +94,10 @@ fn saved_settings_match(w: &mut Browser) {
     assert_eq!(w.store.load_settings(), w.state().settings);
 }
 
-#[then(expr = "the source button reads {string}")]
-fn button_reads(w: &mut Browser, label: String) {
-    assert_eq!(source_button(w.state()).0, label);
+/// Its tooltip and status-line name, as on Linux and Windows.
+#[then(expr = "the source button is named {string}")]
+fn button_named(w: &mut Browser, name: String) {
+    assert_eq!(content::icon_name(source_button(w.state()).0, false), name);
 }
 
 #[then("the source button is enabled")]

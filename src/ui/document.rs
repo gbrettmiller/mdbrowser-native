@@ -13,7 +13,7 @@ use iced::advanced::{Clipboard, Shell, clipboard};
 use iced::keyboard::{self, Key, key::Named};
 use iced::{Border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 
-use super::focus::{RING_RADIUS, RING_WIDTH};
+use super::focus::{self, RING_RADIUS, RING_WIDTH};
 use super::keys::{self, Scroll};
 use crate::layout::{Caret, Direction, Page, Reach, Stop, Target, reach};
 use crate::theme;
@@ -131,6 +131,14 @@ impl State {
     /// What Enter does on the focused stop.
     fn target(&self) -> Option<&Target> {
         self.stop.and_then(|stop| self.stops.get(stop)).map(|stop| &stop.target)
+    }
+
+    /// The focused stop's name for the status line: the address a link goes to (as hovering it
+    /// shows), or the image a note would load. None on the page itself.
+    fn name(&self) -> Option<String> {
+        self.focused.then(|| self.target()).flatten().map(|target| match target {
+            Target::Link(href) | Target::Image(href) => href.clone(),
+        })
     }
 
     /// Tab (or Shift+Tab) on the page: true when it moved to a stop, so the key is used up;
@@ -300,6 +308,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Document<'_, Message> {
     ) {
         let state = tree.state.downcast_mut::<State>();
         operation.focusable(self.id.as_ref(), layout.bounds(), state);
+        if let Some(name) = state.name() {
+            operation.custom(None, layout.bounds(), &mut focus::Name(name));
+        }
         operation.custom(self.id.as_ref(), layout.bounds(), state);
     }
 
@@ -466,6 +477,16 @@ mod tests {
         let mut state = State::on(page, 1, None);
         state.focus();
         state
+    }
+
+    #[test]
+    fn the_focused_link_is_named_by_its_address_and_the_page_itself_by_nothing() {
+        let mut state = focused(&page("[a](a.md) and ![pic](p.png)"));
+        assert_eq!(state.name(), None, "the page itself");
+        state.tab(Direction::Forward);
+        assert_eq!(state.name().as_deref(), Some("a.md"), "as a hovered link shows");
+        state.unfocus();
+        assert_eq!(state.name(), None, "not while the keyboard is elsewhere");
     }
 
     #[test]

@@ -12,10 +12,13 @@ Feature: Browse remote Markdown
   #   /post          text/markdown   "# Post Without Extension"
   #   /plain.md      text/plain      "# Plain Served"       /plain.txt    text/plain    "# Not this"
   #   /untyped.md    (no type)       "# Untyped"            /page.html    text/html     "<h1>HTML</h1>"
+  #   /binary.md     application/octet-stream "# Binary Served"   /archive.bin  application/octet-stream
+  #   /song.mp3      audio/mpeg
   #   /fake.md       text/html       "<h1>Not Markdown</h1>"
   #   /moved.md      301 → /index.md                        /loop.md      302 → /loop.md
   #   /to-file.md    302 → file:///etc/hosts                /no-location.md 302, no Location
   #   /missing.md    404   /gone.md 410   /broken.md 500
+  #   /private.md    403   /teapot.md 418   /busy.md 503
   #   /latin1.md     text/markdown; charset=iso-8859-1      /bad-utf8.md  text/markdown, invalid bytes
   #   /huge.md       body over the world's size limit (the limit is lowered for the test)
   #   /slow.md       "# Slow"; held by the world until released
@@ -35,6 +38,7 @@ Feature: Browse remote Markdown
       | /post       | Post Without Extension   |
       | /plain.md   | Plain Served             |
       | /untyped.md | Untyped                  |
+      | /binary.md  | Binary Served            |
 
   Scenario Outline: A page that isn't Markdown can go to the system browser
     When I enter the URL of "<path>"
@@ -46,6 +50,18 @@ Feature: Browse remote Markdown
       | path       |
       | /page.html |
       | /plain.txt |
+
+  Scenario Outline: A file that isn't a page says so and can go to the system browser
+    When I enter the URL of "<path>"
+    Then I see the error "isFile"
+    And the error shows the URL of "<path>"
+    And I am not offered the site's llms.txt
+    When I choose to open it in the browser
+    Then the system opened the URL of "<path>"
+    Examples:
+      | path         |
+      | /archive.bin |
+      | /song.mp3    |
 
   Scenario: A followed link to a page that isn't Markdown offers the system browser
     Given I am viewing the URL of "/index.md"
@@ -89,9 +105,27 @@ Feature: Browse remote Markdown
       | /missing.md  | notFound    |
       | /gone.md     | notFound    |
       | /broken.md   | serverError |
+      | /private.md  | needsSignIn |
+      | /teapot.md   | refused     |
+      | /busy.md     | busy        |
       | /latin1.md   | unreadable  |
       | /bad-utf8.md | unreadable  |
       | /huge.md     | unreadable  |
+
+  Scenario Outline: An HTTP error names the site's status
+    When I enter the URL of "<path>"
+    Then the error says the site answered "<status>"
+    Examples:
+      | path        | status                    |
+      | /broken.md  | 500 Internal Server Error |
+      | /private.md | 403 Forbidden             |
+      | /teapot.md  | 418                       |
+      | /busy.md    | 503 Service Unavailable   |
+
+  Scenario: A page that needs a sign-in can go to the system browser
+    When I enter the URL of "/private.md"
+    And I choose to open it in the browser
+    Then the system opened the URL of "/private.md"
 
   Scenario: A site that refuses the connection
     When I enter a URL whose connection is refused

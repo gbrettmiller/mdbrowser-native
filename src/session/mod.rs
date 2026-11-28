@@ -3,6 +3,7 @@
 
 pub mod about;
 pub mod address;
+pub mod bookmarks;
 pub mod error;
 mod href;
 pub mod images;
@@ -23,6 +24,7 @@ use std::sync::Arc;
 
 use crate::model::Document;
 use crate::theme::{Appearance, Colours, Palette, ReadingFont, Spacing, TextSize, Which};
+use bookmarks::Bookmark;
 use error::ErrorCode;
 use location::Location;
 use navigation::Navigation;
@@ -156,6 +158,11 @@ pub enum Event {
     OpenLlmsTxt,
     OpenHistory(String),
     ClearHistory,
+    /// Bookmark the shown page, or remove it if it is bookmarked. Only a page History records.
+    ToggleBookmark,
+    OpenBookmark(String),
+    RemoveBookmark(String),
+    MoveBookmark(String, bookmarks::Move),
     ChooseFont(ReadingFont),
     ChooseAppearance(Appearance),
     /// One of the reader's own colours, as typed: `#rgb` or `#rrggbb`.
@@ -190,6 +197,7 @@ pub enum Event {
     FragmentHandled,
     Restore {
         visits: Vec<Visit>,
+        bookmarks: Vec<Bookmark>,
         settings: Settings,
     },
 }
@@ -200,6 +208,7 @@ pub enum Effect {
     LoadImage { location: Location, origin: web::Origin },
     OpenExternal(String),
     PersistVisits(Vec<Visit>),
+    PersistBookmarks(Vec<Bookmark>),
     PersistSettings(Settings),
 }
 
@@ -215,6 +224,8 @@ pub struct State {
     /// Anchor waiting to be scrolled to once the page is laid out.
     pub fragment: Option<String>,
     pub visits: Vec<Visit>,
+    /// In the reader's own order.
+    pub bookmarks: Vec<Bookmark>,
     pub notices: Vec<Notice>,
     pub notice_seq: u64,
     /// A link out of the app (system browser or mail) waiting for the reader to agree.
@@ -242,6 +253,7 @@ impl State {
             view: View::Page,
             fragment: None,
             visits: Vec::new(),
+            bookmarks: Vec::new(),
             notices: Vec::new(),
             notice_seq: 0,
             leaving: None,
@@ -266,19 +278,30 @@ impl State {
         }
     }
 
+    /// The shown page's address and title, if it can be bookmarked: a page History records.
+    pub fn bookmarkable(&self) -> Option<(String, &str)> {
+        let Status::Ready(shown) = &self.status else { return None };
+        let location = self.current_location().filter(|location| location.records_history())?;
+        Some((location.address(), shown.title.as_str()))
+    }
+
+    pub fn is_bookmarked(&self) -> bool {
+        self.bookmarkable().is_some_and(|(address, _)| bookmarks::contains(&self.bookmarks, &address))
+    }
+
     pub fn current_location(&self) -> Option<&Location> {
         self.nav.current()?.target.as_ref().map(|target| &target.location)
     }
 
     /// The address the system browser may open instead: a web page that turned
-    /// out not to be Markdown, or the original address of one whose Markdown
-    /// version is shown. Local files are never handed over.
+    /// out not to be Markdown or needs a sign-in, or the original address of one
+    /// whose Markdown version is shown. Local files are never handed over.
     pub fn browser_offer(&self) -> Option<String> {
         if let Status::Ready(shown) = &self.status {
             return shown.fallback_from.clone();
         }
-        let not_markdown = matches!(self.status, Status::Failed(code) if code.is_not_markdown());
-        self.current_location().filter(|location| not_markdown && location.is_web()).map(Location::address)
+        let offered = matches!(self.status, Status::Failed(code) if code.offers_browser());
+        self.current_location().filter(|location| offered && location.is_web()).map(Location::address)
     }
 
     /// The site's `llms.txt`, offered (never substituted) when a web page has no

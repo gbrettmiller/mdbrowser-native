@@ -56,6 +56,11 @@ pub enum Message {
     /// The window changed size; the width decides how many panels fit beside the page.
     Resized(Size),
     Relayout,
+    /// Enter or Space on the source button: switch the view, and keep the keyboard on the button.
+    ToggleSourceByKey,
+    /// Enter or Space on a bookmark's move button: move it, and keep the keyboard on it.
+    MoveBookmarkByKey(String, crate::session::bookmarks::Move),
+    ToggleBookmarks,
     ToggleHistory,
     ToggleSettings,
     HomeDraftChanged(String),
@@ -74,6 +79,10 @@ pub enum Message {
     Reveal(f32, f32),
     /// A key asked to scroll the page.
     Scroll(Scroll),
+    /// The name of the control that has the keyboard, if it has one (an icon button).
+    FocusedName(Option<String>),
+    /// A mouse button went down: a click takes the keyboard from a focused control.
+    Pointer,
 }
 
 pub struct App {
@@ -82,6 +91,8 @@ pub struct App {
     draft: String,
     store: Option<Arc<Store>>,
     hover: Option<String>,
+    /// The focused icon button's name, for the status line: its tooltip shows only under the mouse.
+    focused_name: Option<String>,
     panels: Open,
     /// Window width, from the last resize.
     window_width: f32,
@@ -98,6 +109,7 @@ impl App {
     fn boot() -> (Self, Task<Message>) {
         let store = Store::default_location().map(Arc::new);
         let visits = store.as_ref().map(|store| store.load_visits()).unwrap_or_default();
+        let bookmarks = store.as_ref().map(|store| store.load_bookmarks()).unwrap_or_default();
         let settings = store.as_ref().map(|store| store.load_settings()).unwrap_or_default();
         let home = dirs::home_dir().unwrap_or_else(|| "/".into());
         let mut app = App {
@@ -105,6 +117,7 @@ impl App {
             draft: String::new(),
             store,
             hover: None,
+            focused_name: None,
             panels: Open::default(),
             window_width: WINDOW_SIZE.0,
             home_draft: settings.home.clone(),
@@ -113,7 +126,7 @@ impl App {
             viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR, WINDOW_SIZE.1),
             relayout_scheduled: false,
         };
-        let restore = app.dispatch(Event::Restore { visits, settings });
+        let restore = app.dispatch(Event::Restore { visits, bookmarks, settings });
         let argument = files::launch_address_from_environment();
         let focus = if argument.is_none() { operation::focus(ADDRESS_ID) } else { Task::none() };
         let open = Task::batch([app.dispatch(Event::Launch(argument)), focus]);
@@ -192,7 +205,7 @@ impl App {
         let focus = if about {
             // About is a page: two overlays would compete with it in a small window.
             self.panels = panels::Open::default();
-            operation::focus(PAGE_ID)
+            operation::focus(PAGE_ID).chain(name_focused())
         } else {
             Task::none()
         };
@@ -201,7 +214,16 @@ impl App {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Session(event) | Message::Effect(Some(event)) => self.dispatch(event),
+            Message::Session(event) => {
+                let dispatched = self.dispatch(event);
+                Task::batch([dispatched, name_focused()])
+            }
+            Message::Effect(Some(event)) => self.dispatch(event),
+            Message::FocusedName(name) => {
+                self.focused_name = name;
+                Task::none()
+            }
+            Message::Pointer => name_focused(),
             Message::Effect(None) => Task::none(),
             Message::AddressChanged(draft) => {
                 self.draft = draft;
@@ -221,6 +243,18 @@ impl App {
                 self.relayout_scheduled = false;
                 if self.viewport.settling() { self.schedule_relayout() } else { Task::none() }
             }
+            Message::ToggleSourceByKey => self
+                .dispatch(Event::ToggleSource)
+                .chain(operation::focus(super::toolbar::SOURCE_ID))
+                .chain(name_focused()),
+            Message::MoveBookmarkByKey(address, by) => {
+                let moved = self.dispatch(Event::MoveBookmark(address.clone(), by));
+                match super::bookmarks::focus_after_move(&self.session().bookmarks, &address, by) {
+                    Some(id) => moved.chain(operation::focus(id)).chain(name_focused()),
+                    None => moved.chain(name_focused()),
+                }
+            }
+            Message::ToggleBookmarks => self.toggle(Panel::Bookmarks),
             Message::ToggleHistory => self.toggle(Panel::History),
             Message::ToggleSettings => self.toggle(Panel::Settings),
             Message::HomeDraftChanged(draft) => {
@@ -242,7 +276,7 @@ impl App {
             })),
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
             Message::ImagesArrived => self.images_arrived(),
-            Message::Reveal(top, bottom) => self.reveal(top, bottom),
+            Message::Reveal(top, bottom) => self.reveal(top, bottom).chain(name_focused()),
             Message::Scroll(by) => self.key_scroll(by),
             Message::Scrolled(y) => {
                 self.viewport.scrolled(y);
@@ -265,13 +299,13 @@ impl App {
         match keys::command(key.as_ref(), modifiers) {
             Some(Command::Session(event)) => self.dispatch(event),
             Some(Command::FocusAddress) => {
-                Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)])
+                Task::batch([operation::focus(ADDRESS_ID), operation::select_all(ADDRESS_ID)]).chain(name_focused())
             }
             Some(Command::Scroll(by)) => self.shortcut_scroll(by),
             Some(Command::ClosePanel) => self.close_panel(),
             Some(Command::FocusNext) => {
                 let applied = self.apply_pending_colour();
-                applied.chain(operation::focus_next()).chain(focus::reveal_focused(PAGE_ID))
+                applied.chain(operation::focus_next()).chain(focus::reveal_focused(PAGE_ID)).chain(name_focused())
             }
             Some(Command::FocusPrevious) => {
                 let applied = self.apply_pending_colour();
@@ -279,7 +313,9 @@ impl App {
                     .chain(operation::focus_previous())
                     .chain(self.enter_page_from_behind())
                     .chain(focus::reveal_focused(PAGE_ID))
+                    .chain(name_focused())
             }
+            Some(Command::ToggleBookmarks) => self.update(Message::ToggleBookmarks),
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),
             Some(Command::ToggleSettings) => self.update(Message::ToggleSettings),
             None => Task::none(),
@@ -320,26 +356,34 @@ impl App {
     fn toggle(&mut self, panel: Panel) -> Task<Message> {
         let before = self.panels;
         self.panels = panels::toggled(before, panel, self.window_width);
-        if before.lost_a_panel(self.panels) { operation::focus(PAGE_ID) } else { Task::none() }
+        if before.lost_a_panel(self.panels) { operation::focus(PAGE_ID).chain(name_focused()) } else { Task::none() }
     }
 
-    /// Esc: closes the Settings panel, or else History, and puts the keyboard back on the page.
+    /// Esc: closes the Settings panel, or else Bookmarks or History, and puts the keyboard back on the page.
     /// With none open it still does, so Esc after typing in the address bar returns to the page.
     fn close_panel(&mut self) -> Task<Message> {
         let in_source = matches!(self.session().view, View::Source(_));
         let Escaped { panels, leave_source } = escaped(self.panels, in_source);
         self.panels = panels;
-        let focus = operation::focus(PAGE_ID);
+        let focus = operation::focus(PAGE_ID).chain(name_focused());
         if leave_source { self.dispatch(Event::ToggleSource).chain(focus) } else { focus }
     }
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
             keyboard::listen().map(Message::Key),
+            iced::event::listen_with(|event, _, _| {
+                matches!(event, iced::Event::Mouse(iced::mouse::Event::ButtonPressed(_))).then_some(Message::Pointer)
+            }),
             window::resize_events().map(|(_, size)| Message::Resized(size)),
             iced::system::theme_changes().map(Message::SystemMode),
         ])
     }
+}
+
+/// Asks which control has the keyboard, for the status line.
+fn name_focused() -> Task<Message> {
+    focus::focused_name().map(Message::FocusedName)
 }
 
 pub fn run() -> iced::Result {

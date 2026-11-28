@@ -57,6 +57,9 @@ fn routes() -> HashMap<String, Reply> {
         ("/plain.md", typed("text/plain", b"# Plain Served\n")),
         ("/plain.txt", typed("text/plain", b"# Not this\n")),
         ("/untyped.md", Reply::new(200).body("# Untyped\n")),
+        ("/binary.md", typed("application/octet-stream", b"# Binary Served\n")),
+        ("/archive.bin", typed("application/octet-stream", b"# Not this either\n")),
+        ("/song.mp3", typed("audio/mpeg", b"ID3")),
         ("/page.html", typed("text/html", b"<h1>HTML</h1>")),
         ("/fake.md", typed("text/html", b"<h1>Not Markdown</h1>")),
         ("/moved.md", Reply::redirect(301, "/index.md")),
@@ -65,6 +68,9 @@ fn routes() -> HashMap<String, Reply> {
         ("/no-location.md", Reply::new(302)),
         ("/gone.md", Reply::new(410)),
         ("/broken.md", Reply::new(500)),
+        ("/private.md", Reply::new(403)),
+        ("/teapot.md", Reply::new(418)),
+        ("/busy.md", Reply::new(503)),
         ("/latin1.md", typed("text/markdown; charset=iso-8859-1", b"# Caf\xe9\n")),
         ("/bad-utf8.md", typed("text/markdown", b"# \xff\xfe\n")),
         ("/huge.md", Reply::markdown(&"x".repeat(SIZE_LIMIT as usize + 1))),
@@ -280,6 +286,9 @@ impl Browser {
             Effect::PersistVisits(visits) => {
                 self.store.save_visits(self.store.ticket(), &visits).expect("save history")
             }
+            Effect::PersistBookmarks(bookmarks) => {
+                self.store.save_bookmarks(self.store.ticket(), &bookmarks).expect("save bookmarks")
+            }
             Effect::PersistSettings(settings) => {
                 self.store.save_settings(self.store.ticket(), settings).expect("save settings")
             }
@@ -374,8 +383,9 @@ impl Browser {
     pub fn restart(&mut self) {
         self.state = Some(State::new(self.home.path()));
         let visits = self.store.load_visits();
+        let bookmarks = self.store.load_bookmarks();
         let settings = self.store.load_settings();
-        self.send(Event::Restore { visits, settings });
+        self.send(Event::Restore { visits, bookmarks, settings });
     }
 
     pub fn seed_history(&mut self, visits: Vec<Visit>) {

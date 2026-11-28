@@ -45,6 +45,7 @@ pub fn scroll(key: Key<&str>, modifiers: Modifiers, page_focused: bool) -> Optio
 pub enum Command {
     Session(Event),
     FocusAddress,
+    ToggleBookmarks,
     ToggleHistory,
     ToggleSettings,
     /// Tab and Shift+Tab, when nothing on the page used them: on to the next or previous control.
@@ -81,6 +82,8 @@ pub fn command(key: Key<&str>, modifiers: Modifiers) -> Option<Command> {
         Key::Character("r") if primary => Command::Session(Event::Reload),
         Key::Character("l") if primary => Command::FocusAddress,
         Key::Character("h") if primary => Command::ToggleHistory,
+        Key::Character("b") if primary => Command::ToggleBookmarks,
+        Key::Character("d") if primary => Command::Session(Event::ToggleBookmark),
         Key::Character(",") if primary => Command::ToggleSettings,
         // `=` and `+` are one key; Shift makes the second on most layouts. Not bare keys: those
         // type into the address bar.
@@ -144,6 +147,8 @@ mod tests {
             ("F1 or Ctrl+?", command(Key::Named(Named::F1), Modifiers::empty()), session(Event::About)),
             ("Ctrl+,", command(Key::Character(","), primary()), Some(Command::ToggleSettings)),
             ("Ctrl+H", command(Key::Character("h"), primary()), Some(Command::ToggleHistory)),
+            ("Ctrl+B", command(Key::Character("b"), primary()), Some(Command::ToggleBookmarks)),
+            ("Ctrl+D", command(Key::Character("d"), primary()), session(Event::ToggleBookmark)),
             ("Ctrl+L", command(Key::Character("l"), primary()), Some(Command::FocusAddress)),
             ("Ctrl+U", command(Key::Character("u"), primary()), session(Event::ToggleSource)),
             ("Alt+Home", command(Key::Named(Named::Home), Modifiers::ALT), session(Event::Home)),

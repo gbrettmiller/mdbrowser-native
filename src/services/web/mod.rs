@@ -65,7 +65,7 @@ fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Error
         Ok(found) => return Ok(found),
         Err(refused) => refused,
     };
-    if refused.error != web::FetchError::WrongType {
+    if !matches!(refused.error, web::FetchError::WrongType | web::FetchError::File) {
         return Err(refused.error.for_page());
     }
     let asked = refused.url.as_ref().unwrap_or(url);
@@ -74,7 +74,9 @@ fn fallback(url: &Url, limits: &Limits, origin: Origin) -> Result<Fetched, Error
         .find_map(|candidate| page(candidate, &remaining(), web::candidate_origin(origin, asked, candidate)).ok())
         .map(|found| Fetched { fallback_from: Some(url.clone()), ..found })
         .ok_or_else(|| {
-            if has_llms_txt(url, &remaining(), origin) {
+            if refused.error == web::FetchError::File {
+                ErrorCode::IsFile
+            } else if has_llms_txt(url, &remaining(), origin) {
                 ErrorCode::NotMarkdownWithLlms
             } else {
                 ErrorCode::NotMarkdown
@@ -164,7 +166,7 @@ mod tests {
         let quick = Limits { overall: Duration::from_millis(400), ..limits() };
         let started = Instant::now();
         let result = fetch(&Url::parse(&server.url("/a.md")).unwrap(), &quick, Origin::Trusted).map(|f| f.source);
-        assert_eq!(result, Err(ErrorCode::Unreachable));
+        assert_eq!(result, Err(ErrorCode::TimedOut));
         assert!(server.requests().len() < 4, "stopped by the deadline, not the hop limit");
         assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
     }
@@ -178,7 +180,14 @@ mod tests {
 
     #[test]
     fn failing_statuses() {
-        for (status, code) in [(404, ErrorCode::NotFound), (410, ErrorCode::NotFound), (500, ErrorCode::ServerError)] {
+        for (status, code) in [
+            (404, ErrorCode::NotFound),
+            (410, ErrorCode::NotFound),
+            (403, ErrorCode::NeedsSignIn(403)),
+            (400, ErrorCode::Refused(400)),
+            (429, ErrorCode::Busy(429)),
+            (500, ErrorCode::ServerError(500)),
+        ] {
             assert_eq!(source(&serve(Reply::new(status)).url("/a.md")), Err(code), "{status}");
         }
     }
@@ -328,6 +337,21 @@ mod tests {
         assert_eq!(result, Err(ErrorCode::NotMarkdown));
     }
 
+    #[test]
+    fn a_file_says_so_still_tries_fallbacks_and_offers_no_llms_txt() {
+        let server = Server::start(|request| match request.path.as_str() {
+            "/archive" => Reply::new(200).header("Content-Type", "application/zip").body("PK"),
+            "/download" => Reply::new(200).header("Content-Type", "application/zip").body("PK"),
+            "/download.md" => Reply::markdown("# Download notes"),
+            "/llms.txt" => Reply::markdown("# Site"),
+            _ => Reply::new(404),
+        });
+        let result = fallback(&Url::parse(&server.url("/archive")).unwrap(), &limits(), Origin::Trusted);
+        assert_eq!(result, Err(ErrorCode::IsFile));
+        let found = fallback(&Url::parse(&server.url("/download")).unwrap(), &limits(), Origin::Trusted).unwrap();
+        assert_eq!(found.source, "# Download notes");
+    }
+
     fn with_llms(llms: Reply) -> Server {
         Server::start(move |request| match request.path.as_str() {
             "/post" => html(),
@@ -415,7 +439,7 @@ mod tests {
                 "/post.md" => Reply::markdown("# Found"),
                 _ => Reply::new(status),
             });
-            let expected = if status == 404 { ErrorCode::NotFound } else { ErrorCode::ServerError };
+            let expected = if status == 404 { ErrorCode::NotFound } else { ErrorCode::ServerError(500) };
             assert_eq!(fall(&server, "/post"), Err(expected), "{status}");
             assert_eq!(paths(&server), ["/post"], "{status}");
         }
@@ -431,23 +455,23 @@ mod tests {
     }
 
     #[test]
-    fn a_silent_server_times_out_as_unreachable() {
+    fn a_silent_server_times_out() {
         let silent = TcpListener::bind("127.0.0.1:0").unwrap(); // connects, never answers
         let url = Url::parse(&format!("http://{}/a.md", silent.local_addr().unwrap())).unwrap();
         let quick = Limits { overall: Duration::from_millis(300), ..limits() };
         let started = Instant::now();
-        assert_eq!(fetch(&url, &quick, Origin::Trusted).map(|f| f.source), Err(ErrorCode::Unreachable));
+        assert_eq!(fetch(&url, &quick, Origin::Trusted).map(|f| f.source), Err(ErrorCode::TimedOut));
         let waited = started.elapsed();
         assert!(waited >= Duration::from_millis(250) && waited < Duration::from_secs(3), "{waited:?}");
     }
 
     #[test]
-    fn a_body_that_stalls_past_the_deadline_is_unreachable() {
+    fn a_body_that_stalls_past_the_deadline_times_out() {
         let stalled = serve(Reply::markdown("# Hi").cut_short(100, Duration::from_secs(5)));
         let quick = Limits { overall: Duration::from_millis(300), ..limits() };
         let started = Instant::now();
         let result = fetch(&Url::parse(&stalled.url("/a.md")).unwrap(), &quick, Origin::Trusted).map(|f| f.source);
-        assert_eq!(result, Err(ErrorCode::Unreachable));
+        assert_eq!(result, Err(ErrorCode::TimedOut));
         assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
     }
 

@@ -18,15 +18,17 @@ pub fn message<'a>(message: impl text::IntoFragment<'a>) -> Element<'a, Message>
     container(text(message).size(chrome_text::BODY)).padding(32).into()
 }
 
-/// The failure, a hint for pages on the web, the address it was for, and the
-/// system browser when the session offers it.
+/// The failure, the HTTP status the site answered with, a hint for pages on the
+/// web, the address it was for, and the system browser when the session offers it.
 pub fn error<'a>(code: ErrorCode, state: &State, theme: &theme::Theme) -> Element<'a, Message> {
     let muted = theme.muted;
     let (message, hint) = content::failure(code, state.current_location().is_some_and(Location::is_web));
     let (address, browser_offered) = (state.address(), state.browser_offer().is_some());
     let open = button(content::OPEN_IN_BROWSER, Some(Message::Session(Event::OpenInBrowser)));
     let llms = state.llms_offer().map(|_| button(content::TRY_LLMS_TXT, Some(Message::Session(Event::OpenLlmsTxt))));
+    let status = content::status_line(code).map(|line| text(line).size(chrome_text::BODY));
     column![text(message).size(chrome_text::HEADLINE)]
+        .push(status)
         .push(hint.map(|hint| text(hint).size(chrome_text::BODY)))
         .push(text(address).size(chrome_text::LABEL).style(move |_| text::Style { color: Some(muted) }))
         .push(row![].push(browser_offered.then_some(open)).push(llms).spacing(8))

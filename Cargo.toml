@@ -47,6 +47,8 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 iced = { version = "0.14", features = ["canvas", "advanced", "image-without-codecs"] }
 open = { version = "5.4.5", features = ["shellexecute-on-windows"] }
 pulldown-cmark = "0.13"
+# Only for the certificate error type inside ureq's errors; the same crate ureq already uses.
+rustls = { version = "0.23.46", default-features = false }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 ureq = "3.5.0"
