@@ -132,6 +132,19 @@ Feature: Shared front matter
     And there is no byline
     And the page offers no Previous or Next
 
+  Scenario: Blank lines around the keys, as Dave writes them
+    Given a file "post.md" containing "---\n\nauthor: Dave Winer\n\ndescription: An editor\n\n---\n\n# The Post"
+    When I view "post.md"
+    Then the byline reads "Dave Winer"
+    And the description reads "An editor"
+    And I see the document titled "The Post"
+
+  Scenario: A page that opens with a rule keeps it
+    Given a file "post.md" containing "---\n\nA line between rules.\n\n---\n\n# The Post"
+    When I view "post.md"
+    Then there is no byline
+    And the text "A line between rules." appears once on the page
+
   Scenario: Malformed front matter doesn't stop the page
     Given a file "post.md" containing "---\nauthor: [unclosed\n---\n# Body Survives"
     When I view "post.md"

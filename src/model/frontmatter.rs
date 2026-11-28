@@ -4,22 +4,34 @@
 use yaml_rust2::{Yaml, YamlLoader};
 
 /// Splits a leading front matter block from the body. The block opens with `---` on the first
-/// line, not followed by a blank line (so a leading thematic break stays a rule), and closes with
-/// `---` or `...`. Anything else is all body.
+/// line and closes with `---` or `...`. When a blank line follows the opening `---`, the block
+/// counts only if it reads as YAML keys and values: otherwise it is a leading thematic break,
+/// and stays a rule. Anything else is all body.
 pub fn split(source: &str) -> (Option<&str>, &str) {
     let text = source.strip_prefix('\u{feff}').unwrap_or(source);
     let Some(rest) = after_opening_fence(text) else { return (None, source) };
-    if rest.lines().next().is_none_or(|line| line.trim().is_empty()) {
+    let Some((block, body)) = until_closing_fence(rest) else { return (None, source) };
+    let blank_first = rest.lines().next().is_none_or(|line| line.trim().is_empty());
+    if blank_first && !is_mapping(block) {
         return (None, source);
     }
+    (Some(block), body)
+}
+
+fn until_closing_fence(rest: &str) -> Option<(&str, &str)> {
     let mut offset = 0;
     for line in rest.split_inclusive('\n') {
         if matches!(line.trim_end(), "---" | "...") {
-            return (Some(&rest[..offset]), &rest[offset + line.len()..]);
+            return Some((&rest[..offset], &rest[offset + line.len()..]));
         }
         offset += line.len();
     }
-    (None, source)
+    None
+}
+
+/// Whether `yaml` is one document of keys and values, as front matter is.
+fn is_mapping(yaml: &str) -> bool {
+    YamlLoader::load_from_str(yaml).is_ok_and(|documents| matches!(documents.as_slice(), [Yaml::Hash(_)]))
 }
 
 fn after_opening_fence(text: &str) -> Option<&str> {
@@ -123,9 +135,31 @@ mod tests {
         assert_eq!(split("--- \nx\n---  \n"), (Some("x\n"), ""));
     }
 
+    /// A blank line after the opening `---` could start a rule, so the block counts only if it
+    /// reads as YAML keys and values, as Dave's posts do.
+    #[test]
+    fn a_blank_line_after_the_fence_is_front_matter_only_if_it_is_a_mapping() {
+        let dave = "---\n\ntitle: \"An editor\"\n\ndescription: \"Help\"\n\n---\n\n# An editor\n";
+        assert_eq!(split(dave), (Some("\ntitle: \"An editor\"\n\ndescription: \"Help\"\n\n"), "\n# An editor\n"));
+        assert_eq!(parse(split(dave).0.expect("front matter")).title.as_deref(), Some("An editor"));
+        for rules in [
+            "---\n\nA paragraph between rules.\n\n---\n",
+            "---\n\n---\n",
+            "---\n\n- a\n- b\n\n---\n",
+            "---\n\nkey: [unclosed\n---\n",
+        ] {
+            assert_eq!(split(rules), (None, rules), "{rules:?} stays Markdown");
+        }
+    }
+
     #[test]
     fn leaves_documents_without_a_leading_block_alone() {
-        for source in ["# Title\n\n---\ntitle: x\n---\n", "---\n\nNot front matter\n---\n", "---\ntitle: unclosed\n"] {
+        for source in [
+            "# Title\n\n---\ntitle: x\n---\n",
+            "---\n\nNot front matter\n---\n",
+            "---\n\ntitle: unclosed\n",
+            "---\ntitle: unclosed\n",
+        ] {
             assert_eq!(split(source), (None, source), "{source:?}");
         }
     }
