@@ -56,6 +56,8 @@ pub enum Message {
     /// The window changed size; the width decides how many panels fit beside the page.
     Resized(Size),
     Relayout,
+    /// Enter or Space on the source button: switch the view, and keep the keyboard on the button.
+    ToggleSourceByKey,
     /// Enter or Space on a bookmark's move button: move it, and keep the keyboard on it.
     MoveBookmarkByKey(String, crate::session::bookmarks::Move),
     ToggleBookmarks,
@@ -241,6 +243,10 @@ impl App {
                 self.relayout_scheduled = false;
                 if self.viewport.settling() { self.schedule_relayout() } else { Task::none() }
             }
+            Message::ToggleSourceByKey => self
+                .dispatch(Event::ToggleSource)
+                .chain(operation::focus(super::toolbar::SOURCE_ID))
+                .chain(name_focused()),
             Message::MoveBookmarkByKey(address, by) => {
                 let moved = self.dispatch(Event::MoveBookmark(address.clone(), by));
                 match super::bookmarks::focus_after_move(&self.session().bookmarks, &address, by) {

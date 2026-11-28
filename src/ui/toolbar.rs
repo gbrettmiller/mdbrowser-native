@@ -1,6 +1,7 @@
 //! Back, forward, reload, the source toggle, Home, the address bar, the bookmark star, and the
 //! Bookmarks, History and Settings toggles, all as icons but the address bar (ADR-016).
 
+use iced::advanced::widget::Id;
 use iced::widget::{row, text_input};
 use iced::{Element, Fill};
 
@@ -52,6 +53,15 @@ pub fn bookmark_button(state: &State) -> (Icon, bool) {
     (icon, state.bookmarkable().is_some())
 }
 
+/// The source button, so a keyboard press can keep the keyboard on it.
+pub const SOURCE_ID: &str = "source";
+
+/// What a click and a key press on the source button send. Both switch the view; the key
+/// press also keeps the keyboard on the button, where a click (or Ctrl+U) puts it on the page.
+fn source_messages(enabled: bool) -> (Option<Message>, Option<Message>) {
+    (enabled.then_some(Message::Session(Event::ToggleSource)), enabled.then_some(Message::ToggleSourceByKey))
+}
+
 fn stop<'a>(state: &'a State, draft: &'a str, at: Stop) -> Element<'a, Message> {
     let nav = &state.nav;
     let session = |event: Event| Message::Session(event);
@@ -61,7 +71,8 @@ fn stop<'a>(state: &'a State, draft: &'a str, at: Stop) -> Element<'a, Message> 
         Stop::Reload => icon::button(Icon::Reload, nav.current().is_some().then(|| session(Event::Reload))),
         Stop::Source => {
             let (view, enabled) = source_button(state);
-            icon::button(view, enabled.then(|| session(Event::ToggleSource)))
+            let (click, key) = source_messages(enabled);
+            icon::button_with_id(view, click, key, Id::new(SOURCE_ID))
         }
         Stop::Home => icon::button(Icon::Home, Some(session(Event::Home))),
         Stop::Address => text_input(content::ADDRESS_PLACEHOLDER, draft)
@@ -103,6 +114,14 @@ mod tests {
         let at = |stop| ORDER.iter().position(|&s| s == stop).expect("in the toolbar");
         assert_eq!(at(Stop::Source), at(Stop::Reload) + 1);
         assert_eq!(ORDER.len(), 10, "every stop appears once");
+    }
+
+    #[test]
+    fn a_key_press_on_the_source_button_keeps_the_keyboard_there_and_a_click_does_not() {
+        let (click, key) = source_messages(true);
+        assert!(matches!(click, Some(Message::Session(Event::ToggleSource))));
+        assert!(matches!(key, Some(Message::ToggleSourceByKey)));
+        assert!(matches!(source_messages(false), (None, None)), "no page, no stop");
     }
 
     #[test]

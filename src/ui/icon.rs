@@ -1,18 +1,24 @@
 //! Icon buttons (ADR-016): a Font Awesome glyph, a tooltip naming the action and its shortcut,
 //! and the same name for the status line while the button has the keyboard.
 
-use iced::Element;
 use iced::advanced::widget::Id;
+use iced::alignment::Horizontal;
 use iced::widget::{text, tooltip};
+use iced::{Element, Length};
 
 use super::app::Message;
 use super::focus;
 use crate::content;
-use crate::theme::chrome_text;
-use crate::theme::icons::Icon;
+use crate::theme::icons::{self, Icon};
 
+/// Every icon in the same box, centred, so one swapped for another moves nothing beside it.
 fn glyph<'a>(icon: Icon) -> Element<'a, Message> {
-    text(icon.glyph()).font(icon.font()).size(chrome_text::BODY).into()
+    text(icon.glyph())
+        .font(icon.font())
+        .size(icons::SIZE)
+        .width(Length::Fixed(icons::WIDTH))
+        .align_x(Horizontal::Center)
+        .into()
 }
 
 fn name(icon: Icon) -> String {

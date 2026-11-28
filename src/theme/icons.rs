@@ -5,6 +5,11 @@ use iced::Font;
 use iced::font::{Family, Weight};
 
 pub const ICON_FAMILY: &str = "Font Awesome 7 Free";
+/// An icon's size: the chrome's body text.
+pub const SIZE: f32 = super::chrome_text::BODY;
+/// The width every icon is drawn in, centred: the widest glyph at `SIZE`, so icons that swap
+/// in place keep the same width.
+pub const WIDTH: f32 = 18.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Icon {
@@ -111,6 +116,30 @@ mod tests {
             assert!(matches!(face.source, Source::Binary(_)), "{icon:?} came from the host");
             let font = system.get_font(id, weight).expect("font loads");
             assert_ne!(font.as_swash().charmap().map(icon.glyph()), 0, "{icon:?} has no glyph");
+        }
+    }
+
+    /// Every icon fits the one box width, so swapping one icon for another (Source and Page,
+    /// the two stars) never moves the rest of the toolbar.
+    #[test]
+    fn every_icon_fits_the_box() {
+        install();
+        let mut guard = font_system().write().expect("font system lock");
+        let system = guard.raw();
+        for icon in Icon::ALL {
+            let weight = fontdb_weight(icon.weight());
+            let query = Query {
+                families: &[fontdb::Family::Name(ICON_FAMILY)],
+                weight,
+                stretch: Stretch::Normal,
+                style: Style::Normal,
+            };
+            let id = system.db().query(&query).expect("face");
+            let font = system.get_font(id, weight).expect("font loads");
+            let font = font.as_swash();
+            let glyph = font.charmap().map(icon.glyph());
+            let advance = font.glyph_metrics(&[]).advance_width(glyph) / f32::from(font.metrics(&[]).units_per_em);
+            assert!(advance * SIZE <= WIDTH, "{icon:?} is {} px wide", advance * SIZE);
         }
     }
 
