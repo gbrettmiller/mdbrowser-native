@@ -214,6 +214,22 @@ pub const RELOAD: &str = "Reload";
 pub const HISTORY: &str = "History";
 pub const CLEAR_HISTORY: &str = "Clear History";
 pub const HISTORY_EMPTY: &str = "Nothing here yet. Documents you open are listed here.";
+pub const BOOKMARKS: &str = "Bookmarks";
+pub const BOOKMARKS_EMPTY: &str = "No bookmarks yet. Press ☆ or Ctrl+D on a page to keep it here.";
+/// The toolbar's bookmark toggle: an empty star to add the page, a filled one when it is kept.
+pub const BOOKMARK: &str = "☆";
+pub const BOOKMARKED: &str = "★";
+pub fn bookmark_tooltip(bookmarked: bool, mac: bool) -> String {
+    let what = if bookmarked { "Remove this bookmark" } else { "Bookmark this page" };
+    format!("{what} ({}+D)", if mac { "Cmd" } else { "Ctrl" })
+}
+/// Each bookmark's own buttons, and what a screen reader or tooltip calls them.
+pub const MOVE_UP: &str = "↑";
+pub const MOVE_DOWN: &str = "↓";
+pub const REMOVE_BOOKMARK: &str = "×";
+pub const MOVE_UP_TIP: &str = "Move up";
+pub const MOVE_DOWN_TIP: &str = "Move down";
+pub const REMOVE_BOOKMARK_TIP: &str = "Remove bookmark";
 pub const DISMISS: &str = "Dismiss";
 pub const OPEN_IN_BROWSER: &str = "Open in browser";
 pub const ADDRESS_PLACEHOLDER: &str = "Path or web address of a Markdown file, e.g. ~/notes/index.md";

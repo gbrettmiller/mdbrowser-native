@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::about;
 use super::address::parse_address;
+use super::bookmarks::{self, Bookmark};
 use super::error::ErrorCode;
 use super::images::{ImageLoading, Images};
 use super::links::{self, Link};
@@ -24,7 +25,7 @@ pub(super) fn none(state: State) -> Step {
 
 pub fn step(state: State, event: Event) -> Step {
     match event {
-        Event::Enter(input) | Event::OpenHistory(input) => {
+        Event::Enter(input) | Event::OpenHistory(input) | Event::OpenBookmark(input) => {
             let entry = entry_for(&input, &state);
             navigate_to(state, entry)
         }
@@ -60,6 +61,21 @@ pub fn step(state: State, event: Event) -> Step {
             None => none(state),
         },
         Event::ClearHistory => persist_visits(State { visits: Vec::new(), ..state }),
+        Event::ToggleBookmark => match state.bookmarkable() {
+            Some((address, title)) => {
+                let changed = bookmarks::toggle(&state.bookmarks, &address, title);
+                save_bookmarks(state, changed)
+            }
+            None => none(state),
+        },
+        Event::RemoveBookmark(address) => {
+            let changed = bookmarks::remove(&state.bookmarks, &address);
+            save_bookmarks(state, changed)
+        }
+        Event::MoveBookmark(address, by) => {
+            let changed = bookmarks::shift(&state.bookmarks, &address, by);
+            save_bookmarks(state, changed)
+        }
         Event::ChooseFont(font) => update_settings(state, |settings| Settings { font, ..settings }),
         Event::ChooseAppearance(appearance) => choose_appearance(state, appearance),
         Event::ChooseCustomColour(which, typed) => choose_colour(state, which, &typed),
@@ -87,7 +103,7 @@ pub fn step(state: State, event: Event) -> Step {
             none(State { notices, ..state })
         }
         Event::FragmentHandled => none(State { fragment: None, ..state }),
-        Event::Restore { visits, settings } => none(State { visits, settings, ..state }),
+        Event::Restore { visits, bookmarks, settings } => none(State { visits, bookmarks, settings, ..state }),
     }
 }
 
@@ -199,6 +215,11 @@ fn notice(state: State, kind: NoticeKind) -> Step {
 fn persist_visits(state: State) -> Step {
     let effects = vec![Effect::PersistVisits(state.visits.clone())];
     (state, effects)
+}
+
+fn save_bookmarks(state: State, bookmarks: Vec<Bookmark>) -> Step {
+    let effects = vec![Effect::PersistBookmarks(bookmarks.clone())];
+    (State { bookmarks, ..state }, effects)
 }
 
 /// Applies a change to the images and turns the loads it starts into effects,

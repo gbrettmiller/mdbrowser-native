@@ -1,4 +1,4 @@
-//! Persists History and settings as small JSON files in the user's data directory.
+//! Persists History, Bookmarks and settings as small JSON files in the user's data directory.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::session::Settings;
+use crate::session::bookmarks::{self, Bookmark};
 use crate::session::images::ImageLoading;
 use crate::session::visits::{self, Visit};
 use crate::theme::colours::{self, Colours};
@@ -44,6 +45,14 @@ impl Store {
 
     pub fn load_visits(&self) -> Vec<Visit> {
         std::fs::read_to_string(self.file(HISTORY)).map(|raw| visits::parse_stored(&raw)).unwrap_or_default()
+    }
+
+    pub fn load_bookmarks(&self) -> Vec<Bookmark> {
+        std::fs::read_to_string(self.file(BOOKMARKS)).map(|raw| bookmarks::parse_stored(&raw)).unwrap_or_default()
+    }
+
+    pub fn save_bookmarks(&self, ticket: Ticket, bookmarks: &[Bookmark]) -> std::io::Result<()> {
+        self.save(BOOKMARKS, ticket, &bookmarks::to_stored(bookmarks))
     }
 
     pub fn ticket(&self) -> Ticket {
@@ -114,6 +123,7 @@ fn stored_colours(stored: &serde_json::Value) -> Option<Colours> {
 }
 
 const HISTORY: &str = "history.json";
+const BOOKMARKS: &str = "bookmarks.json";
 const SETTINGS: &str = "settings.json";
 /// Real settings files are a few hundred bytes; anything past this isn't one of ours.
 const MAX_SETTINGS_BYTES: u64 = 64 * 1024;
@@ -145,7 +155,23 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::at(dir.path().join("not-yet-created"));
         assert_eq!(store.load_visits(), vec![]);
+        assert_eq!(store.load_bookmarks(), vec![]);
         assert_eq!(store.load_settings(), Settings::default());
+    }
+
+    #[test]
+    fn bookmarks_round_trip_in_their_order_apart_from_history() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::at(dir.path());
+        let mark = |address: &str| Bookmark { address: address.into(), title: address.into() };
+        store.save_visits(store.ticket(), &[visit("/a.md")]).unwrap();
+        store.save_bookmarks(store.ticket(), &[mark("/z.md"), mark("/a.md")]).unwrap();
+        store.save_visits(store.ticket(), &[]).unwrap();
+        assert_eq!(store.load_bookmarks(), vec![mark("/z.md"), mark("/a.md")]);
+        let stale = store.ticket();
+        store.save_bookmarks(store.ticket(), &[mark("/a.md")]).unwrap();
+        store.save_bookmarks(stale, &[]).unwrap();
+        assert_eq!(store.load_bookmarks(), vec![mark("/a.md")], "an older save doesn't overwrite a newer one");
     }
 
     #[test]

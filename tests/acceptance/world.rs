@@ -286,6 +286,9 @@ impl Browser {
             Effect::PersistVisits(visits) => {
                 self.store.save_visits(self.store.ticket(), &visits).expect("save history")
             }
+            Effect::PersistBookmarks(bookmarks) => {
+                self.store.save_bookmarks(self.store.ticket(), &bookmarks).expect("save bookmarks")
+            }
             Effect::PersistSettings(settings) => {
                 self.store.save_settings(self.store.ticket(), settings).expect("save settings")
             }
@@ -380,8 +383,9 @@ impl Browser {
     pub fn restart(&mut self) {
         self.state = Some(State::new(self.home.path()));
         let visits = self.store.load_visits();
+        let bookmarks = self.store.load_bookmarks();
         let settings = self.store.load_settings();
-        self.send(Event::Restore { visits, settings });
+        self.send(Event::Restore { visits, bookmarks, settings });
     }
 
     pub fn seed_history(&mut self, visits: Vec<Visit>) {

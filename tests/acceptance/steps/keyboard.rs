@@ -278,6 +278,7 @@ fn smallest_window(_w: &mut Browser, width: f32, height: f32) {
 
 fn panel(name: &str) -> Panel {
     match name {
+        "Bookmarks" => Panel::Bookmarks,
         "History" => Panel::History,
         "Settings" => Panel::Settings,
         other => panic!("no panel named {other}"),
@@ -302,5 +303,5 @@ fn panel_closed(w: &mut Browser, name: String) {
 
 #[then("both panels are open")]
 fn both_open(w: &mut Browser) {
-    assert!(w.keys.panels.history && w.keys.panels.settings);
+    assert!(w.keys.panels.list.is_some() && w.keys.panels.settings);
 }

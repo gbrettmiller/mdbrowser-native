@@ -1,4 +1,5 @@
-//! Back, forward, reload, the source toggle, Home, the address bar, and the History and Settings toggles.
+//! Back, forward, reload, the source toggle, Home, the address bar, the bookmark star, and the
+//! Bookmarks, History and Settings toggles.
 
 use iced::widget::{row, text, text_input, tooltip};
 use iced::{Element, Fill};
@@ -17,17 +18,35 @@ enum Stop {
     Source,
     Home,
     Address,
+    Bookmark,
+    Bookmarks,
     History,
     Settings,
 }
 
-const ORDER: [Stop; 8] =
-    [Stop::Back, Stop::Forward, Stop::Reload, Stop::Source, Stop::Home, Stop::Address, Stop::History, Stop::Settings];
+const ORDER: [Stop; 10] = [
+    Stop::Back,
+    Stop::Forward,
+    Stop::Reload,
+    Stop::Source,
+    Stop::Home,
+    Stop::Address,
+    Stop::Bookmark,
+    Stop::Bookmarks,
+    Stop::History,
+    Stop::Settings,
+];
 
 /// The source button's label, and whether it can be pressed: only with a page shown.
 pub fn source_button(state: &State) -> (&'static str, bool) {
     let label = if matches!(state.view, View::Source(_)) { content::PAGE } else { content::SOURCE };
     (label, matches!(state.status, Status::Ready(_)))
+}
+
+/// The star's label, and whether it can be pressed: only on a page that can be bookmarked.
+pub fn bookmark_button(state: &State) -> (&'static str, bool) {
+    let label = if state.is_bookmarked() { content::BOOKMARKED } else { content::BOOKMARK };
+    (label, state.bookmarkable().is_some())
 }
 
 fn stop<'a>(state: &'a State, draft: &'a str, at: Stop) -> Element<'a, Message> {
@@ -50,6 +69,17 @@ fn stop<'a>(state: &'a State, draft: &'a str, at: Stop) -> Element<'a, Message> 
             .on_submit(Message::Submit)
             .width(Fill)
             .into(),
+        Stop::Bookmark => {
+            let (label, enabled) = bookmark_button(state);
+            let tip = content::bookmark_tooltip(state.is_bookmarked(), cfg!(target_os = "macos"));
+            tooltip(
+                button(label, enabled.then(|| session(Event::ToggleBookmark))),
+                text(tip),
+                tooltip::Position::Bottom,
+            )
+            .into()
+        }
+        Stop::Bookmarks => button(content::BOOKMARKS, Some(Message::ToggleBookmarks)),
         Stop::History => button(content::HISTORY, Some(Message::ToggleHistory)),
         Stop::Settings => button(content::SETTINGS, Some(Message::ToggleSettings)),
     }
@@ -77,7 +107,18 @@ mod tests {
     fn the_source_button_follows_reload_in_tab_order() {
         let at = |stop| ORDER.iter().position(|&s| s == stop).expect("in the toolbar");
         assert_eq!(at(Stop::Source), at(Stop::Reload) + 1);
-        assert_eq!(ORDER.len(), 8, "every stop appears once");
+        assert_eq!(ORDER.len(), 10, "every stop appears once");
+    }
+
+    #[test]
+    fn the_star_follows_the_address_bar_and_shows_whether_the_page_is_kept() {
+        let at = |stop| ORDER.iter().position(|&s| s == stop).expect("in the toolbar");
+        assert_eq!(at(Stop::Bookmark), at(Stop::Address) + 1);
+        let page = ready();
+        assert_eq!(bookmark_button(&page), (content::BOOKMARK, true));
+        let (kept, _) = step(page, Event::ToggleBookmark);
+        assert_eq!(bookmark_button(&kept), (content::BOOKMARKED, true));
+        assert_eq!(bookmark_button(&State::new(native("/home/r"))), (content::BOOKMARK, false), "nothing shown");
     }
 
     #[test]

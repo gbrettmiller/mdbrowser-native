@@ -36,6 +36,7 @@ mdBrowser opens web addresses: type or paste one into the address bar, or follow
 - Renders CommonMark plus GitHub tables, task lists and strikethrough. In-page `#anchors` use GitHub heading slugs.
 - Takes the window title from front matter `title`, then the first heading, then the file name.
 - Back, forward, reload, and a History panel that persists across restarts.
+- Bookmarks: ☆ in the toolbar (or Ctrl+D) keeps the page you're reading, and the **Bookmarks** panel (Ctrl+B) lists them in your own order. New ones go at the end; ↑ and ↓ move one, × removes it. A built-in page or an error can't be bookmarked.
 - Four bundled reading faces: Literata (default), Source Serif 4, iA Writer Quattro and Inter. Code is set in JetBrains Mono.
 - A **Settings** panel (Ctrl+, or Cmd+,) holds the reading font, text size (12 to 32 px in steps of 2), spacing (Compact, Comfortable or Spacious), Web images, Appearance (System, Light, Dark, one of seven presets, or Custom) and a Home page, with a button that puts size and spacing back. System follows the operating system. Custom takes page, text and link colours as `#rgb` or `#rrggbb` (applied on Enter or Tab), and refuses a set whose text or links fall below WCAG AA contrast (4.5:1) on the page. Home (the toolbar button or Alt+Home) opens the home page, or a built-in welcome page when none is set, and the app opens it on launch unless you give an address.
 - Reads the shared Web of Markdown front matter: a byline under the title from `author`, `pubDate` and the `source` site name, a `description`, a **Listen** line for an `enclosure` (a link like any other: it isn't Markdown, so you are offered **Open in browser**), and **Previous** and **Next** links from `urlPrev` and `urlNext`. Other keys, and the `image`, `inlineImage` and `metaImage` fields, are ignored.
@@ -76,6 +77,8 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Reload | Ctrl+R or F5 | Cmd+R or F5 |
 | Focus the address bar | Ctrl+L | Cmd+L |
 | Show or hide History | Ctrl+H | The History button (Cmd+H hides the app on macOS) |
+| Show or hide Bookmarks | Ctrl+B | Cmd+B |
+| Bookmark this page, or remove it | Ctrl+D | Cmd+D |
 | Show or hide Settings | Ctrl+, | Cmd+, |
 | About mdBrowser: version, licence, what the app sends, shortcuts, FAQ | F1 or Ctrl+? | F1 or Cmd+? (F1 may need Fn) |
 | Previous / next post | Ctrl+[ / Ctrl+] | Cmd+[ / Cmd+] |
@@ -92,11 +95,11 @@ The first build takes a few minutes. The app ends up at `target/release/mdbrowse
 | Scroll a line, or to the top or bottom | Up / Down, Home / End, when the page has focus | the same |
 | Close a panel and return to the page | Esc | Esc |
 
-Opening a page puts the keyboard on it, so the scroll keys work at once. While you type in a text field, only PageUp and PageDown scroll the page; Tab or Esc takes you out of the field. A ring in the link colour shows where focus is. The window can't be made smaller than 620 by 360, and if History and Settings are both open and there isn't room for the page beside them, opening one closes the other. Screen readers are not supported yet: iced has no accessibility tree.
+Opening a page puts the keyboard on it, so the scroll keys work at once. While you type in a text field, only PageUp and PageDown scroll the page; Tab or Esc takes you out of the field. A ring in the link colour shows where focus is. The window can't be made smaller than 620 by 360, Bookmarks and History share one side of the window, so opening one closes the other; if one of them and Settings are both open and there isn't room for the page beside them, opening one closes the other. Screen readers are not supported yet: iced has no accessibility tree.
 
 ### Where your data lives
 
-History and settings are kept in an `mdbrowser` folder in your user data directory:
+History, Bookmarks and settings are kept in an `mdbrowser` folder in your user data directory:
 
 | OS | Folder |
 |---|---|

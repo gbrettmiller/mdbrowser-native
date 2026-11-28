@@ -12,7 +12,8 @@ use crate::session::location::Location;
 use crate::session::{Event, Shown, Status, View};
 use crate::theme::{self, chrome_text};
 use crate::ui::document::{Document, Handlers};
-use crate::ui::{body, history, images, settings, toolbar};
+use crate::ui::panels::List;
+use crate::ui::{body, bookmarks, history, images, settings, toolbar};
 
 impl App {
     pub(super) fn title(&self) -> String {
@@ -62,7 +63,10 @@ impl App {
             .height(Fill)
             .style(move |_| container::Style { background: Some(background.into()), ..container::Style::default() });
         let panels = row![page]
-            .push(self.panels.history.then(|| history::panel(state, self.palette())))
+            .push(self.panels.list.map(|list| match list {
+                List::Bookmarks => bookmarks::panel(state, self.palette()),
+                List::History => history::panel(state, self.palette()),
+            }))
             .push(self.panels.settings.then(|| settings::panel(state, &self.home_draft, &self.colour_drafts)));
         let content: Element<'_, Message> = panels.into();
         let status = self.hover.clone().unwrap_or_default();

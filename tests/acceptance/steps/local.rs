@@ -90,7 +90,7 @@ fn entered_and_failed(w: &mut Browser, name: String, code: String) {
 
 #[given(expr = "I am viewing {string}")]
 #[given(expr = "I viewed {string}")]
-fn viewing(w: &mut Browser, name: String) {
+pub(super) fn viewing(w: &mut Browser, name: String) {
     enter_absolute(w, name.clone());
     still_viewing(w, name);
 }

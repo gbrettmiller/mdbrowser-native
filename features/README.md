@@ -5,6 +5,7 @@ Gherkin specs for user-visible behaviour, ported from the predecessor `mdbrowser
 `cargo test` runs them through the `cucumber` crate (`tests/acceptance/`). Steps drive the real session reducer, read real files in a temporary home, fetch real pages from a local web server, and persist through the real store. Only the system opener is faked. Steps assert on session state and recorded effects, never on pixels. The one exception is "set in", which inspects the font faces that shaped the laid-out page.
 
 - `browse.feature` — addresses, links, back/forward, reload, errors and History (ported from `mdbrowser`)
+- `bookmarks.feature` — bookmarking the shown page, the reader's own order (move up and down), removing, opening, restart, what can't be bookmarked, and Bookmarks sharing History's side
 - `reading.feature` — choosing the reading font
 - `reader-controls.feature` — text size and its limits, the three spacings, custom colours (hex, refusals, readability), reset, and settings files from earlier phases
 - `settings.feature` — appearance (System, Light, Dark), the home page and the Home button, and the built-in welcome page

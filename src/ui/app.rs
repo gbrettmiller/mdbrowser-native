@@ -56,6 +56,9 @@ pub enum Message {
     /// The window changed size; the width decides how many panels fit beside the page.
     Resized(Size),
     Relayout,
+    /// Enter or Space on a bookmark's move button: move it, and keep the keyboard on it.
+    MoveBookmarkByKey(String, crate::session::bookmarks::Move),
+    ToggleBookmarks,
     ToggleHistory,
     ToggleSettings,
     HomeDraftChanged(String),
@@ -98,6 +101,7 @@ impl App {
     fn boot() -> (Self, Task<Message>) {
         let store = Store::default_location().map(Arc::new);
         let visits = store.as_ref().map(|store| store.load_visits()).unwrap_or_default();
+        let bookmarks = store.as_ref().map(|store| store.load_bookmarks()).unwrap_or_default();
         let settings = store.as_ref().map(|store| store.load_settings()).unwrap_or_default();
         let home = dirs::home_dir().unwrap_or_else(|| "/".into());
         let mut app = App {
@@ -113,7 +117,7 @@ impl App {
             viewport: Viewport::new(WINDOW_SIZE.0 - SCROLLBAR, WINDOW_SIZE.1),
             relayout_scheduled: false,
         };
-        let restore = app.dispatch(Event::Restore { visits, settings });
+        let restore = app.dispatch(Event::Restore { visits, bookmarks, settings });
         let argument = files::launch_address_from_environment();
         let focus = if argument.is_none() { operation::focus(ADDRESS_ID) } else { Task::none() };
         let open = Task::batch([app.dispatch(Event::Launch(argument)), focus]);
@@ -221,6 +225,14 @@ impl App {
                 self.relayout_scheduled = false;
                 if self.viewport.settling() { self.schedule_relayout() } else { Task::none() }
             }
+            Message::MoveBookmarkByKey(address, by) => {
+                let moved = self.dispatch(Event::MoveBookmark(address.clone(), by));
+                match super::bookmarks::focus_after_move(&self.session().bookmarks, &address, by) {
+                    Some(id) => moved.chain(operation::focus(id)),
+                    None => moved,
+                }
+            }
+            Message::ToggleBookmarks => self.toggle(Panel::Bookmarks),
             Message::ToggleHistory => self.toggle(Panel::History),
             Message::ToggleSettings => self.toggle(Panel::Settings),
             Message::HomeDraftChanged(draft) => {
@@ -280,6 +292,7 @@ impl App {
                     .chain(self.enter_page_from_behind())
                     .chain(focus::reveal_focused(PAGE_ID))
             }
+            Some(Command::ToggleBookmarks) => self.update(Message::ToggleBookmarks),
             Some(Command::ToggleHistory) => self.update(Message::ToggleHistory),
             Some(Command::ToggleSettings) => self.update(Message::ToggleSettings),
             None => Task::none(),
@@ -323,7 +336,7 @@ impl App {
         if before.lost_a_panel(self.panels) { operation::focus(PAGE_ID) } else { Task::none() }
     }
 
-    /// Esc: closes the Settings panel, or else History, and puts the keyboard back on the page.
+    /// Esc: closes the Settings panel, or else Bookmarks or History, and puts the keyboard back on the page.
     /// With none open it still does, so Esc after typing in the address bar returns to the page.
     fn close_panel(&mut self) -> Task<Message> {
         let in_source = matches!(self.session().view, View::Source(_));

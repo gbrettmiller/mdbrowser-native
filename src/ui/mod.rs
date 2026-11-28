@@ -2,6 +2,7 @@
 
 pub mod app;
 mod body;
+mod bookmarks;
 mod chrome;
 pub mod document;
 mod focus;

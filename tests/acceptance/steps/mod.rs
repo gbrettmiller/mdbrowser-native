@@ -2,6 +2,7 @@
 //! requests the test server saw, never on pixels.
 
 mod about;
+mod bookmarks;
 mod fallbacks;
 mod frontmatter;
 mod images;

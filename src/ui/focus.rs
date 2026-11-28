@@ -30,6 +30,23 @@ pub fn button<'a, Message: Clone + 'a>(
     pressable(widgets::button(content).on_press_maybe(on_press.clone()), on_press)
 }
 
+/// A `button` that `operation::focus(id)` can reach, and whose Enter or Space sends `on_key`
+/// rather than the click's message.
+pub fn button_with_id<'a, Message: Clone + 'a>(
+    content: impl Into<Element<'a, Message>>,
+    on_press: Option<Message>,
+    on_key: Option<Message>,
+    id: Id,
+) -> Element<'a, Message> {
+    let reachable = on_key.is_some();
+    Element::new(FocusStop {
+        content: widgets::button(content).on_press_maybe(on_press).into(),
+        keys: Keys { press: on_key, previous: None, next: None },
+        reachable,
+        id: Some(id),
+    })
+}
+
 /// The same for a button built by hand (to style it): `button` must carry the same `on_press`.
 pub fn pressable<'a, Message: Clone + 'a>(
     button: impl Into<Element<'a, Message>>,
@@ -40,6 +57,7 @@ pub fn pressable<'a, Message: Clone + 'a>(
         content: button.into(),
         keys: Keys { press: on_press, previous: None, next: None },
         reachable,
+        id: None,
     })
 }
 
@@ -50,7 +68,12 @@ pub fn choice<'a, Message: Clone + 'a>(
     previous: Option<Message>,
     next: Option<Message>,
 ) -> Element<'a, Message> {
-    Element::new(FocusStop { content: content.into(), keys: Keys { press: None, previous, next }, reachable: true })
+    Element::new(FocusStop {
+        content: content.into(),
+        keys: Keys { press: None, previous, next },
+        reachable: true,
+        id: None,
+    })
 }
 
 /// The option before or after `current`, if there is one: where Up and Down take a choice.
@@ -195,6 +218,8 @@ struct FocusStop<'a, Message> {
     content: Element<'a, Message>,
     keys: Keys<Message>,
     reachable: bool,
+    /// For `operation::focus`; most stops are reached only by Tab.
+    id: Option<Id>,
 }
 
 #[derive(Default)]
@@ -244,7 +269,7 @@ impl<Message: Clone> Widget<Message, Theme, Renderer> for FocusStop<'_, Message>
     fn operate(&mut self, tree: &mut Tree, layout: Layout<'_>, renderer: &Renderer, operation: &mut dyn Operation) {
         let state = tree.state.downcast_mut::<State>();
         if in_tab_order(self.reachable, state.focused) {
-            operation.focusable(None, layout.bounds(), state);
+            operation.focusable(self.id.as_ref(), layout.bounds(), state);
         }
         self.content.as_widget_mut().operate(&mut tree.children[0], layout, renderer, operation);
     }
