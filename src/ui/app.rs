@@ -205,7 +205,7 @@ impl App {
         let focus = if about {
             // About is a page: two overlays would compete with it in a small window.
             self.panels = panels::Open::default();
-            operation::focus(PAGE_ID)
+            operation::focus(PAGE_ID).chain(name_focused())
         } else {
             Task::none()
         };
@@ -276,7 +276,7 @@ impl App {
             })),
             Message::ResolveAnchor(fragment, attempt) => self.resolve_anchor(fragment, attempt),
             Message::ImagesArrived => self.images_arrived(),
-            Message::Reveal(top, bottom) => self.reveal(top, bottom),
+            Message::Reveal(top, bottom) => self.reveal(top, bottom).chain(name_focused()),
             Message::Scroll(by) => self.key_scroll(by),
             Message::Scrolled(y) => {
                 self.viewport.scrolled(y);

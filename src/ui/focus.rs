@@ -246,7 +246,7 @@ struct FocusStop<'a, Message> {
 }
 
 /// A focused stop's name, handed to `FocusedName` through `Operation::custom`.
-struct Name(String);
+pub(super) struct Name(pub(super) String);
 
 /// The name of the focused stop, if it has one: shown in the status line, because an icon's
 /// tooltip shows only under the mouse (ADR-016).

@@ -7,7 +7,7 @@ use std::time::Instant;
 use iced::Task;
 use iced::widget::operation::{self, AbsoluteOffset, RelativeOffset};
 
-use super::{ANCHOR_ATTEMPTS, ANCHOR_RETRY, App, Message, PAGE_ID, SCROLL_ID};
+use super::{ANCHOR_ATTEMPTS, ANCHOR_RETRY, App, Message, PAGE_ID, SCROLL_ID, name_focused};
 use crate::model::Document as Doc;
 use crate::services::background;
 use crate::session::{Event, Shown};
@@ -104,7 +104,7 @@ impl App {
             let y = self.viewport.swap_view();
             return Task::batch([
                 operation::scroll_to(SCROLL_ID, AbsoluteOffset { x: None, y: Some(y) }),
-                operation::focus(PAGE_ID),
+                operation::focus(PAGE_ID).chain(name_focused()),
             ]);
         }
         if is_new {
@@ -112,7 +112,10 @@ impl App {
         }
         let to_top = if is_new {
             // A page you open is the page you read: the scroll keys work at once.
-            Task::batch([operation::snap_to(SCROLL_ID, RelativeOffset::START), operation::focus(PAGE_ID)])
+            Task::batch([
+                operation::snap_to(SCROLL_ID, RelativeOffset::START),
+                operation::focus(PAGE_ID).chain(name_focused()),
+            ])
         } else {
             Task::none()
         };
