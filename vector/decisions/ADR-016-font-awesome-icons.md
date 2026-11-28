@@ -1,7 +1,7 @@
 # ADR-016: Toolbar and panel icons come from Font Awesome Free, bundled as its font
 
 **Date:** 2026-11-27
-**Status:** proposed
+**Status:** accepted
 **Deciders:** gBRETT (product owner)
 
 ## Context
